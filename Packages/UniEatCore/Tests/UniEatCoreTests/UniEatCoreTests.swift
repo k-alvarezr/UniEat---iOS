@@ -60,4 +60,16 @@ final class UniEatCoreTests: XCTestCase {
             for: FeedFilters(availableMinutes: 20, area: "Centro"), at: now)
         XCTAssertTrue(result.isEmpty)
     }
+
+    func testRestaurantRevisionKeepsIdentityAndClosingExpiresPublication() {
+        let original = menu(validUntil: now.addingTimeInterval(3_600))
+        let revised = original.revised(title: "Nuevo almuerzo", establishmentName: "Café",
+                                       area: "Centro", address: "Calle 1", validUntil: now.addingTimeInterval(7_200),
+                                       items: original.items, at: now)
+        XCTAssertEqual(revised.id, original.id)
+        XCTAssertEqual(revised.version, original.version + 1)
+        XCTAssertTrue(revised.isActive(at: now.addingTimeInterval(1)))
+        let closed = revised.closed(at: now.addingTimeInterval(2))
+        XCTAssertFalse(closed.isActive(at: now.addingTimeInterval(2)))
+    }
 }

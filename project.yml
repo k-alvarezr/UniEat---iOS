@@ -29,3 +29,10 @@ targets:
         CODE_SIGN_STYLE: Automatic
     dependencies:
       - package: UniEatCore
+schemes:
+  UniEat:
+    build:
+      targets:
+        UniEat: all
+    run:
+      config: Debug

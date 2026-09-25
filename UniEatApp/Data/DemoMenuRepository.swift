@@ -20,7 +20,11 @@ final class DemoMenuRepository: MenuRepository {
 
     func saveMenu(_ menu: Menu) async throws {
         var menus = storedMenus()
-        menus.insert(menu, at: 0)
+        if let index = menus.firstIndex(where: { $0.id == menu.id }) {
+            menus[index] = menu
+        } else {
+            menus.insert(menu, at: 0)
+        }
         let data = try UniEatDates.encoder().encode(menus)
         UserDefaults.standard.set(data, forKey: storageKey)
     }

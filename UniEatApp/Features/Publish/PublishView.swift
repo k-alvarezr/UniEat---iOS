@@ -9,6 +9,17 @@ private struct DishDraft: Identifiable {
     var vegetarian = false
     var vegan = false
     var dietaryKnown = false
+
+    init() {}
+
+    init(dish: MenuDish) {
+        name = dish.name
+        detail = dish.description
+        priceText = String(dish.priceCop)
+        vegetarian = dish.dietaryTags.contains("vegetarian")
+        vegan = dish.dietaryTags.contains("vegan")
+        dietaryKnown = dish.dietaryKnown
+    }
 }
 
 struct PublishView: View {
@@ -21,6 +32,7 @@ struct PublishView: View {
     @State private var dishes = [DishDraft()]
     @State private var isSaving = false
     @State private var message: String?
+    @State private var editingMenu: Menu?
 
     private var valid: Bool {
         !restaurantName.trimmingCharacters(in: .whitespaces).isEmpty &&
@@ -35,7 +47,7 @@ struct PublishView: View {
             VStack(alignment: .leading, spacing: 15) {
                 BrandHeader(title: "UniEat · Publicar")
                 DemoNotice()
-                Text("Publicar menú del día")
+                Text(editingMenu == nil ? "Publicar menú del día" : "Editar menú del día")
                     .font(.system(size: 27, weight: .heavy, design: .rounded))
                 Text("Completa los campos estructurados para que estudiantes puedan comparar y filtrar tu oferta.")
                     .font(.subheadline).foregroundStyle(.secondary)
@@ -103,7 +115,8 @@ struct PublishView: View {
                         .padding(12)
                         .background(Palette.cyan, in: RoundedRectangle(cornerRadius: 12))
                 }
-                SolidButton(title: isSaving ? "Publicando…" : "Publicar menú ahora", icon: "arrow.right", color: Palette.coral) {
+                SolidButton(title: isSaving ? "Guardando…" : (editingMenu == nil ? "Publicar menú ahora" : "Guardar cambios"),
+                            icon: "arrow.right", color: Palette.coral) {
                     Task { await publish() }
                 }
                 .disabled(!valid || isSaving)
@@ -111,6 +124,29 @@ struct PublishView: View {
                     SurfaceCard {
                         Label("Aún no has publicado un menú del día.", systemImage: "storefront")
                             .font(.subheadline)
+                    }
+                } else {
+                    Text("Mis publicaciones")
+                        .font(.system(size: 21, weight: .heavy, design: .rounded))
+                    ForEach(store.ownMenus) { menu in
+                        SurfaceCard {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(menu.title).font(.headline)
+                                Text("Versión \(menu.version) · \(menu.isActive() ? "vigente" : "cerrada o vencida")")
+                                    .font(.caption).foregroundStyle(.secondary)
+                                HStack {
+                                    Button("Editar") { edit(menu) }
+                                        .buttonStyle(.bordered)
+                                    if menu.isActive() {
+                                        Button("Cerrar publicación", role: .destructive) {
+                                            Task { await close(menu) }
+                                        }
+                                        .buttonStyle(.bordered)
+                                    }
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
                 }
             }
@@ -126,6 +162,27 @@ struct PublishView: View {
         Text(title).font(.system(size: 17, weight: .heavy, design: .rounded))
     }
 
+    private func edit(_ menu: Menu) {
+        editingMenu = menu
+        restaurantName = menu.establishmentName
+        area = menu.area
+        address = menu.address
+        title = menu.title
+        validUntil = max(menu.validUntil, Date.now.addingTimeInterval(60 * 60))
+        dishes = menu.items.map(DishDraft.init(dish:))
+        message = "Editando versión \(menu.version). Guardar creará una versión nueva."
+    }
+
+    private func close(_ menu: Menu) async {
+        do {
+            try await store.close(menu)
+            if editingMenu?.id == menu.id { editingMenu = nil }
+            message = "Publicación cerrada en este dispositivo."
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+
     private func publish() async {
         guard valid else { return }
         isSaving = true
@@ -137,8 +194,10 @@ struct PublishView: View {
         }
         do {
             try await store.publish(title: title, restaurantName: restaurantName, area: area,
-                                    address: address, validUntil: validUntil, dishes: items)
+                                    address: address, validUntil: validUntil, dishes: items,
+                                    replacing: editingMenu)
             dishes = [DishDraft()]
+            editingMenu = nil
             message = "Menú guardado en este dispositivo (demo)."
         } catch {
             message = error.localizedDescription

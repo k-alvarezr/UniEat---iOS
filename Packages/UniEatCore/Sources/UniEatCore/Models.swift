@@ -83,6 +83,22 @@ public struct Menu: Codable, Hashable, Identifiable, Sendable {
         return newest <= date && date.timeIntervalSince(newest) <= 30 * 60
     }
     public var hasWaitEvidence: Bool { hasWaitEvidence(at: .now) }
+
+    public func revised(title: String, establishmentName: String, area: String, address: String,
+                        validUntil: Date, items: [MenuDish], at date: Date = .now) -> Menu {
+        Menu(id: id, title: title, version: version + 1, validUntil: validUntil,
+             publishedAt: date, establishmentId: establishmentId,
+             establishmentName: establishmentName, area: area, address: address,
+             entranceDescription: entranceDescription, latitude: latitude, longitude: longitude,
+             photoUrl: photoUrl, paymentMethods: paymentMethods, isVerified: isVerified,
+             items: items, lowestPriceCop: items.map(\.priceCop).min() ?? 0,
+             explanation: "Publicación actualizada")
+    }
+
+    public func closed(at date: Date = .now) -> Menu {
+        revised(title: title, establishmentName: establishmentName, area: area,
+                address: address, validUntil: date, items: items, at: date)
+    }
 }
 
 public struct FeedFilters: Codable, Hashable, Sendable {

@@ -26,7 +26,7 @@ En Windows se puede editar el código y analizar la sintaxis con Swift para Wind
 | Rol | Flujo | Pantallas |
 | --- | --- | --- |
 | Estudiante | Entrar, explorar menús vigentes, filtrar por presupuesto/tiempo/dieta/zona/pago, abrir detalle, reportar un cambio y usar «Elige por mí» | Inicio, filtros, detalle, reporte, recomendación, perfil |
-| Restaurante | Entrar, publicar menú estructurado con platos/precios/vigencia y consultar señales de interés | Inicio, publicar, rendimiento, perfil |
+| Restaurante | Entrar, publicar, editar o cerrar un menú estructurado con platos/precios/vigencia y consultar señales de interés | Inicio, publicar, rendimiento, perfil |
 
 La pantalla **Sin menú del día** se abre como ejemplo desde Inicio. Las publicaciones de prueba, reportes y eventos se guardan localmente. El perfil ofrece un interruptor para simular falta de conexión. El feed indica la fecha de carga y excluye menús vencidos también en ese modo. Los ejemplos de restaurantes, platos y métricas son datos de demostración, no información real de comercios.
 

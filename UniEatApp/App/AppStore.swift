@@ -169,14 +169,27 @@ final class AppStore: ObservableObject {
     }
 
     func publish(title: String, restaurantName: String, area: String, address: String,
-                 validUntil: Date, dishes: [MenuDish]) async throws {
+                 validUntil: Date, dishes: [MenuDish], replacing old: Menu? = nil) async throws {
         guard let owner = profile, owner.role == "restaurant" else { return }
-        let menu = Menu(title: title, validUntil: validUntil, establishmentId: owner.id,
+        guard old == nil || old?.establishmentId == owner.id else { return }
+        let menu: Menu
+        if let old {
+            menu = old.revised(title: title, establishmentName: restaurantName, area: area,
+                               address: address, validUntil: validUntil, items: dishes)
+        } else {
+            menu = Menu(title: title, validUntil: validUntil, establishmentId: owner.id,
                         establishmentName: restaurantName, area: area, address: address,
                         paymentMethods: ["Nequi", "Efectivo"], items: dishes,
-                        lowestPriceCop: dishes.map(\.priceCop).min() ?? 0,
-                        explanation: "Publicado por este restaurante")
+                        lowestPriceCop: dishes.map(\.priceCop).min() ?? 0)
+        }
         try await repository.saveMenu(menu)
+        await refresh()
+    }
+
+    func close(_ menu: Menu) async throws {
+        guard let owner = profile, owner.role == "restaurant",
+              menu.establishmentId == owner.id else { return }
+        try await repository.saveMenu(menu.closed())
         await refresh()
     }
 
