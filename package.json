@@ -1,0 +1,20 @@
+{
+  "name": "unieat---ios",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Development tools for the UniEat iOS app",
+  "scripts": {
+    "backend:version": "supabase --version",
+    "backend:start": "supabase start",
+    "backend:stop": "supabase stop",
+    "backend:status": "supabase status",
+    "backend:reset": "supabase db reset"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/k-alvarezr/UniEat---iOS.git"
+  },
+  "devDependencies": {
+    "supabase": "2.117.0"
+  }
+}

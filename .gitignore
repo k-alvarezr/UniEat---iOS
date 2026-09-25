@@ -1,0 +1,18 @@
+# Node and Supabase tooling
+node_modules/
+.env
+.env.*
+!.env.example
+
+# Swift Package Manager and Xcode
+.build/
+.swiftpm/
+.local-swift-sdk/
+.local-windows-includes/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
