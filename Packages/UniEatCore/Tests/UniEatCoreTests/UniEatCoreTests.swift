@@ -48,6 +48,8 @@ final class UniEatCoreTests: XCTestCase {
         let filters = FeedFilters(budgetCop: 15_000, diet: "vegetarian")
         let result = ContextualRankingStrategy().ranked([mismatch, match], for: filters, at: now)
         XCTAssertEqual(result.map(\.id), [match.id])
+        XCTAssertTrue(ContextualRankingStrategy().explanation(for: match, filters: filters, at: now)
+            .contains("Vegetariano por $12000 COP"))
     }
 
     func testKnownLongWaitExceedsTimeBudget() {

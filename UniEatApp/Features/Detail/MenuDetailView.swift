@@ -136,7 +136,7 @@ struct InsufficientEvidenceView: View {
         VStack(alignment: .leading, spacing: 7) {
             Label("Información insuficiente", systemImage: "hourglass")
                 .font(.system(size: 17, weight: .heavy, design: .rounded))
-            Text("Hay \(count) reporte(s) reciente(s). Se necesitan al menos tres para mostrar una estimación.")
+            Text("Hay \(count) reporte(s) registrados. Se necesitan al menos tres y uno de los últimos 30 minutos para mostrar una estimación.")
                 .font(.subheadline)
             Text("Puedes informar el tiempo de fila después de visitar el local.")
                 .font(.caption).foregroundStyle(.secondary)

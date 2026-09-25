@@ -45,7 +45,7 @@ struct RecommendationView: View {
                         .padding(.vertical, 20)
                     }
                     .background(Palette.cyan, in: RoundedRectangle(cornerRadius: 16))
-                    MenuCard(menu: menu, pendingReports: store.pendingReports(for: menu),
+                    MenuCard(menu: menu, explanation: store.explanation(for: menu), pendingReports: store.pendingReports(for: menu),
                              assessment: PublicationAssessment(menu: menu))
                     SolidButton(title: "Elegir otra opción", icon: "arrow.clockwise", color: Palette.yellow) {
                         index += 1

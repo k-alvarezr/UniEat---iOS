@@ -52,7 +52,7 @@ struct TodayFeedView: View {
                         } else {
                             ForEach(store.rankedMenus) { menu in
                                 NavigationLink(destination: MenuDetailView(menu: menu)) {
-                                    MenuCard(menu: menu, pendingReports: store.pendingReports(for: menu),
+                                    MenuCard(menu: menu, explanation: store.explanation(for: menu), pendingReports: store.pendingReports(for: menu),
                                              assessment: PublicationAssessment(menu: menu, at: timeline.date))
                                 }
                                 .buttonStyle(.plain)
@@ -77,6 +77,7 @@ struct TodayFeedView: View {
 
 struct MenuCard: View {
     let menu: Menu
+    let explanation: String
     let pendingReports: Int
     let assessment: PublicationAssessment
 
@@ -108,7 +109,7 @@ struct MenuCard: View {
                     Label("Menú por vencer", systemImage: "hourglass")
                         .font(.caption).foregroundStyle(Palette.coral)
                 }
-                Text(menu.explanation)
+                Text(explanation)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

@@ -86,6 +86,9 @@ final class AppStore: ObservableObject {
     var isRestaurant: Bool { profile?.role == "restaurant" }
     var rankedMenus: [Menu] { ranking.ranked(menus, for: filters, at: .now) }
     var topRecommendation: Menu? { rankedMenus.first }
+    func explanation(for menu: Menu) -> String {
+        ranking.explanation(for: menu, filters: filters, at: .now)
+    }
     var ownMenus: [Menu] {
         guard let id = profile?.id else { return [] }
         return menus.filter { $0.establishmentId == id }
