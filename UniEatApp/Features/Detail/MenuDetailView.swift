@@ -43,7 +43,7 @@ struct MenuDetailView: View {
                             Text("Estimación basada en \(menu.waitSampleCount) reportes recientes. No es un tiempo garantizado.")
                                 .font(.caption).foregroundStyle(.secondary)
                             if let updated = menu.waitNewestReportAt {
-                                Text("Último reporte: \(updated.formatted(date: .omitted, time: .shortened))")
+                                Text("Último reporte: \(SpanishPresentation.time(updated))")
                                     .font(.caption)
                             }
                         } else {
@@ -71,7 +71,7 @@ struct MenuDetailView: View {
                                     if !dish.description.isEmpty {
                                         Text(dish.description).font(.caption).foregroundStyle(.secondary)
                                     }
-                                    Text(dish.dietaryKnown ? (dish.dietaryTags.isEmpty ? "Dieta declarada" : dish.dietaryTags.joined(separator: ", ")) : "Dieta sin confirmar")
+                                    Text(dish.dietaryKnown ? (dish.dietaryTags.isEmpty ? "Dieta declarada" : SpanishPresentation.dietaryTags(dish.dietaryTags)) : "Dieta sin confirmar")
                                         .font(.caption)
                                 }
                                 Spacer()
@@ -108,7 +108,7 @@ struct MenuDetailView: View {
                     VStack(alignment: .leading, spacing: 7) {
                         Text("Medios de pago").font(.headline)
                         Text(menu.paymentMethods.isEmpty ? "Sin información declarada" : menu.paymentMethods.joined(separator: " · "))
-                        Text("Válido hasta \(menu.validUntil.formatted(date: .abbreviated, time: .shortened))")
+                        Text("Válido hasta \(SpanishPresentation.dateAndTime(menu.validUntil))")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -118,7 +118,7 @@ struct MenuDetailView: View {
                         store.track("selection", menu: menu)
                     }
                 } else {
-                    Text("Esta publicación venció. Vuelve al feed para ver opciones vigentes.")
+                    Text("Esta publicación venció. Vuelve a la lista de menús para ver opciones vigentes.")
                         .font(.subheadline.weight(.bold))
                         .padding(12)
                         .background(Palette.coral.opacity(0.3), in: RoundedRectangle(cornerRadius: 12))

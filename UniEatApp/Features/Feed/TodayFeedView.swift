@@ -18,7 +18,7 @@ struct TodayFeedContent: View {
                         BrandHeader(title: "UniEat · Hoy")
                         DemoNotice()
                         HStack(spacing: 8) {
-                            Sticker(text: Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide)),
+                            Sticker(text: SpanishPresentation.dayAndMonth(timeline.date),
                                     color: Palette.yellow, icon: "calendar")
                             Spacer()
                             if let budget = store.filters.budgetCop {
@@ -163,7 +163,7 @@ struct OfflineNotice: View {
             Image(systemName: "wifi.slash").font(.title3)
             VStack(alignment: .leading, spacing: 3) {
                 Text("Sin conexión · vista guardada").fontWeight(.heavy)
-                Text("Última carga: \(cachedAt.formatted(date: .abbreviated, time: .shortened)). Los menús vencidos se ocultan.")
+                Text("Última carga: \(SpanishPresentation.dateAndTime(cachedAt)). Los menús vencidos se ocultan.")
                     .font(.caption)
             }
         }

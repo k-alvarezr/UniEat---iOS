@@ -27,7 +27,7 @@ struct InsufficientQueueEvidenceView: View {
                         Text("\(menu.waitSampleCount) reporte(s) elegible(s)")
                             .font(.subheadline)
                         if let newest = menu.waitNewestReportAt {
-                            Text("Último reporte: \(newest.formatted(date: .abbreviated, time: .shortened))")
+                            Text("Último reporte: \(SpanishPresentation.dateAndTime(newest))")
                                 .font(.caption)
                         }
                         Text("Mostramos un tiempo aproximado solo cuando hay al menos tres reportes recientes. No inventamos una estimación cuando faltan datos.")

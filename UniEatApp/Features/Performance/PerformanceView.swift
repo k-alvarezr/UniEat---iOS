@@ -40,7 +40,7 @@ struct PerformanceView: View {
                             Image(systemName: "chart.bar.xaxis").font(.largeTitle)
                             Text("Publica tu primer menú para ver actividad")
                                 .font(.headline)
-                            Text("Las métricas aparecerán cuando alguien interactúe con tu publicación en esta demo.")
+                            Text("Las métricas aparecerán cuando alguien interactúe con tu publicación en esta demostración.")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: .infinity)

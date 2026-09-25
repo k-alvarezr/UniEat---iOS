@@ -37,7 +37,7 @@ struct ProfileView: View {
                             Text(store.profile?.displayName ?? "")
                                 .font(.system(size: 23, weight: .heavy, design: .rounded))
                             Sticker(text: store.isRestaurant ? "Restaurante" : "Estudiante", color: Palette.green)
-                            Text("Las preferencias de presupuesto, dieta, tiempo y zona se conservan al volver al feed.")
+                            Text("Las preferencias de presupuesto, dieta, tiempo y zona se conservan al volver a la lista de menús.")
                                 .font(.subheadline).foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)

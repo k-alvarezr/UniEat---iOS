@@ -8,6 +8,7 @@ struct UniEatApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(store)
+                .environment(\.locale, SpanishPresentation.locale)
                 .preferredColorScheme(.light)
         }
     }

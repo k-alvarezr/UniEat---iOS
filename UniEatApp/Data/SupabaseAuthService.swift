@@ -84,9 +84,22 @@ final class SupabaseAuthService {
         guard let http = response as? HTTPURLResponse else { throw AuthFailure.invalidResponse }
         guard (200..<300).contains(http.statusCode) else {
             let details = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
-            let message = (details?["msg"] as? String) ??
-                          (details?["error_description"] as? String) ??
-                          "No se pudo completar la autenticación."
+            let code = (details?["error_code"] as? String) ?? (details?["code"] as? String) ?? ""
+            let message: String
+            switch code {
+            case "invalid_credentials":
+                message = "Correo o contraseña incorrectos."
+            case "email_not_confirmed":
+                message = "Confirma tu correo antes de iniciar sesión."
+            case "user_already_exists", "email_exists":
+                message = "Ya existe una cuenta con este correo."
+            case "weak_password":
+                message = "La contraseña no cumple los requisitos de seguridad."
+            default:
+                message = http.statusCode == 429
+                    ? "Demasiados intentos. Espera un momento y vuelve a probar."
+                    : "No se pudo completar la autenticación. Revisa tus datos e inténtalo de nuevo."
+            }
             throw AuthFailure.service(message)
         }
         return data

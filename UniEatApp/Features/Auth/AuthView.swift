@@ -65,7 +65,7 @@ struct AuthView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 9) {
-                    Text("Probar sin backend")
+                    Text("Probar sin servidor")
                         .font(.system(size: 17, weight: .heavy, design: .rounded))
                     HStack(spacing: 10) {
                         Button("Soy estudiante") { store.enterDemo(role: "student") }
@@ -73,7 +73,7 @@ struct AuthView: View {
                         Button("Soy restaurante") { store.enterDemo(role: "restaurant") }
                             .buttonStyle(DemoChoiceStyle(color: Palette.green))
                     }
-                    Text("El modo demo usa datos locales y no crea una cuenta real.")
+                    Text("El modo de demostración usa datos locales y no crea una cuenta real.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 20)
@@ -94,7 +94,8 @@ struct AuthView: View {
                 try await store.signIn(email: email, password: password)
             }
         } catch {
-            errorText = error.localizedDescription
+            errorText = (error as? AuthFailure)?.localizedDescription ??
+                "No se pudo conectar con el servicio. Inténtalo de nuevo."
         }
     }
 }

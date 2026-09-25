@@ -14,7 +14,7 @@ struct OfflineFeedView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Label("Sin conexión", systemImage: "wifi.slash")
                             .font(.system(size: 25, weight: .heavy, design: .rounded))
-                        Text("Mostrando datos guardados a las \(store.cachedAt.formatted(date: .abbreviated, time: .shortened)).")
+                        Text("Mostrando datos guardados el \(SpanishPresentation.dateAndTime(store.cachedAt)).")
                             .font(.subheadline.weight(.semibold))
                         Text("Los menús vencidos se ocultan aunque sigan en la copia local.")
                             .font(.subheadline)

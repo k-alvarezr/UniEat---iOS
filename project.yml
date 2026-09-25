@@ -1,6 +1,7 @@
 name: UniEat
 options:
   bundleIdPrefix: co.edu.uniandes
+  developmentLanguage: es
   deploymentTarget:
     iOS: "17.0"
 packages:
@@ -16,6 +17,8 @@ targets:
       path: UniEatApp/Info.plist
       properties:
         CFBundleDisplayName: UniEat
+        CFBundleLocalizations:
+          - es
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
@@ -36,3 +39,5 @@ schemes:
         UniEat: all
     run:
       config: Debug
+      language: es
+      region: CO

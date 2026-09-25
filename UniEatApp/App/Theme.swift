@@ -13,6 +13,7 @@ enum Palette {
 extension Int {
     var cop: String {
         let number = NumberFormatter()
+        number.locale = SpanishPresentation.locale
         number.numberStyle = .decimal
         number.groupingSeparator = "."
         number.maximumFractionDigits = 0

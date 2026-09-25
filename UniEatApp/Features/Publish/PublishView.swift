@@ -51,7 +51,7 @@ struct PublishView: View {
                 BrandHeader(title: "UniEat · Publicar")
                 DemoNotice()
                 if !store.isRestaurant {
-                    Text("Vista de restaurante. Entra a la demo como restaurante para guardar una publicación.")
+                    Text("Vista de restaurante. Entra a la demostración como restaurante para guardar una publicación.")
                         .font(.subheadline.weight(.semibold))
                         .padding(12)
                         .background(Palette.cyan.opacity(0.35), in: RoundedRectangle(cornerRadius: 12))
@@ -205,7 +205,7 @@ struct PublishView: View {
             if editingMenu?.id == menu.id { editingMenu = nil }
             message = "Publicación cerrada en este dispositivo."
         } catch {
-            message = error.localizedDescription
+            message = "No se pudo cerrar la publicación. Inténtalo de nuevo."
         }
     }
 
@@ -226,9 +226,9 @@ struct PublishView: View {
                                     replacing: editingMenu)
             dishes = [DishDraft()]
             editingMenu = nil
-            message = "Menú guardado en este dispositivo (demo)."
+            message = "Menú guardado en este dispositivo (demostración)."
         } catch {
-            message = error.localizedDescription
+            message = "No se pudo guardar el menú. Revisa los datos e inténtalo de nuevo."
         }
     }
 }

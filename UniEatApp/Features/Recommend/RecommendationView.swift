@@ -20,7 +20,7 @@ struct RecommendationView: View {
                         Text("FILTROS APLICADOS")
                             .font(.system(size: 11, weight: .heavy, design: .rounded))
                         Text("Presupuesto: \((store.filters.budgetCop ?? 20_000).cop) · Tiempo: \(store.filters.availableMinutes ?? 40) min")
-                        Text("Zona: \(store.filters.area ?? "Todas") · Dieta: \(store.filters.diet ?? "Todas")")
+                        Text("Zona: \(store.filters.area ?? "Todas") · Dieta: \(SpanishPresentation.diet(store.filters.diet))")
                         Text("\(store.rankedMenus.count) opciones compatibles")
                             .font(.caption.weight(.bold))
                             .padding(7)
