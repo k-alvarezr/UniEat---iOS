@@ -6,7 +6,7 @@ Aplicación iOS de UniEat. Este repositorio contiene la app, el backend y la doc
 
 - Git, Node.js, VS Code y la extensión oficial de Swift.
 - Swift para Windows permite compilar y probar paquetes Swift independientes de iOS.
-- Desde PowerShell, `./scripts/swift-core-windows.ps1 build` compila `UniEatCore`. El script carga las herramientas C++ de Visual Studio y configura las rutas locales del SDK automáticamente.
+- Desde PowerShell, `./scripts/swift-core-windows.ps1` compila `UniEatCore`. En VS Code se puede ejecutar con **Ctrl+Shift+B**. El script carga las herramientas C++ de Visual Studio y configura las rutas locales del SDK automáticamente.
 - `npm ci` instala la versión fijada de Supabase CLI. `npx supabase --version` comprueba la instalación.
 - `npx supabase start` requiere Docker Desktop en ejecución. La configuración local está en `supabase/config.toml`.
 

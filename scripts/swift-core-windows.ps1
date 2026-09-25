@@ -1,8 +1,3 @@
-param(
-    [ValidateSet('build', 'test')]
-    [string] $Action = 'build'
-)
-
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $package = Join-Path $repo 'Packages\UniEatCore'
@@ -50,7 +45,7 @@ foreach ($name in $includes.Keys) {
 $env:SDKROOT = $sdkLink
 $env:Path = [Environment]::GetEnvironmentVariable('Path', 'User') + ';' + $env:Path
 $flags = foreach ($name in $includes.Keys) { '-Xcc -I"' + (Join-Path $includeLinks $name) + '"' }
-$command = 'call "' + $vcCmd + '" -arch=x64 -host_arch=x64 >nul && "' + $swift + '" ' + $Action + ' -j 1 ' + ($flags -join ' ')
+$command = 'call "' + $vcCmd + '" -arch=x64 -host_arch=x64 >nul && "' + $swift + '" build -j 1 ' + ($flags -join ' ')
 Push-Location $package
 try {
     & cmd.exe /d /c $command
