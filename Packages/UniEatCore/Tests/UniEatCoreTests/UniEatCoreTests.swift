@@ -64,10 +64,12 @@ final class UniEatCoreTests: XCTestCase {
     func testRestaurantRevisionKeepsIdentityAndClosingExpiresPublication() {
         let original = menu(validUntil: now.addingTimeInterval(3_600))
         let revised = original.revised(title: "Nuevo almuerzo", establishmentName: "Café",
-                                       area: "Centro", address: "Calle 1", validUntil: now.addingTimeInterval(7_200),
-                                       items: original.items, at: now)
+                                       area: "Centro", address: "Calle 1", entranceDescription: "Local 2",
+                                       validUntil: now.addingTimeInterval(7_200),
+                                       items: original.items, paymentMethods: ["Nequi"], at: now)
         XCTAssertEqual(revised.id, original.id)
         XCTAssertEqual(revised.version, original.version + 1)
+        XCTAssertEqual(revised.paymentMethods, ["Nequi"])
         XCTAssertTrue(revised.isActive(at: now.addingTimeInterval(1)))
         let closed = revised.closed(at: now.addingTimeInterval(2))
         XCTAssertFalse(closed.isActive(at: now.addingTimeInterval(2)))

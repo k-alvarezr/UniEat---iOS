@@ -169,17 +169,22 @@ final class AppStore: ObservableObject {
     }
 
     func publish(title: String, restaurantName: String, area: String, address: String,
-                 validUntil: Date, dishes: [MenuDish], replacing old: DailyMenu? = nil) async throws {
+                 entranceDescription: String,
+                 validUntil: Date, dishes: [MenuDish], paymentMethods: [String],
+                 replacing old: DailyMenu? = nil) async throws {
         guard let owner = profile, owner.role == "restaurant" else { return }
         guard old == nil || old?.establishmentId == owner.id else { return }
         let menu: DailyMenu
         if let old {
             menu = old.revised(title: title, establishmentName: restaurantName, area: area,
-                               address: address, validUntil: validUntil, items: dishes)
+                               address: address, entranceDescription: entranceDescription,
+                               validUntil: validUntil, items: dishes,
+                               paymentMethods: paymentMethods)
         } else {
             menu = DailyMenu(title: title, validUntil: validUntil, establishmentId: owner.id,
                         establishmentName: restaurantName, area: area, address: address,
-                        paymentMethods: ["Nequi", "Efectivo"], items: dishes,
+                        entranceDescription: entranceDescription,
+                        paymentMethods: paymentMethods, items: dishes,
                         lowestPriceCop: dishes.map(\.priceCop).min() ?? 0)
         }
         try await repository.saveMenu(menu)

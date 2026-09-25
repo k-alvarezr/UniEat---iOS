@@ -85,7 +85,9 @@ public struct DailyMenu: Codable, Hashable, Identifiable, Sendable {
     public var hasWaitEvidence: Bool { hasWaitEvidence(at: .now) }
 
     public func revised(title: String, establishmentName: String, area: String, address: String,
-                        validUntil: Date, items: [MenuDish], at date: Date = .now) -> DailyMenu {
+                        entranceDescription: String,
+                        validUntil: Date, items: [MenuDish], paymentMethods: [String],
+                        at date: Date = .now) -> DailyMenu {
         DailyMenu(id: id, title: title, version: version + 1, validUntil: validUntil,
              publishedAt: date, establishmentId: establishmentId,
              establishmentName: establishmentName, area: area, address: address,
@@ -97,7 +99,9 @@ public struct DailyMenu: Codable, Hashable, Identifiable, Sendable {
 
     public func closed(at date: Date = .now) -> DailyMenu {
         revised(title: title, establishmentName: establishmentName, area: area,
-                address: address, validUntil: date, items: items, at: date)
+                address: address, entranceDescription: entranceDescription,
+                validUntil: date, items: items,
+                paymentMethods: paymentMethods, at: date)
     }
 }
 

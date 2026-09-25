@@ -27,12 +27,15 @@ struct PublishView: View {
     @State private var restaurantName = ""
     @State private var area = "Centro"
     @State private var address = ""
+    @State private var entranceDescription = ""
     @State private var title = "Almuerzo completo"
     @State private var validUntil = Date.now.addingTimeInterval(4 * 60 * 60)
     @State private var dishes = [DishDraft()]
     @State private var isSaving = false
     @State private var message: String?
     @State private var editingMenu: DailyMenu?
+    @State private var paymentMethods: Set<String> = ["Nequi", "Efectivo"]
+    private let paymentChoices = ["Nequi", "Daviplata", "Efectivo", "Tarjeta"]
 
     private var valid: Bool {
         !restaurantName.trimmingCharacters(in: .whitespaces).isEmpty &&
@@ -63,6 +66,19 @@ struct PublishView: View {
                         }
                         TextField("Dirección o referencia de entrada", text: $address)
                             .textFieldStyle(.roundedBorder)
+                        TextField("Cómo encontrar la entrada (opcional)", text: $entranceDescription)
+                            .textFieldStyle(.roundedBorder)
+                        Text("Medios de pago aceptados")
+                            .font(.subheadline.weight(.bold))
+                        ForEach(paymentChoices, id: \.self) { method in
+                            Toggle(method, isOn: Binding(
+                                get: { paymentMethods.contains(method) },
+                                set: { selected in
+                                    if selected { paymentMethods.insert(method) }
+                                    else { paymentMethods.remove(method) }
+                                }
+                            ))
+                        }
                     }
                 }
                 SurfaceCard {
@@ -167,9 +183,11 @@ struct PublishView: View {
         restaurantName = menu.establishmentName
         area = menu.area
         address = menu.address
+        entranceDescription = menu.entranceDescription
         title = menu.title
         validUntil = max(menu.validUntil, Date.now.addingTimeInterval(60 * 60))
         dishes = menu.items.map(DishDraft.init(dish:))
+        paymentMethods = Set(menu.paymentMethods)
         message = "Editando versión \(menu.version). Guardar creará una versión nueva."
     }
 
@@ -194,7 +212,9 @@ struct PublishView: View {
         }
         do {
             try await store.publish(title: title, restaurantName: restaurantName, area: area,
-                                    address: address, validUntil: validUntil, dishes: items,
+                                    address: address, entranceDescription: entranceDescription,
+                                    validUntil: validUntil, dishes: items,
+                                    paymentMethods: paymentChoices.filter { paymentMethods.contains($0) },
                                     replacing: editingMenu)
             dishes = [DishDraft()]
             editingMenu = nil
