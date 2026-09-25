@@ -3,22 +3,22 @@ import UniEatCore
 
 @MainActor
 protocol MenuRepository {
-    func loadMenus() async throws -> [Menu]
-    func saveMenu(_ menu: Menu) async throws
+    func loadMenus() async throws -> [DailyMenu]
+    func saveMenu(_ menu: DailyMenu) async throws
 }
 
 @MainActor
 final class DemoMenuRepository: MenuRepository {
     private let storageKey = "unieat.demo.published-menus.v2"
 
-    func loadMenus() async throws -> [Menu] {
+    func loadMenus() async throws -> [DailyMenu] {
         let localMenus = storedMenus()
         // Sample publications are regenerated for each demo launch so an old
         // installation still opens with current examples; user publications persist.
         return localMenus + SampleMenus.all
     }
 
-    func saveMenu(_ menu: Menu) async throws {
+    func saveMenu(_ menu: DailyMenu) async throws {
         var menus = storedMenus()
         if let index = menus.firstIndex(where: { $0.id == menu.id }) {
             menus[index] = menu
@@ -29,9 +29,9 @@ final class DemoMenuRepository: MenuRepository {
         UserDefaults.standard.set(data, forKey: storageKey)
     }
 
-    private func storedMenus() -> [Menu] {
+    private func storedMenus() -> [DailyMenu] {
         guard let data = UserDefaults.standard.data(forKey: storageKey),
-              let menus = try? UniEatDates.decoder().decode([Menu].self, from: data) else { return [] }
+              let menus = try? UniEatDates.decoder().decode([DailyMenu].self, from: data) else { return [] }
         return menus
     }
 }
@@ -41,11 +41,11 @@ enum SampleMenus {
     private static let secondID = UUID(uuidString: "10000000-0000-4000-8000-000000000002")!
     private static let thirdID = UUID(uuidString: "10000000-0000-4000-8000-000000000003")!
 
-    static var all: [Menu] {
+    static var all: [DailyMenu] {
         let until = Date.now.addingTimeInterval(5 * 60 * 60)
         let earlier = Date.now.addingTimeInterval(-35 * 60)
         return [
-            Menu(id: firstID, title: "Almuerzo completo", validUntil: until, publishedAt: earlier,
+            DailyMenu(id: firstID, title: "Almuerzo completo", validUntil: until, publishedAt: earlier,
                  establishmentName: "Ajíaco y Fríjoles", area: "Centro", address: "Calle 19 #1-21",
                  entranceDescription: "Entrada junto a la plazoleta", latitude: 4.6028, longitude: -74.0652,
                  paymentMethods: ["Nequi", "Efectivo"], isVerified: false,
@@ -55,7 +55,7 @@ enum SampleMenus {
                  lowestPriceCop: 14_500, waitMinutes: 8, waitSampleCount: 4,
                  waitNewestReportAt: Date.now.addingTimeInterval(-8 * 60), relevanceScore: 30,
                  explanation: "Cerca del área elegida y dentro del presupuesto"),
-            Menu(id: secondID, title: "Bowl completo", validUntil: until, publishedAt: earlier.addingTimeInterval(-600),
+            DailyMenu(id: secondID, title: "Bowl completo", validUntil: until, publishedAt: earlier.addingTimeInterval(-600),
                  establishmentName: "Bowls Centro Cívico", area: "Centro", address: "Carrera 1 #18A-70",
                  entranceDescription: "Local junto a la esquina del bloque B", latitude: 4.6036, longitude: -74.0640,
                  paymentMethods: ["Nequi", "Tarjeta"], isVerified: false,
@@ -64,7 +64,7 @@ enum SampleMenus {
                          MenuDish(name: "Bowl de pollo teriyaki", priceCop: 14_000, dietaryKnown: true)],
                  lowestPriceCop: 12_000, waitMinutes: nil, waitSampleCount: 1,
                  relevanceScore: 20, explanation: "Opción vegetariana con precio declarado"),
-            Menu(id: thirdID, title: "Almuerzo casero", validUntil: until, publishedAt: earlier.addingTimeInterval(-1200),
+            DailyMenu(id: thirdID, title: "Almuerzo casero", validUntil: until, publishedAt: earlier.addingTimeInterval(-1200),
                  establishmentName: "Doña Elvira", area: "Norte", address: "Calle 21 #2-15",
                  entranceDescription: "Fachada amarilla", latitude: 4.6054, longitude: -74.0628,
                  paymentMethods: ["Efectivo", "Daviplata"], isVerified: false,

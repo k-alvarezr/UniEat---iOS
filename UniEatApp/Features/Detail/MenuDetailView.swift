@@ -5,7 +5,7 @@ import UniEatCore
 struct MenuDetailView: View {
     @EnvironmentObject private var store: AppStore
     @State private var showingReport = false
-    let menu: Menu
+    let menu: DailyMenu
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { timeline in

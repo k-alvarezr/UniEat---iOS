@@ -32,7 +32,7 @@ struct PublishView: View {
     @State private var dishes = [DishDraft()]
     @State private var isSaving = false
     @State private var message: String?
-    @State private var editingMenu: Menu?
+    @State private var editingMenu: DailyMenu?
 
     private var valid: Bool {
         !restaurantName.trimmingCharacters(in: .whitespaces).isEmpty &&
@@ -162,7 +162,7 @@ struct PublishView: View {
         Text(title).font(.system(size: 17, weight: .heavy, design: .rounded))
     }
 
-    private func edit(_ menu: Menu) {
+    private func edit(_ menu: DailyMenu) {
         editingMenu = menu
         restaurantName = menu.establishmentName
         area = menu.area
@@ -173,7 +173,7 @@ struct PublishView: View {
         message = "Editando versión \(menu.version). Guardar creará una versión nueva."
     }
 
-    private func close(_ menu: Menu) async {
+    private func close(_ menu: DailyMenu) async {
         do {
             try await store.close(menu)
             if editingMenu?.id == menu.id { editingMenu = nil }

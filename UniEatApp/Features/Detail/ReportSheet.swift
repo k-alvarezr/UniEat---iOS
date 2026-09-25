@@ -4,7 +4,7 @@ import UniEatCore
 struct ReportSheet: View {
     @EnvironmentObject private var store: AppStore
     @Environment(\.dismiss) private var dismiss
-    let menu: Menu
+    let menu: DailyMenu
     @State private var kind: ReportKind = .unavailable
     @State private var note = ""
     @State private var waitMinutes = 20

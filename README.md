@@ -43,9 +43,10 @@ flowchart LR
 ```
 
 - **MVVM:** las vistas observan `AppStore`; el estado y las acciones no dependen de la vista concreta.
+- **Observer:** `ObservableObject` y `@Published` actualizan el feed, los reportes y el rendimiento al cambiar el estado.
 - **Repository:** `MenuRepository` abstrae la lectura y publicación de menús. La implementación actual usa `UserDefaults` para una demo autónoma.
 - **Strategy:** `ContextualRankingStrategy` evalúa vigencia, presupuesto y dieta en un mismo plato, medio de pago y tiempo estimado cuando existe evidencia suficiente.
-- **DTO/modelos:** `Menu`, `MenuDish`, `FeedFilters`, `Profile` y `PerformanceSummary` son tipos `Codable` del paquete `UniEatCore`.
+- **DTO/modelos:** `DailyMenu`, `MenuDish`, `FeedFilters`, `Profile` y `PerformanceSummary` son tipos `Codable` del paquete `UniEatCore`.
 - **Adapter:** `SupabaseAuthService` encapsula el intercambio HTTP y el Keychain para autenticación opcional. Las decisiones online definitivas y la autorización del rol de restaurante deberán venir del servicio compartido.
 
 ### Decisiones de negocio del Sprint 2

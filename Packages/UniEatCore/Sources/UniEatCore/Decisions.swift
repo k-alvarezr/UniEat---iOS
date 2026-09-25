@@ -10,7 +10,7 @@ public struct PublicationAssessment: Equatable, Sendable {
     public let state: PublicationState
     public let pendingReports: Int
 
-    public init(menu: Menu, at date: Date = .now) {
+    public init(menu: DailyMenu, at date: Date = .now) {
         if !menu.isActive(at: date) {
             state = .expired
         } else if menu.validUntil.timeIntervalSince(date) <= 30 * 60 {
@@ -23,8 +23,8 @@ public struct PublicationAssessment: Equatable, Sendable {
 }
 
 public protocol FeedRankingStrategy {
-    func ranked(_ menus: [Menu], for filters: FeedFilters, at date: Date) -> [Menu]
-    func explanation(for menu: Menu, filters: FeedFilters, at date: Date) -> String
+    func ranked(_ menus: [DailyMenu], for filters: FeedFilters, at date: Date) -> [DailyMenu]
+    func explanation(for menu: DailyMenu, filters: FeedFilters, at date: Date) -> String
 }
 
 /// Local strategy for the offline/demo feed. The shared backend will make the
@@ -32,7 +32,7 @@ public protocol FeedRankingStrategy {
 public struct ContextualRankingStrategy: FeedRankingStrategy {
     public init() {}
 
-    public func ranked(_ menus: [Menu], for filters: FeedFilters, at date: Date = .now) -> [Menu] {
+    public func ranked(_ menus: [DailyMenu], for filters: FeedFilters, at date: Date = .now) -> [DailyMenu] {
         menus.filter { menu in
             guard menu.isActive(at: date) else { return false }
             if let payment = filters.paymentMethod, !menu.paymentMethods.contains(payment) { return false }
@@ -56,7 +56,7 @@ public struct ContextualRankingStrategy: FeedRankingStrategy {
         }
     }
 
-    public func explanation(for menu: Menu, filters: FeedFilters, at date: Date = .now) -> String {
+    public func explanation(for menu: DailyMenu, filters: FeedFilters, at date: Date = .now) -> String {
         var reasons: [String] = []
         if let budget = filters.budgetCop,
            let dish = menu.items.filter({ item in
@@ -81,7 +81,7 @@ public struct ContextualRankingStrategy: FeedRankingStrategy {
         return reasons.isEmpty ? "Publicación vigente con información declarada" : reasons.joined(separator: " · ")
     }
 
-    private func score(_ menu: Menu, filters: FeedFilters, at date: Date) -> Int {
+    private func score(_ menu: DailyMenu, filters: FeedFilters, at date: Date) -> Int {
         var value = menu.relevanceScore
         if let area = filters.area, area == menu.area { value += 30 }
         if let budget = filters.budgetCop, menu.lowestPriceCop <= budget { value += 10 }

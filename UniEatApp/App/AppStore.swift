@@ -26,7 +26,7 @@ struct SubmittedReport: Codable, Identifiable {
     let waitMinutes: Int?
     let date: Date
 
-    init(menu: Menu, kind: ReportKind, note: String, waitMinutes: Int?) {
+    init(menu: DailyMenu, kind: ReportKind, note: String, waitMinutes: Int?) {
         id = UUID()
         menuID = menu.id
         menuVersion = menu.version
@@ -40,7 +40,7 @@ struct SubmittedReport: Codable, Identifiable {
 @MainActor
 final class AppStore: ObservableObject {
     @Published private(set) var profile: Profile?
-    @Published private(set) var menus: [Menu] = SampleMenus.all
+    @Published private(set) var menus: [DailyMenu] = SampleMenus.all
     @Published private(set) var filters: FeedFilters = FeedFilters()
     @Published private(set) var isConnected = true
     @Published var forceOffline = false
@@ -84,12 +84,12 @@ final class AppStore: ObservableObject {
 
     var isOffline: Bool { forceOffline || !isConnected }
     var isRestaurant: Bool { profile?.role == "restaurant" }
-    var rankedMenus: [Menu] { ranking.ranked(menus, for: filters, at: .now) }
-    var topRecommendation: Menu? { rankedMenus.first }
-    func explanation(for menu: Menu) -> String {
+    var rankedMenus: [DailyMenu] { ranking.ranked(menus, for: filters, at: .now) }
+    var topRecommendation: DailyMenu? { rankedMenus.first }
+    func explanation(for menu: DailyMenu) -> String {
         ranking.explanation(for: menu, filters: filters, at: .now)
     }
-    var ownMenus: [Menu] {
+    var ownMenus: [DailyMenu] {
         guard let id = profile?.id else { return [] }
         return menus.filter { $0.establishmentId == id }
     }
@@ -137,7 +137,7 @@ final class AppStore: ObservableObject {
         impressions.removeAll()
     }
 
-    func track(_ kind: String, menu: Menu) {
+    func track(_ kind: String, menu: DailyMenu) {
         if kind == "feed_impression" && !impressions.insert(menu.id).inserted { return }
         events.append(InteractionEvent(menuID: menu.id, kind: kind))
         persistEvents()
@@ -154,11 +154,11 @@ final class AppStore: ObservableObject {
         }
     }
 
-    func pendingReports(for menu: Menu) -> Int {
+    func pendingReports(for menu: DailyMenu) -> Int {
         menu.pendingReports + reports.filter { $0.menuID == menu.id && $0.menuVersion == menu.version }.count
     }
 
-    func submitReport(for menu: Menu, kind: ReportKind, note: String, waitMinutes: Int?) {
+    func submitReport(for menu: DailyMenu, kind: ReportKind, note: String, waitMinutes: Int?) {
         reports.append(SubmittedReport(menu: menu, kind: kind, note: note, waitMinutes: waitMinutes))
         if let data = try? UniEatDates.encoder().encode(reports) {
             UserDefaults.standard.set(data, forKey: "unieat.demo.reports.v1")
@@ -169,15 +169,15 @@ final class AppStore: ObservableObject {
     }
 
     func publish(title: String, restaurantName: String, area: String, address: String,
-                 validUntil: Date, dishes: [MenuDish], replacing old: Menu? = nil) async throws {
+                 validUntil: Date, dishes: [MenuDish], replacing old: DailyMenu? = nil) async throws {
         guard let owner = profile, owner.role == "restaurant" else { return }
         guard old == nil || old?.establishmentId == owner.id else { return }
-        let menu: Menu
+        let menu: DailyMenu
         if let old {
             menu = old.revised(title: title, establishmentName: restaurantName, area: area,
                                address: address, validUntil: validUntil, items: dishes)
         } else {
-            menu = Menu(title: title, validUntil: validUntil, establishmentId: owner.id,
+            menu = DailyMenu(title: title, validUntil: validUntil, establishmentId: owner.id,
                         establishmentName: restaurantName, area: area, address: address,
                         paymentMethods: ["Nequi", "Efectivo"], items: dishes,
                         lowestPriceCop: dishes.map(\.priceCop).min() ?? 0)
@@ -186,7 +186,7 @@ final class AppStore: ObservableObject {
         await refresh()
     }
 
-    func close(_ menu: Menu) async throws {
+    func close(_ menu: DailyMenu) async throws {
         guard let owner = profile, owner.role == "restaurant",
               menu.establishmentId == owner.id else { return }
         try await repository.saveMenu(menu.closed())

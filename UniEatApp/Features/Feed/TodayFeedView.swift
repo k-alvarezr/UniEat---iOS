@@ -76,7 +76,7 @@ struct TodayFeedView: View {
 }
 
 struct MenuCard: View {
-    let menu: Menu
+    let menu: DailyMenu
     let explanation: String
     let pendingReports: Int
     let assessment: PublicationAssessment

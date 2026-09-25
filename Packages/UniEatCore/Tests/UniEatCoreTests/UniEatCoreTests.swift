@@ -7,8 +7,8 @@ final class UniEatCoreTests: XCTestCase {
     private func menu(validUntil: Date, publishedAt: Date = Date(timeIntervalSince1970: 9_000),
                       items: [MenuDish] = [MenuDish(name: "Almuerzo", priceCop: 15_000)],
                       waitMinutes: Int? = nil, waitSampleCount: Int = 0,
-                      waitNewestReportAt: Date? = nil) -> Menu {
-        Menu(title: "Menú del día", validUntil: validUntil, publishedAt: publishedAt,
+                      waitNewestReportAt: Date? = nil) -> DailyMenu {
+        DailyMenu(title: "Menú del día", validUntil: validUntil, publishedAt: publishedAt,
              establishmentName: "Café", area: "Centro", address: "",
              items: items, lowestPriceCop: items.map(\.priceCop).min() ?? 0,
              waitMinutes: waitMinutes, waitSampleCount: waitSampleCount,

@@ -14,7 +14,7 @@ struct PerformanceView: View {
                 DemoNotice()
                 Text("Señales de interés")
                     .font(.system(size: 27, weight: .heavy, design: .rounded))
-                Text("Métricas de interacción dentro de esta sesión demo. No representan ventas ni visitas verificadas.")
+                Text("Interacciones guardadas en este dispositivo. No representan ventas ni visitas verificadas.")
                     .font(.subheadline).foregroundStyle(.secondary)
                 Picker("Período", selection: $days) {
                     Text("Últimos 7 días").tag(7)

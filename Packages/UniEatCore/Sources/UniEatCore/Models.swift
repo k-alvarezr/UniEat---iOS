@@ -20,7 +20,7 @@ public struct MenuDish: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
-public struct Menu: Codable, Hashable, Identifiable, Sendable {
+public struct DailyMenu: Codable, Hashable, Identifiable, Sendable {
     public let id: UUID
     public let title: String
     public let version: Int
@@ -85,8 +85,8 @@ public struct Menu: Codable, Hashable, Identifiable, Sendable {
     public var hasWaitEvidence: Bool { hasWaitEvidence(at: .now) }
 
     public func revised(title: String, establishmentName: String, area: String, address: String,
-                        validUntil: Date, items: [MenuDish], at date: Date = .now) -> Menu {
-        Menu(id: id, title: title, version: version + 1, validUntil: validUntil,
+                        validUntil: Date, items: [MenuDish], at date: Date = .now) -> DailyMenu {
+        DailyMenu(id: id, title: title, version: version + 1, validUntil: validUntil,
              publishedAt: date, establishmentId: establishmentId,
              establishmentName: establishmentName, area: area, address: address,
              entranceDescription: entranceDescription, latitude: latitude, longitude: longitude,
@@ -95,7 +95,7 @@ public struct Menu: Codable, Hashable, Identifiable, Sendable {
              explanation: "Publicación actualizada")
     }
 
-    public func closed(at date: Date = .now) -> Menu {
+    public func closed(at date: Date = .now) -> DailyMenu {
         revised(title: title, establishmentName: establishmentName, area: area,
                 address: address, validUntil: date, items: items, at: date)
     }
