@@ -10,7 +10,7 @@ struct MainTabsView: View {
             if store.isRestaurant {
                 PublishView()
                     .tabItem { Label("Publicar", systemImage: "plus.circle.fill") }
-                PerformanceView()
+                NavigationStack { PerformanceView() }
                     .tabItem { Label("Rendimiento", systemImage: "chart.bar.fill") }
             } else {
                 NavigationStack { RecommendationView() }
@@ -47,6 +47,14 @@ struct ProfileView: View {
                         .background(Palette.paper, in: RoundedRectangle(cornerRadius: 14))
                     Text("La información guardada muestra cuándo se obtuvo y descarta menús vencidos incluso sin conexión.")
                         .font(.footnote).foregroundStyle(.secondary)
+                    NavigationLink(destination: ScreenGalleryView()) {
+                        Label("Explorar las 10 pantallas de MS7", systemImage: "square.grid.2x2")
+                            .font(.system(size: 15, weight: .heavy, design: .rounded))
+                            .foregroundStyle(Palette.ink)
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                            .background(Palette.cyan, in: RoundedRectangle(cornerRadius: 12))
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Palette.ink, lineWidth: 2))
+                    }
                     SolidButton(title: "Cerrar sesión", icon: "rectangle.portrait.and.arrow.right", color: Palette.yellow) {
                         store.signOut()
                     }

@@ -2,10 +2,16 @@ import SwiftUI
 import UniEatCore
 
 struct TodayFeedView: View {
+    var body: some View {
+        NavigationStack { TodayFeedContent(hidesNavigationBar: true) }
+    }
+}
+
+struct TodayFeedContent: View {
     @EnvironmentObject private var store: AppStore
+    var hidesNavigationBar = false
 
     var body: some View {
-        NavigationStack {
             TimelineView(.periodic(from: .now, by: 60)) { timeline in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
@@ -20,7 +26,10 @@ struct TodayFeedView: View {
                             }
                         }
                         if store.isOffline {
-                            OfflineNotice(cachedAt: store.cachedAt)
+                            NavigationLink(destination: OfflineFeedView()) {
+                                OfflineNotice(cachedAt: store.cachedAt)
+                            }
+                            .buttonStyle(.plain)
                         }
                         NavigationLink(destination: RecommendationView()) {
                             HStack {
@@ -65,13 +74,18 @@ struct TodayFeedView: View {
                                 .foregroundStyle(Palette.ink)
                         }
                         .padding(.vertical, 10)
+                        NavigationLink(destination: OfflineFeedView()) {
+                            Label("Ver ejemplo: pantalla sin conexión", systemImage: "wifi.slash")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(Palette.ink)
+                        }
+                        .padding(.bottom, 10)
                     }
                     .padding(16)
                 }
             }
             .background(Palette.cream)
-            .navigationBarHidden(true)
-        }
+            .navigationBarHidden(hidesNavigationBar)
     }
 }
 
@@ -176,24 +190,67 @@ struct EmptyFeedView: View {
 }
 
 struct NoMenuPublishedView: View {
+    @EnvironmentObject private var store: AppStore
+    @Environment(\.dismiss) private var dismiss
+
     var body: some View {
         ScrollView {
-            VStack(spacing: 18) {
+            VStack(alignment: .leading, spacing: 18) {
                 BrandHeader(title: "Sin menú del día")
-                Spacer(minLength: 40)
-                Image(systemName: "bell.slash.fill")
-                    .font(.system(size: 70))
-                    .frame(width: 132, height: 132)
-                    .background(Palette.cream, in: Circle())
-                Text("Este local no ha publicado el menú de hoy")
-                    .font(.system(size: 24, weight: .heavy, design: .rounded))
-                    .multilineTextAlignment(.center)
-                Text("La ausencia de menú no significa que esté cerrado. Puedes revisar otras opciones cercanas.")
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.secondary)
+                DemoNotice()
+                SurfaceCard {
+                    VStack(alignment: .leading, spacing: 7) {
+                        Sticker(text: "CAFÉ UNIVERSITARIO", color: Palette.cyan, icon: "cup.and.saucer")
+                        Text("Saudade — Café & Panadería")
+                            .font(.system(size: 25, weight: .heavy, design: .rounded))
+                        Label("Bloque AU · Piso 2", systemImage: "mappin")
+                            .font(.subheadline)
+                        Sticker(text: "Sin menú publicado hoy", color: Palette.cream, icon: "book.closed")
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                SurfaceCard {
+                    VStack(spacing: 14) {
+                        Image(systemName: "bell.slash.fill")
+                            .font(.system(size: 60))
+                            .frame(width: 120, height: 120)
+                            .background(Palette.cream, in: Circle())
+                        Text("Este local no ha publicado el menú del día")
+                            .font(.system(size: 23, weight: .heavy, design: .rounded))
+                            .multilineTextAlignment(.center)
+                        Text("La ausencia de menú no significa que esté cerrado. Puedes revisar otras opciones cercanas.")
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(.secondary)
+                        SolidButton(title: "Volver a los menús de hoy", icon: "arrow.left", color: Palette.yellow) {
+                            dismiss()
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                Text("Locales cercanos con menú listo")
+                    .font(.system(size: 21, weight: .heavy, design: .rounded))
+                ForEach(Array(store.rankedMenus.prefix(2))) { menu in
+                    NavigationLink(destination: MenuDetailView(menu: menu)) {
+                        SurfaceCard {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text(menu.establishmentName).font(.headline)
+                                    Text(menu.title).font(.caption)
+                                }
+                                Spacer()
+                                Sticker(text: menu.lowestPriceCop.cop, color: Palette.yellow)
+                                Image(systemName: "chevron.right")
+                            }
+                        }
+                        .foregroundStyle(Palette.ink)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
-            .padding(24)
+            .padding(16)
         }
         .background(Palette.cream)
+        .navigationTitle("Sin menú publicado")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }

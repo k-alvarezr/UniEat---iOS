@@ -10,6 +10,11 @@ struct ReportSheet: View {
     @State private var waitMinutes = 20
     @State private var sent = false
 
+    init(menu: DailyMenu, initialKind: ReportKind = .unavailable) {
+        self.menu = menu
+        _kind = State(initialValue: initialKind)
+    }
+
     private let choices: [(ReportKind, String, String)] = [
         (.unavailable, "Plato agotado o no disponible", "fork.knife"),
         (.price, "Precio distinto al publicado", "tag"),

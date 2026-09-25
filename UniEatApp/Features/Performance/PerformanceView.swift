@@ -4,8 +4,18 @@ import UniEatCore
 struct PerformanceView: View {
     @EnvironmentObject private var store: AppStore
     @State private var days = 7
+    var preview = false
 
-    private var summary: PerformanceSummary { store.performance(days: days) }
+    init(preview: Bool = false) { self.preview = preview }
+
+    private var summary: PerformanceSummary {
+        preview
+            ? PerformanceSummary(periodDays: days, impressions: days == 7 ? 214 : 638,
+                                 detailOpens: days == 7 ? 38 : 109,
+                                 selections: days == 7 ? 21 : 61,
+                                 reportedArrivals: days == 7 ? 12 : 34)
+            : store.performance(days: days)
+    }
 
     var body: some View {
         ScrollView {
@@ -16,12 +26,15 @@ struct PerformanceView: View {
                     .font(.system(size: 27, weight: .heavy, design: .rounded))
                 Text("Interacciones guardadas en este dispositivo. No representan ventas ni visitas verificadas.")
                     .font(.subheadline).foregroundStyle(.secondary)
+                if preview {
+                    Sticker(text: "CIFRAS ILUSTRATIVAS", color: Palette.cyan, icon: "info.circle")
+                }
                 Picker("Período", selection: $days) {
                     Text("Últimos 7 días").tag(7)
                     Text("28 días").tag(28)
                 }
                 .pickerStyle(.segmented)
-                if store.ownMenus.isEmpty {
+                if store.ownMenus.isEmpty && !preview {
                     SurfaceCard {
                         VStack(spacing: 8) {
                             Image(systemName: "chart.bar.xaxis").font(.largeTitle)
@@ -49,6 +62,19 @@ struct PerformanceView: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                }
+                NavigationLink(destination: PublishView()) {
+                    HStack {
+                        Spacer()
+                        Text("Ir a publicar un menú")
+                        Image(systemName: "arrow.right")
+                        Spacer()
+                    }
+                    .font(.system(size: 16, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Palette.ink)
+                    .padding(.vertical, 15)
+                    .background(Palette.coral, in: RoundedRectangle(cornerRadius: 14))
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Palette.ink, lineWidth: 2))
                 }
             }
             .padding(16)

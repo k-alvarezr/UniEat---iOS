@@ -28,7 +28,22 @@ En Windows se puede editar el código y analizar la sintaxis con Swift para Wind
 | Estudiante | Entrar, explorar menús vigentes, filtrar por presupuesto/tiempo/dieta/zona/pago, abrir detalle, reportar un cambio y usar «Elige por mí» | Inicio, filtros, detalle, reporte, recomendación, perfil |
 | Restaurante | Entrar, publicar, editar o cerrar un menú estructurado con platos/precios/vigencia y consultar señales de interés | Inicio, publicar, rendimiento, perfil |
 
-La pantalla **Sin menú del día** se abre como ejemplo desde Inicio. Las publicaciones de prueba, reportes y eventos se guardan localmente. El perfil ofrece un interruptor para simular falta de conexión. El feed indica la fecha de carga y excluye menús vencidos también en ese modo. Los ejemplos de restaurantes, platos y métricas son datos de demostración, no información real de comercios.
+Desde **Perfil → Explorar las 10 pantallas de MS7** se puede abrir cada vista del prototipo sin preparar datos ni cambiar de rol. El reporte se abre como hoja contextual. Las pantallas de restaurante están disponibles para revisar su diseño, pero guardar publicaciones requiere entrar en la demo como restaurante.
+
+| MS7 | Pantalla | Ruta normal |
+| --- | --- | --- |
+| 01 | Hoy · Menús | Pestaña Hoy |
+| 02 | Filtros | Hoy → Filtros |
+| 03 | Detalle del menú | Hoy → tarjeta de menú |
+| 04 | Elige por mí | Pestaña Elige por mí o Hoy → recomendación |
+| 05 | Publicar menú | Pestaña Publicar con rol restaurante |
+| 06 | Reportar un cambio | Detalle → Reportar un cambio |
+| 07 | Sin conexión | Hoy → ejemplo sin conexión; también desde el aviso al simular falta de red |
+| 08 | Sin menú publicado | Hoy → ejemplo de local sin menú |
+| 09 | Espera sin evidencia | Detalle de un menú sin estimación → Ver por qué |
+| 10 | Rendimiento | Pestaña Rendimiento con rol restaurante |
+
+Las publicaciones de prueba, reportes y eventos se guardan localmente. El perfil ofrece un interruptor para simular falta de conexión. El feed indica la fecha de carga y excluye menús vencidos también en ese modo. Los ejemplos de restaurantes, platos y métricas son datos de demostración, no información real de comercios.
 
 ## Arquitectura
 

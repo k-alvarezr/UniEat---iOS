@@ -50,6 +50,12 @@ struct PublishView: View {
             VStack(alignment: .leading, spacing: 15) {
                 BrandHeader(title: "UniEat · Publicar")
                 DemoNotice()
+                if !store.isRestaurant {
+                    Text("Vista de restaurante. Entra a la demo como restaurante para guardar una publicación.")
+                        .font(.subheadline.weight(.semibold))
+                        .padding(12)
+                        .background(Palette.cyan.opacity(0.35), in: RoundedRectangle(cornerRadius: 12))
+                }
                 Text(editingMenu == nil ? "Publicar menú del día" : "Editar menú del día")
                     .font(.system(size: 27, weight: .heavy, design: .rounded))
                 Text("Completa los campos estructurados para que estudiantes puedan comparar y filtrar tu oferta.")
@@ -135,7 +141,7 @@ struct PublishView: View {
                             icon: "arrow.right", color: Palette.coral) {
                     Task { await publish() }
                 }
-                .disabled(!valid || isSaving)
+                .disabled(!valid || isSaving || !store.isRestaurant)
                 if store.ownMenus.isEmpty {
                     SurfaceCard {
                         Label("Aún no has publicado un menú del día.", systemImage: "storefront")
@@ -170,7 +176,9 @@ struct PublishView: View {
         }
         .background(Palette.cream)
         .onAppear {
-            if restaurantName.isEmpty { restaurantName = store.profile?.displayName ?? "" }
+            if restaurantName.isEmpty {
+                restaurantName = store.isRestaurant ? (store.profile?.displayName ?? "") : "Restaurante de ejemplo"
+            }
         }
     }
 

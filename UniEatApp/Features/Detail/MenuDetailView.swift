@@ -47,7 +47,15 @@ struct MenuDetailView: View {
                                     .font(.caption)
                             }
                         } else {
-                            InsufficientEvidenceView(count: menu.waitSampleCount)
+                            NavigationLink(destination: InsufficientQueueEvidenceView(menu: menu)) {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    InsufficientEvidenceView(count: menu.waitSampleCount)
+                                    Label("Ver por qué no hay estimación", systemImage: "arrow.right")
+                                        .font(.subheadline.weight(.bold))
+                                        .foregroundStyle(Palette.ink)
+                                }
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
