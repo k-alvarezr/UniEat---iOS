@@ -9,6 +9,8 @@ struct ReportSheet: View {
     @State private var note = ""
     @State private var waitMinutes = 20
     @State private var sent = false
+    @State private var isSending = false
+    @State private var errorText: String?
 
     init(menu: DailyMenu, initialKind: ReportKind = .unavailable) {
         self.menu = menu
@@ -68,17 +70,35 @@ struct ReportSheet: View {
                             .background(Palette.paper, in: RoundedRectangle(cornerRadius: 12))
                         Text("Tu reporte no modifica el menú oficial automáticamente. Otros usuarios verán una advertencia mientras se verifica.")
                             .font(.footnote).foregroundStyle(.secondary)
-                        SolidButton(title: "Enviar reporte comunitario", icon: "paperplane.fill", color: Palette.coral) {
-                            store.submitReport(for: menu, kind: kind, note: note,
-                                               waitMinutes: kind == .longLine ? waitMinutes : nil)
-                            sent = true
+                        if let errorText {
+                            Text(errorText).font(.footnote.weight(.semibold)).foregroundStyle(Palette.coral)
                         }
+                        SolidButton(title: isSending ? "Enviando…" : "Enviar reporte comunitario",
+                                    icon: "paperplane.fill", color: Palette.coral) {
+                            Task { await send() }
+                        }
+                        .disabled(isSending)
                     }
                 }
                 .padding(16)
             }
             .background(Palette.cream)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Cerrar") { dismiss() } } }
+        }
+    }
+
+    /// Solo marca "enviado" cuando el servidor confirma; si falla muestra su mensaje
+    /// (por ejemplo, límite de reportes o sin conexión).
+    private func send() async {
+        isSending = true
+        errorText = nil
+        defer { isSending = false }
+        do {
+            try await store.submitReport(for: menu, kind: kind, note: note,
+                                         waitMinutes: kind == .longLine ? waitMinutes : nil)
+            sent = true
+        } catch {
+            errorText = error.localizedDescription
         }
     }
 }

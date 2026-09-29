@@ -80,6 +80,8 @@ struct PerformanceView: View {
             .padding(16)
         }
         .background(Palette.cream)
+        // Con cuenta real las cifras vienen agregadas del servidor para el período elegido.
+        .task(id: days) { if !preview { await store.loadPerformance(days: days) } }
     }
 
     private func bar(_ title: String, value: Int, maxValue: Int, color: Color) -> some View {

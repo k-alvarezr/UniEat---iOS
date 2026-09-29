@@ -203,7 +203,9 @@ struct PublishView: View {
         do {
             try await store.close(menu)
             if editingMenu?.id == menu.id { editingMenu = nil }
-            message = "Publicación cerrada en este dispositivo."
+            message = store.isRemote ? "Publicación cerrada. El historial se conserva." : "Publicación cerrada en este dispositivo."
+        } catch let failure as APIFailure {
+            message = failure.message
         } catch {
             message = "No se pudo cerrar la publicación. Inténtalo de nuevo."
         }
@@ -226,7 +228,14 @@ struct PublishView: View {
                                     replacing: editingMenu)
             dishes = [DishDraft()]
             editingMenu = nil
-            message = "Menú guardado en este dispositivo (demostración)."
+            message = store.isRemote ? "Menú publicado. Ya es visible para los estudiantes." : "Menú guardado en este dispositivo (demostración)."
+        } catch let failure as APIFailure where failure.code == "VERSION_CONFLICT" {
+            // Otra edición ganó: se recarga la lista para que el dueño edite la versión actual.
+            editingMenu = nil
+            await store.refresh()
+            message = "Otra persona editó este menú. Recargamos la versión actual; vuelve a aplicar tus cambios."
+        } catch let failure as APIFailure {
+            message = failure.message
         } catch {
             message = "No se pudo guardar el menú. Revisa los datos e inténtalo de nuevo."
         }

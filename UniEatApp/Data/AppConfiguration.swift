@@ -16,4 +16,9 @@ struct AppConfiguration: Decodable {
     var isConfigured: Bool {
         URL(string: supabaseURL)?.scheme != nil && !publishableKey.isEmpty
     }
+
+    /// API v1 compartida por iOS y Android (Edge Function `api-v1`).
+    var apiBaseURL: URL? {
+        URL(string: supabaseURL)?.appending(path: "functions/v1/api-v1")
+    }
 }
