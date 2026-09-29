@@ -20,6 +20,8 @@ private struct StoredSession: Codable {
     let accessToken: String
     let refreshToken: String
     let profile: Profile
+    /// Opcional para que las sesiones guardadas por versiones anteriores sigan decodificando.
+    let expiresAt: Date?
 }
 
 @MainActor
@@ -50,15 +52,34 @@ final class SupabaseAuthService {
               let data = keychainData(),
               let cached = try? JSONDecoder().decode(StoredSession.self, from: data) else { return nil }
         do {
-            let response = try await request(path: "auth/v1/token", query: "grant_type=refresh_token",
-                                             body: ["refresh_token": cached.refreshToken])
-            guard let renewed = try session(from: response) else { return nil }
-            store(renewed)
-            return renewed.profile
+            return try await refresh(cached).profile
+        } catch is URLError {
+            // Arranque sin conexión: se conserva la sesión para seguir mostrando el feed guardado.
+            return cached.profile
         } catch {
             signOut()
             return nil
         }
+    }
+
+    /// Token de acceso para llamar a la API; se renueva un minuto antes de vencer.
+    func validAccessToken() async throws -> String {
+        guard let data = keychainData(),
+              let cached = try? JSONDecoder().decode(StoredSession.self, from: data) else {
+            throw AuthFailure.service("Tu sesión terminó. Inicia sesión de nuevo.")
+        }
+        if let expiresAt = cached.expiresAt, expiresAt > .now.addingTimeInterval(60) {
+            return cached.accessToken
+        }
+        return try await refresh(cached).accessToken
+    }
+
+    private func refresh(_ cached: StoredSession) async throws -> StoredSession {
+        let response = try await request(path: "auth/v1/token", query: "grant_type=refresh_token",
+                                         body: ["refresh_token": cached.refreshToken])
+        guard let renewed = try session(from: response) else { throw AuthFailure.invalidResponse }
+        store(renewed)
+        return renewed
     }
 
     func signOut() {
@@ -116,8 +137,10 @@ final class SupabaseAuthService {
         let email = user["email"] as? String ?? ""
         let name = metadata?["display_name"] as? String ?? email
         let role = metadata?["role"] as? String == "restaurant" ? "restaurant" : "student"
+        let expiresAt = (json["expires_at"] as? Double).map { Date(timeIntervalSince1970: $0) }
+            ?? (json["expires_in"] as? Double).map { Date.now.addingTimeInterval($0) }
         return StoredSession(accessToken: access, refreshToken: refresh,
-                             profile: Profile(id: id, displayName: name, role: role))
+                             profile: Profile(id: id, displayName: name, role: role), expiresAt: expiresAt)
     }
 
     private func store(_ session: StoredSession) {
