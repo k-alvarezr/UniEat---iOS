@@ -1,6 +1,6 @@
 # UniEat para iOS
 
-Aplicación SwiftUI para consultar y publicar menús del día cerca de Uniandes. El producto sigue la [wiki de UniEat](https://github.com/EstebanRojas01/Moviles/wiki) y las pantallas MS7 del Sprint 1. Esta entrega implementa el **cliente iOS**; el servicio compartido con Android queda para una integración posterior.
+Aplicación SwiftUI para consultar y publicar menús del día cerca de Uniandes. El producto sigue la [wiki de UniEat](https://github.com/EstebanRojas01/Moviles/wiki) y las pantallas MS7 del Sprint 1. La app puede funcionar como demostración local o conectarse al [backend compartido](https://github.com/EstebanRojas01/UniEat---iOS-Back) mediante la API v1 de Supabase.
 
 ## Ejecutar en macOS
 
@@ -28,7 +28,7 @@ En Windows se puede editar el código y analizar la sintaxis con Swift para Wind
 | Estudiante | Entrar, explorar menús vigentes, filtrar por presupuesto/tiempo/dieta/zona/pago, abrir detalle, reportar un cambio y usar «Elige por mí» | Inicio, filtros, detalle, reporte, recomendación, perfil |
 | Restaurante | Entrar, publicar, editar o cerrar un menú estructurado con platos/precios/vigencia y consultar señales de interés | Inicio, publicar, rendimiento, perfil |
 
-Desde **Perfil → Explorar las 10 pantallas de MS7** se puede abrir cada vista del prototipo sin preparar datos ni cambiar de rol. El reporte se abre como hoja contextual. Las pantallas de restaurante están disponibles para revisar su diseño, pero guardar publicaciones requiere entrar en la demo como restaurante.
+Desde **Perfil → Explorar las 10 pantallas de MS7** se puede abrir cada vista del prototipo sin preparar datos ni cambiar de rol. El reporte se abre como hoja contextual. Para guardar publicaciones se necesita el rol restaurante de la demo o una cuenta real con un local aprobado.
 
 | MS7 | Pantalla | Ruta normal |
 | --- | --- | --- |
@@ -43,7 +43,7 @@ Desde **Perfil → Explorar las 10 pantallas de MS7** se puede abrir cada vista 
 | 09 | Espera sin evidencia | Detalle de un menú sin estimación → Ver por qué |
 | 10 | Rendimiento | Pestaña Rendimiento con rol restaurante |
 
-Las publicaciones de prueba, reportes y eventos se guardan localmente. El perfil ofrece un interruptor para simular falta de conexión. El feed indica la fecha de carga y excluye menús vencidos también en ese modo. Los ejemplos de restaurantes, platos y métricas son datos de demostración, no información real de comercios.
+En **Probar sin servidor**, las publicaciones, reportes y eventos se guardan localmente. Con una **cuenta real**, el feed, las publicaciones, los reportes y las métricas provienen de la API compartida. El perfil ofrece un interruptor para simular falta de conexión. La copia del feed se asocia a la cuenta y a sus filtros, indica cuándo se obtuvo y excluye menús vencidos o cerrados.
 
 ## Arquitectura
 
@@ -53,34 +53,39 @@ flowchart LR
     VM --> Core[UniEatCore / modelos y decisiones]
     VM --> Repo[MenuRepository]
     Repo --> Demo[DemoMenuRepository / almacenamiento local]
-    VM --> Auth[SupabaseAuthService / cliente opcional]
+    VM --> Auth[SupabaseAuthService / Keychain]
+    VM --> API[APIClient / api-v1 compartida]
     VM --> Network[NWPathMonitor]
 ```
 
 - **MVVM:** las vistas observan `AppStore`; el estado y las acciones no dependen de la vista concreta.
 - **Observer:** `ObservableObject` y `@Published` actualizan el feed, los reportes y el rendimiento al cambiar el estado.
-- **Repository:** `MenuRepository` abstrae la lectura y publicación de menús. La implementación actual usa `UserDefaults` para una demo autónoma.
-- **Strategy:** `ContextualRankingStrategy` evalúa vigencia, presupuesto y dieta en un mismo plato, medio de pago y tiempo estimado cuando existe evidencia suficiente.
+- **Repository:** `MenuRepository` mantiene la demostración autónoma en `UserDefaults`. Con una cuenta real, `APIClient` consulta la API compartida.
+- **Strategy:** `ContextualRankingStrategy` evalúa la demostración local. En línea, el backend filtra y ordena con `rank-v1`; iOS conserva ese orden.
 - **DTO/modelos:** `DailyMenu`, `MenuDish`, `FeedFilters`, `Profile` y `PerformanceSummary` son tipos `Codable` del paquete `UniEatCore`.
-- **Adapter:** `SupabaseAuthService` encapsula el intercambio HTTP y el Keychain para autenticación opcional. Las decisiones online definitivas y la autorización del rol de restaurante deberán venir del servicio compartido.
+- **Adapter:** `SupabaseAuthService` gestiona autenticación y Keychain; `APIClient` adapta los DTO de la API v1. El backend decide el rol efectivo y comprueba los permisos de cada publicación.
 
 ### Decisiones de negocio del Sprint 2
 
 | Integrante | BQ elegida | Implementación iOS |
 | --- | --- | --- |
-| Kevin Álvarez | **BQ-03:** qué menús vigentes son compatibles con presupuesto, dieta, zona y tiempo; ordenarlos con una explicación | `ContextualRankingStrategy`, filtros, feed y recomendación |
-| Juan Esteban Rojas | **BQ-04:** estado de vigencia y reportes pendientes de una publicación | `PublicationAssessment`, ocultamiento al vencer, advertencias y formulario de reportes |
+| Kevin Álvarez | **BQ-03:** qué menús vigentes son compatibles con presupuesto, dieta, zona y tiempo; ordenarlos con una explicación | Filtros, feed y recomendación. En línea consume el ranking y la explicación `rank-v1` del backend. |
+| Juan Esteban Rojas | **BQ-04:** estado de vigencia y reportes pendientes de una publicación | Estado de publicación, ocultamiento al vencer o cerrar y reportes ligados a una versión. En línea consume la validez y el estado de moderación del backend. |
 
-Estas son las responsabilidades acordadas para la entrega; este repositorio todavía no registra contribuciones individuales de Juan Esteban en commits. Los reportes locales permanecen **pendientes**: la app no los convierte en cambios confirmados. Una estimación de fila se muestra solo con al menos tres reportes y uno de los últimos 30 minutos.
+Una estimación de fila se muestra solo con al menos tres observaciones y una de los últimos 30 minutos. Las discrepancias quedan pendientes de revisión; `long_line`, `accurate` y `arrival` se registran como observaciones.
 
-## Configuración opcional de autenticación
+## Backend compartido y cuentas reales
 
-`UniEatApp/Resources/BackendConfig.json` inicia con `supabaseURL` y `publishableKey` vacíos. Cuando exista un proyecto compartido, agregar allí la URL y la **clave pública** para habilitar ingreso y registro reales. No incluir claves secretas. El cliente guarda la sesión en Keychain. Hasta entonces, usar los dos botones de demo.
+`UniEatApp/Resources/BackendConfig.json` contiene la URL del proyecto Supabase y su **clave publicable**. Estas son credenciales de cliente; nunca incluir la clave secreta o de servicio. El cliente guarda los tokens en Keychain y usa `GET /me` para obtener el rol efectivo. `user_metadata.role` no concede permisos.
 
-La configuración de autenticación **no** conecta el feed ni la publicación al backend. Menús, reportes y métricas siguen locales aun con una cuenta real. El rol enviado en `user_metadata` es solo una preferencia de interfaz y no prueba autorización de un restaurante. El backend compartido tendrá que validar propiedad y permisos, publicar menús, moderar reportes y producir métricas confiables.
+1. Crear cuenta e iniciar sesión. Si se confirmó el correo por email, iniciar sesión después de esa confirmación.
+2. En **Perfil → Solicitar un establecimiento**, registrar nombre, zona, dirección y medios de pago. La solicitud queda pendiente.
+3. Una cuenta con rol **Administrador** puede revisar y aprobar solicitudes desde **Perfil → Solicitudes de restaurantes**. El backend debe tener provisionado al menos un administrador confiable; registrar una cuenta con la opción «Restaurante» no la convierte en admin ni en dueño aprobado.
+4. El dueño toca **Actualizar estado** en Perfil después de la aprobación. Aparecen las pestañas **Publicar** y **Rendimiento**.
+5. Si administra varios locales, elige el local en **Publicar**. La app envía su `establishmentId`; las ediciones conservan el local de la publicación original.
 
-Los archivos `supabase/` y `package.json` que ya estaban en el repositorio corresponden a la preparación local previa. Esta rama no implementa ni despliega el backend compartido.
+Los menús, reportes, eventos y estadísticas de cuentas reales pertenecen al backend. Las pruebas y el despliegue del servicio están en el repositorio compartido; la demo local no escribe en él.
 
 ## Estado de verificación
 
-GitHub Actions en macOS ejecuta las pruebas de `UniEatCore`, genera el proyecto con XcodeGen y compila el cliente para el simulador. Antes de entregar en clase, validar en un iPhone o simulador las rutas de estudiante y restaurante y reemplazar los datos de muestra cuando el equipo conecte el servicio compartido.
+GitHub Actions en macOS ejecuta las pruebas de `UniEatCore`, genera el proyecto con XcodeGen y compila el cliente para el simulador. Antes de entregar en clase, recorrer en un iPhone o simulador una cuenta de estudiante, una solicitud y aprobación de local, la publicación en cada local, un reporte y el cierre de un menú. La demo local sigue disponible para mostrar las pantallas sin conexión.
