@@ -36,7 +36,9 @@ struct PerformanceView: View {
                     Text("28 días").tag(28)
                 }
                 .pickerStyle(.segmented)
-                if store.ownMenus.isEmpty && !preview {
+                if store.isRemote && !preview && store.remotePerformance[days] == nil {
+                    ProgressView("Cargando métricas del servidor…")
+                } else if store.ownMenus.isEmpty && !preview {
                     SurfaceCard {
                         VStack(spacing: 8) {
                             Image(systemName: "chart.bar.xaxis").font(.largeTitle)
@@ -55,6 +57,25 @@ struct PerformanceView: View {
                         MetricTile(number: summary.detailOpens, title: "Aperturas", detail: "Detalle abierto", color: Palette.cyan)
                         MetricTile(number: summary.selections, title: "Selecciones", detail: "Menú elegido", color: Palette.green)
                         MetricTile(number: summary.reportedArrivals, title: "Llegadas", detail: "Reportadas por usuarios", color: Palette.coral)
+                    }
+                    if store.isRemote && !preview {
+                        SurfaceCard {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Lectura del período").font(.headline)
+                                if let count = summary.sampleSize {
+                                    Text("Muestra: \(count) sesiones con al menos una interacción.")
+                                }
+                                if let rates = summary.rates {
+                                    Text("Apertura por impresión: \(Int((rates.detailOpenRate * 100).rounded())) %")
+                                    Text("Selección por impresión: \(Int((rates.selectionRate * 100).rounded())) %")
+                                } else if summary.insufficientData == true {
+                                    Text("Aún no hay suficientes sesiones o impresiones para mostrar tasas fiables.")
+                                }
+                                Text("Una impresión es una sesión que vio una versión de la publicación; las llegadas son reportes, no visitas verificadas.")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
                     SurfaceCard {
                         VStack(alignment: .leading, spacing: 9) {

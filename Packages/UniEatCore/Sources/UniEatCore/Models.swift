@@ -134,13 +134,30 @@ public struct PerformanceSummary: Codable, Sendable {
     public let detailOpens: Int
     public let selections: Int
     public let reportedArrivals: Int
+    public let sampleSize: Int?
+    public let insufficientData: Bool?
+    public let rates: PerformanceRates?
 
-    public init(periodDays: Int, impressions: Int, detailOpens: Int, selections: Int, reportedArrivals: Int) {
+    public init(periodDays: Int, impressions: Int, detailOpens: Int, selections: Int, reportedArrivals: Int,
+                sampleSize: Int? = nil, insufficientData: Bool? = nil, rates: PerformanceRates? = nil) {
         self.periodDays = periodDays
         self.impressions = impressions
         self.detailOpens = detailOpens
         self.selections = selections
         self.reportedArrivals = reportedArrivals
+        self.sampleSize = sampleSize
+        self.insufficientData = insufficientData
+        self.rates = rates
+    }
+}
+
+public struct PerformanceRates: Codable, Sendable {
+    public let detailOpenRate: Double
+    public let selectionRate: Double
+
+    public init(detailOpenRate: Double, selectionRate: Double) {
+        self.detailOpenRate = detailOpenRate
+        self.selectionRate = selectionRate
     }
 }
 

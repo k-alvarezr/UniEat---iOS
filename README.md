@@ -2,6 +2,8 @@
 
 Aplicación SwiftUI para consultar y publicar menús del día cerca de Uniandes. El producto sigue la [wiki de UniEat](https://github.com/EstebanRojas01/Moviles/wiki) y las pantallas MS7 del Sprint 1. La app puede funcionar como demostración local o conectarse al [backend compartido](https://github.com/EstebanRojas01/UniEat---iOS-Back) mediante la API v1 de Supabase.
 
+La trazabilidad de la rúbrica, los patrones, el pipeline de datos y el recorrido de la sustentación están en [docs/sprint2-sustentacion.md](docs/sprint2-sustentacion.md).
+
 ## Ejecutar en macOS
 
 Requisitos: Xcode con un simulador de iPhone, [XcodeGen](https://github.com/yonaskolb/XcodeGen) y macOS compatible con el Xcode instalado.
