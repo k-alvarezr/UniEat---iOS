@@ -24,6 +24,19 @@ final class UniEatCoreTests: XCTestCase {
         XCTAssertEqual(PublicationAssessment(menu: expired, at: now).state, .expired)
     }
 
+    func testClosedPublicationFromServerStaysClosedBeforeItsExpiry() throws {
+        let closed = DailyMenu(title: "Menú cerrado", validUntil: now.addingTimeInterval(3_600),
+                               publishedAt: now.addingTimeInterval(-600),
+                               closedAt: now.addingTimeInterval(-60),
+                               establishmentName: "Café", area: "Centro", address: "Calle 1",
+                               items: [MenuDish(name: "Almuerzo", priceCop: 15_000)],
+                               lowestPriceCop: 15_000)
+        let data = try UniEatDates.encoder().encode(closed)
+        let restored = try UniEatDates.decoder().decode(DailyMenu.self, from: data)
+        XCTAssertNotNil(restored.closedAt)
+        XCTAssertFalse(restored.isActive(at: now))
+    }
+
     func testQueueNeedsThreeRecentReports() {
         let until = now.addingTimeInterval(3_600)
         XCTAssertFalse(menu(validUntil: until, waitMinutes: 8, waitSampleCount: 2,

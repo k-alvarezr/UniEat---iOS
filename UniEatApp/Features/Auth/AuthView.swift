@@ -41,6 +41,10 @@ struct AuthView: View {
                                 Text("Restaurante").tag("restaurant")
                             }
                             .pickerStyle(.segmented)
+                            if role == "restaurant" {
+                                Text("Después de crear la cuenta, registra tu local en Perfil. Un administrador debe aprobarlo antes de publicar.")
+                                    .font(.footnote).foregroundStyle(.secondary)
+                            }
                         }
                         TextField("Correo", text: $email)
                             .textContentType(.emailAddress)

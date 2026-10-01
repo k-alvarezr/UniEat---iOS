@@ -37,6 +37,12 @@ struct SubmittedReport: Codable, Identifiable {
     }
 }
 
+private struct CachedRemoteFeed: Codable {
+    let userId: UUID
+    let filters: FeedFilters
+    let response: FeedResponse
+}
+
 @MainActor
 final class AppStore: ObservableObject {
     @Published private(set) var profile: Profile?
@@ -54,6 +60,8 @@ final class AppStore: ObservableObject {
     @Published private(set) var serverUnreachable = false
     @Published private(set) var remoteOwnMenus: [DailyMenu] = []
     @Published private(set) var remotePerformance: [Int: PerformanceSummary] = [:]
+    @Published private(set) var remoteMemberships: [RemoteMembership] = []
+    @Published private(set) var remoteEstablishments: [RemoteEstablishment] = []
 
     let configuration = AppConfiguration.current
     private let repository: MenuRepository = DemoMenuRepository()
@@ -109,6 +117,9 @@ final class AppStore: ObservableObject {
 
     var isOffline: Bool { forceOffline || !isConnected || (isRemote && serverUnreachable) }
     var isRestaurant: Bool { profile?.role == "restaurant" }
+    var approvedEstablishments: [RemoteEstablishment] {
+        remoteEstablishments.filter(\.approved)
+    }
     var rankedMenus: [DailyMenu] {
         // En línea el servidor ya filtró y ordenó (rank-v1). El filtro por fecha protege la
         // copia guardada: un menú vencido no reaparece solo porque estaba en caché.
@@ -134,13 +145,17 @@ final class AppStore: ObservableObject {
             }
             return
         }
-        guard !forceOffline else { loadCachedFeed(); return }
+        guard !forceOffline else { loadCachedFeed(for: profile?.id); return }
+        let requestedFilters = filters
         do {
-            let feed: FeedResponse = try await api.get("feed", query: filters.queryItems)
+            let feed: FeedResponse = try await api.get("feed", query: requestedFilters.queryItems)
+            guard requestedFilters == filters else { return }
             menus = feed.menus
             cachedAt = feed.fetchedAt
             serverUnreachable = false
-            if let data = try? UniEatDates.encoder().encode(feed) {
+            if let userId = profile?.id,
+               let data = try? UniEatDates.encoder().encode(CachedRemoteFeed(
+                   userId: userId, filters: requestedFilters, response: feed)) {
                 UserDefaults.standard.set(data, forKey: Keys.feedCache)
             }
             if isRestaurant, let mine: MenusResponse = try? await api.get("menus/mine") {
@@ -148,16 +163,21 @@ final class AppStore: ObservableObject {
             }
             await flushEvents()
         } catch {
+            guard requestedFilters == filters else { return }
             serverUnreachable = (error as? APIFailure)?.code == "OFFLINE"
-            loadCachedFeed()
+            loadCachedFeed(for: profile?.id)
         }
     }
 
-    private func loadCachedFeed() {
+    private func loadCachedFeed(for userId: UUID?) {
         guard let data = UserDefaults.standard.data(forKey: Keys.feedCache),
-              let cached = try? UniEatDates.decoder().decode(FeedResponse.self, from: data) else { return }
-        menus = cached.menus
-        cachedAt = cached.fetchedAt
+              let cached = try? UniEatDates.decoder().decode(CachedRemoteFeed.self, from: data),
+              cached.userId == userId, cached.filters == filters else {
+            menus = []
+            return
+        }
+        menus = cached.response.menus
+        cachedAt = cached.response.fetchedAt
     }
 
     func updateFilters(_ value: FeedFilters) {
@@ -200,17 +220,58 @@ final class AppStore: ObservableObject {
     private func startRemoteSession(fallback: Profile) async {
         isRemote = true
         menus = []
-        loadCachedFeed()
-        if let me: Profile = try? await api.get("me") {
-            profile = me
-            if let data = try? JSONEncoder().encode(me) { UserDefaults.standard.set(data, forKey: Keys.profile) }
-        } else if let data = UserDefaults.standard.data(forKey: Keys.profile),
-                  let cached = try? JSONDecoder().decode(Profile.self, from: data), cached.id == fallback.id {
-            profile = cached
-        } else {
-            profile = Profile(id: fallback.id, displayName: fallback.displayName, role: "student")
+        loadCachedFeed(for: fallback.id)
+        do {
+            try await loadRemoteAccount()
+        } catch {
+            if let data = UserDefaults.standard.data(forKey: Keys.profile),
+               let cached = try? JSONDecoder().decode(Profile.self, from: data), cached.id == fallback.id {
+                profile = cached
+            } else {
+                profile = Profile(id: fallback.id, displayName: fallback.displayName, role: "student")
+            }
         }
         await refresh()
+    }
+
+    private func loadRemoteAccount() async throws {
+        let me: MeResponse = try await api.get("me")
+        profile = me.profile
+        remoteMemberships = me.establishments
+        if let data = try? JSONEncoder().encode(me.profile) {
+            UserDefaults.standard.set(data, forKey: Keys.profile)
+        }
+        let mine: EstablishmentsResponse = try await api.get("establishments/mine")
+        remoteEstablishments = mine.establishments
+    }
+
+    func refreshAccount() async throws {
+        guard isRemote else { return }
+        try await loadRemoteAccount()
+        await refresh()
+    }
+
+    func requestEstablishment(name: String, area: String, address: String,
+                              entranceDescription: String, paymentMethods: [String]) async throws {
+        let body = EstablishmentRequestBody(name: name, area: area, address: address,
+                                            entranceDescription: entranceDescription,
+                                            paymentMethods: paymentMethods)
+        let _: EstablishmentRequestResponse = try await api.send("POST", "establishments", body: body)
+        // La solicitud ya existe si el POST respondió 201. Un fallo al recargar no debe
+        // presentarse como fallo de envío ni provocar que el usuario la duplique.
+        try? await loadRemoteAccount()
+    }
+
+    func pendingMembershipRequests() async throws -> [PendingMembership] {
+        let result: PendingMembershipsResponse = try await api.get("admin/memberships", query: [
+            URLQueryItem(name: "status", value: "pending")
+        ])
+        return result.memberships
+    }
+
+    func approveMembership(_ request: PendingMembership) async throws {
+        let _: ApprovalResponse = try await api.send("POST", "admin/memberships/approve", body:
+            ApprovalBody(establishmentId: request.establishmentId, userId: request.userId))
     }
 
     func signOut() {
@@ -219,6 +280,8 @@ final class AppStore: ObservableObject {
         isRemote = false
         remoteOwnMenus = []
         remotePerformance = [:]
+        remoteMemberships = []
+        remoteEstablishments = []
         pendingEvents = []
         persistPendingEvents()
         UserDefaults.standard.removeObject(forKey: Keys.profile)
@@ -277,30 +340,36 @@ final class AppStore: ObservableObject {
         return menu.pendingReports + reports.filter { $0.menuID == menu.id && $0.menuVersion == menu.version }.count
     }
 
-    func submitReport(for menu: DailyMenu, kind: ReportKind, note: String, waitMinutes: Int?) async throws {
+    @discardableResult
+    func submitReport(for menu: DailyMenu, kind: ReportKind, note: String, waitMinutes: Int?) async throws -> String {
         if isRemote {
             // Queda ligado a la versión exacta que vio el estudiante; nunca edita el menú oficial.
-            let _: ReportResponse = try await api.send("POST", "reports", body: ReportBody(
+            let response: ReportResponse = try await api.send("POST", "reports", body: ReportBody(
                 publicationId: menu.id, version: menu.version, kind: kind.rawValue,
                 note: note, observedWaitMinutes: waitMinutes))
             if kind == .arrival { track("arrival", menu: menu) }
             await refresh()
-            return
+            return response.status
         }
         reports.append(SubmittedReport(menu: menu, kind: kind, note: note, waitMinutes: waitMinutes))
         if let data = try? UniEatDates.encoder().encode(reports) {
             UserDefaults.standard.set(data, forKey: "unieat.demo.reports.v1")
         }
         if kind == .arrival { track("arrival", menu: menu) }
+        return [.unavailable, .price, .location].contains(kind) ? "pending" : "observation"
     }
 
-    func publish(title: String, restaurantName: String, area: String, address: String,
+    func publish(establishmentId: UUID?, title: String, restaurantName: String, area: String, address: String,
                  entranceDescription: String,
                  validUntil: Date, dishes: [MenuDish], paymentMethods: [String],
                  replacing old: DailyMenu? = nil) async throws {
         if isRemote {
+            let selectedId = old?.establishmentId ?? establishmentId
+            guard let selectedId, approvedEstablishments.contains(where: { $0.id == selectedId }) else {
+                throw APIFailure(code: "VALIDATION_ERROR", message: "Selecciona un establecimiento aprobado.")
+            }
             let body = MenuBody(
-                title: title, validUntil: validUntil, paymentMethods: paymentMethods,
+                establishmentId: selectedId, title: title, validUntil: validUntil, paymentMethods: paymentMethods,
                 dishes: dishes.map { dish in
                     MenuBody.Dish(name: dish.name, description: dish.description, category: dish.category,
                                   priceCop: dish.priceCop, dietaryKnown: dish.dietaryKnown,

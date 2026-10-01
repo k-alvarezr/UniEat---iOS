@@ -36,11 +36,19 @@ struct ProfileView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(store.profile?.displayName ?? "")
                                 .font(.system(size: 23, weight: .heavy, design: .rounded))
-                            Sticker(text: store.isRestaurant ? "Restaurante" : "Estudiante", color: Palette.green)
+                            Sticker(text: store.profile?.role == "admin" ? "Administrador" :
+                                    (store.isRestaurant ? "Restaurante" : "Estudiante"), color: Palette.green)
                             Text("Las preferencias de presupuesto, dieta, tiempo y zona se conservan al volver a la lista de menús.")
                                 .font(.subheadline).foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    if store.isRemote {
+                        if store.profile?.role == "admin" {
+                            AdminApprovalsView()
+                        } else {
+                            EstablishmentManagementView()
+                        }
                     }
                     Toggle("Simular falta de conexión", isOn: $store.forceOffline)
                         .padding(14)

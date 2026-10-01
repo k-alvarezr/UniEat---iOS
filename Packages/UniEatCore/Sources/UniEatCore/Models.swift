@@ -26,6 +26,7 @@ public struct DailyMenu: Codable, Hashable, Identifiable, Sendable {
     public let version: Int
     public let validUntil: Date
     public let publishedAt: Date
+    public let closedAt: Date?
     public let establishmentId: UUID
     public let establishmentName: String
     public let area: String
@@ -46,6 +47,7 @@ public struct DailyMenu: Codable, Hashable, Identifiable, Sendable {
     public let explanation: String
 
     public init(id: UUID = UUID(), title: String, version: Int = 1, validUntil: Date, publishedAt: Date = .now,
+                closedAt: Date? = nil,
                 establishmentId: UUID = UUID(), establishmentName: String, area: String, address: String,
                 entranceDescription: String = "", latitude: Double? = nil, longitude: Double? = nil,
                 photoUrl: String? = nil, paymentMethods: [String] = [], isVerified: Bool = false,
@@ -57,6 +59,7 @@ public struct DailyMenu: Codable, Hashable, Identifiable, Sendable {
         self.version = version
         self.validUntil = validUntil
         self.publishedAt = publishedAt
+        self.closedAt = closedAt
         self.establishmentId = establishmentId
         self.establishmentName = establishmentName
         self.area = area
@@ -77,7 +80,10 @@ public struct DailyMenu: Codable, Hashable, Identifiable, Sendable {
         self.explanation = explanation
     }
 
-    public func isActive(at date: Date = .now) -> Bool { publishedAt <= date && validUntil > date }
+    public func isActive(at date: Date = .now) -> Bool {
+        if let closedAt, closedAt <= date { return false }
+        return publishedAt <= date && validUntil > date
+    }
     public func hasWaitEvidence(at date: Date = .now) -> Bool {
         guard waitSampleCount >= 3, waitMinutes != nil, let newest = waitNewestReportAt else { return false }
         return newest <= date && date.timeIntervalSince(newest) <= 30 * 60

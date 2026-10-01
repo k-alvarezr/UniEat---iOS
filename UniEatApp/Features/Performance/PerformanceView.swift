@@ -24,7 +24,9 @@ struct PerformanceView: View {
                 DemoNotice()
                 Text("Señales de interés")
                     .font(.system(size: 27, weight: .heavy, design: .rounded))
-                Text("Interacciones guardadas en este dispositivo. No representan ventas ni visitas verificadas.")
+                Text(store.isRemote && !preview
+                     ? "Interacciones agregadas por el servidor. No representan ventas ni visitas verificadas."
+                     : "Interacciones guardadas en este dispositivo. No representan ventas ni visitas verificadas.")
                     .font(.subheadline).foregroundStyle(.secondary)
                 if preview {
                     Sticker(text: "CIFRAS ILUSTRATIVAS", color: Palette.cyan, icon: "info.circle")
@@ -40,7 +42,9 @@ struct PerformanceView: View {
                             Image(systemName: "chart.bar.xaxis").font(.largeTitle)
                             Text("Publica tu primer menú para ver actividad")
                                 .font(.headline)
-                            Text("Las métricas aparecerán cuando alguien interactúe con tu publicación en esta demostración.")
+                            Text(store.isRemote
+                                 ? "Las métricas aparecerán cuando alguien interactúe con tu publicación."
+                                 : "Las métricas aparecerán cuando alguien interactúe con tu publicación en esta demostración.")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: .infinity)

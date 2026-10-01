@@ -25,6 +25,7 @@ private struct DishDraft: Identifiable {
 struct PublishView: View {
     @EnvironmentObject private var store: AppStore
     @State private var restaurantName = ""
+    @State private var selectedEstablishmentID: UUID?
     @State private var area = "Centro"
     @State private var address = ""
     @State private var entranceDescription = ""
@@ -40,7 +41,8 @@ struct PublishView: View {
     private var valid: Bool {
         !restaurantName.trimmingCharacters(in: .whitespaces).isEmpty &&
         !title.trimmingCharacters(in: .whitespaces).isEmpty &&
-        validUntil > .now && !dishes.isEmpty &&
+        validUntil > .now && validUntil <= .now.addingTimeInterval(24 * 60 * 60) &&
+        (!store.isRemote || selectedEstablishmentID != nil) && !paymentMethods.isEmpty && !dishes.isEmpty &&
         dishes.allSatisfy { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty &&
             (Int($0.priceText) ?? 0) > 0 }
     }
@@ -63,6 +65,25 @@ struct PublishView: View {
                 SurfaceCard {
                     VStack(alignment: .leading, spacing: 10) {
                         section("Tu establecimiento")
+                        if store.isRemote {
+                            if store.approvedEstablishments.isEmpty {
+                                Text("No tienes establecimientos aprobados. Solicita uno o actualiza su estado en Perfil.")
+                                    .font(.footnote).foregroundStyle(.secondary)
+                            } else {
+                                Picker("Local que publica", selection: $selectedEstablishmentID) {
+                                    Text("Selecciona un local").tag(UUID?.none)
+                                    ForEach(store.approvedEstablishments) { establishment in
+                                        Text(establishment.name).tag(Optional(establishment.id))
+                                    }
+                                }
+                                .disabled(editingMenu != nil)
+                                .onChange(of: selectedEstablishmentID) { _, selected in
+                                    guard editingMenu == nil,
+                                          let establishment = store.approvedEstablishments.first(where: { $0.id == selected }) else { return }
+                                    fillFromEstablishment(establishment)
+                                }
+                            }
+                        }
                         TextField("Nombre del restaurante", text: $restaurantName)
                             .textFieldStyle(.roundedBorder)
                         Picker("Área", selection: $area) {
@@ -93,7 +114,7 @@ struct PublishView: View {
                         TextField("Nombre del menú", text: $title)
                             .textFieldStyle(.roundedBorder)
                         DatePicker("Válido hasta", selection: $validUntil, in: Date.now..., displayedComponents: [.date, .hourAndMinute])
-                        Text("La publicación dejará de aparecer al vencer.")
+                        Text("La publicación dejará de aparecer al vencer. La vigencia máxima es de 24 horas.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
@@ -154,11 +175,13 @@ struct PublishView: View {
                         SurfaceCard {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text(menu.title).font(.headline)
-                                Text("Versión \(menu.version) · \(menu.isActive() ? "vigente" : "cerrada o vencida")")
+                                Text("Versión \(menu.version) · \(menu.closedAt != nil ? "cerrada" : (menu.isActive() ? "vigente" : "vencida"))")
                                     .font(.caption).foregroundStyle(.secondary)
                                 HStack {
-                                    Button("Editar") { edit(menu) }
-                                        .buttonStyle(.bordered)
+                                    if menu.closedAt == nil {
+                                        Button("Editar") { edit(menu) }
+                                            .buttonStyle(.bordered)
+                                    }
                                     if menu.isActive() {
                                         Button("Cerrar publicación", role: .destructive) {
                                             Task { await close(menu) }
@@ -176,8 +199,20 @@ struct PublishView: View {
         }
         .background(Palette.cream)
         .onAppear {
-            if restaurantName.isEmpty {
+            if store.isRemote, selectedEstablishmentID == nil,
+               let establishment = store.approvedEstablishments.first {
+                selectedEstablishmentID = establishment.id
+                fillFromEstablishment(establishment)
+            } else if !store.isRemote && restaurantName.isEmpty {
                 restaurantName = store.isRestaurant ? (store.profile?.displayName ?? "") : "Restaurante de ejemplo"
+            }
+        }
+        .onChange(of: store.approvedEstablishments.map(\.id)) { _, ids in
+            if store.isRemote, selectedEstablishmentID == nil,
+               let id = ids.first,
+               let establishment = store.approvedEstablishments.first(where: { $0.id == id }) {
+                selectedEstablishmentID = id
+                fillFromEstablishment(establishment)
             }
         }
     }
@@ -186,8 +221,17 @@ struct PublishView: View {
         Text(title).font(.system(size: 17, weight: .heavy, design: .rounded))
     }
 
+    private func fillFromEstablishment(_ establishment: RemoteEstablishment) {
+        restaurantName = establishment.name
+        area = establishment.area
+        address = establishment.address
+        entranceDescription = establishment.entranceDescription
+        paymentMethods = Set(establishment.paymentMethods)
+    }
+
     private func edit(_ menu: DailyMenu) {
         editingMenu = menu
+        selectedEstablishmentID = menu.establishmentId
         restaurantName = menu.establishmentName
         area = menu.area
         address = menu.address
@@ -221,7 +265,8 @@ struct PublishView: View {
                      dietaryKnown: draft.dietaryKnown)
         }
         do {
-            try await store.publish(title: title, restaurantName: restaurantName, area: area,
+            try await store.publish(establishmentId: selectedEstablishmentID,
+                                    title: title, restaurantName: restaurantName, area: area,
                                     address: address, entranceDescription: entranceDescription,
                                     validUntil: validUntil, dishes: items,
                                     paymentMethods: paymentChoices.filter { paymentMethods.contains($0) },

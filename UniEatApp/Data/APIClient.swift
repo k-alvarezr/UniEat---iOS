@@ -81,6 +81,66 @@ struct CloseResponse: Decodable { let closedAt: Date }
 struct ReportResponse: Decodable { let status: String }
 struct BatchResponse: Decodable { let accepted: Int }
 
+struct RemoteMembership: Decodable, Identifiable {
+    let establishmentId: UUID
+    let establishmentName: String
+    let area: String
+    let memberRole: String
+    let approved: Bool
+    var id: UUID { establishmentId }
+}
+
+struct MeResponse: Decodable {
+    let id: UUID
+    let displayName: String
+    let role: String
+    let establishments: [RemoteMembership]
+    var profile: Profile { Profile(id: id, displayName: displayName, role: role) }
+}
+
+struct RemoteEstablishment: Decodable, Identifiable {
+    let id: UUID
+    let name: String
+    let area: String
+    let address: String
+    let entranceDescription: String
+    let paymentMethods: [String]
+    let approved: Bool
+}
+
+struct EstablishmentsResponse: Decodable { let establishments: [RemoteEstablishment] }
+
+struct EstablishmentRequestBody: Encodable {
+    let name: String
+    let area: String
+    let address: String
+    let entranceDescription: String
+    let paymentMethods: [String]
+}
+
+struct EstablishmentRequestResponse: Decodable { let message: String }
+
+struct PendingMembership: Decodable, Identifiable {
+    let establishmentId: UUID
+    let establishmentName: String
+    let area: String
+    let userId: UUID
+    let displayName: String
+    var id: String { "\(establishmentId.uuidString):\(userId.uuidString)" }
+}
+
+struct PendingMembershipsResponse: Decodable { let memberships: [PendingMembership] }
+
+struct ApprovalBody: Encodable {
+    let establishmentId: UUID
+    let userId: UUID
+}
+
+struct ApprovalResponse: Decodable {
+    struct Membership: Decodable { let establishmentId: UUID }
+    let membership: Membership
+}
+
 struct MenuBody: Encodable {
     struct Dish: Encodable {
         let name: String
@@ -91,6 +151,7 @@ struct MenuBody: Encodable {
         let dietaryTags: [String]
     }
 
+    let establishmentId: UUID?
     let title: String
     let validUntil: Date
     let paymentMethods: [String]

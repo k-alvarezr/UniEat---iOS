@@ -8,7 +8,7 @@ struct ReportSheet: View {
     @State private var kind: ReportKind = .unavailable
     @State private var note = ""
     @State private var waitMinutes = 20
-    @State private var sent = false
+    @State private var confirmationMessage: String?
     @State private var isSending = false
     @State private var errorText: String?
 
@@ -33,9 +33,9 @@ struct ReportSheet: View {
                     BrandHeader(title: "Reportar un cambio")
                     Text("\(menu.establishmentName) · versión \(menu.version) del menú")
                         .font(.subheadline)
-                    if sent {
+                    if let confirmationMessage {
                         SurfaceCard {
-                            Label("Gracias. Tu reporte quedó pendiente de verificación.", systemImage: "checkmark.circle.fill")
+                            Label(confirmationMessage, systemImage: "checkmark.circle.fill")
                                 .font(.headline)
                         }
                     } else {
@@ -68,7 +68,9 @@ struct ReportSheet: View {
                             .lineLimit(3...5)
                             .padding(12)
                             .background(Palette.paper, in: RoundedRectangle(cornerRadius: 12))
-                        Text("Tu reporte no modifica el menú oficial automáticamente. Otros usuarios verán una advertencia mientras se verifica.")
+                        Text([ReportKind.unavailable, .price, .location].contains(kind)
+                             ? "Tu reporte no modifica el menú oficial. Otros usuarios verán una advertencia mientras se revisa."
+                             : "Tu observación ayuda a informar a la comunidad y no modifica el menú oficial.")
                             .font(.footnote).foregroundStyle(.secondary)
                         if let errorText {
                             Text(errorText).font(.footnote.weight(.semibold)).foregroundStyle(Palette.coral)
@@ -94,9 +96,11 @@ struct ReportSheet: View {
         errorText = nil
         defer { isSending = false }
         do {
-            try await store.submitReport(for: menu, kind: kind, note: note,
-                                         waitMinutes: kind == .longLine ? waitMinutes : nil)
-            sent = true
+            let status = try await store.submitReport(for: menu, kind: kind, note: note,
+                                                      waitMinutes: kind == .longLine ? waitMinutes : nil)
+            confirmationMessage = status == "pending"
+                ? "Gracias. Tu reporte quedó pendiente de revisión."
+                : "Gracias. Tu observación quedó registrada."
         } catch {
             errorText = error.localizedDescription
         }
