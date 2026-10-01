@@ -38,7 +38,7 @@ struct PerformanceView: View {
                 .pickerStyle(.segmented)
                 if store.isRemote && !preview && store.remotePerformance[days] == nil {
                     ProgressView("Cargando métricas del servidor…")
-                } else if store.ownMenus.isEmpty && !preview {
+                } else if store.ownMenus.isEmpty && !preview && !store.isRemote {
                     SurfaceCard {
                         VStack(spacing: 8) {
                             Image(systemName: "chart.bar.xaxis").font(.largeTitle)

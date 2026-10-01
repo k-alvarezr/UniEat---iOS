@@ -54,11 +54,12 @@ struct FiltersView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         sectionTitle("Zona del campus", icon: "mappin")
                         Picker("Zona", selection: Binding(get: { draft.area ?? "Centro" },
-                                                       set: { draft.area = $0 })) {
+                                                       set: { draft.area = $0; locationMessage = nil })) {
                             ForEach(areas, id: \.self) { Text($0).tag($0) }
                         }
                         .pickerStyle(.menu)
                         Button {
+                            locationMessage = nil
                             location.request()
                         } label: {
                             Label("Sugerir zona con mi ubicación", systemImage: "location")
