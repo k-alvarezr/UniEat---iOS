@@ -87,4 +87,41 @@ final class UniEatCoreTests: XCTestCase {
         let closed = revised.closed(at: now.addingTimeInterval(2))
         XCTAssertFalse(closed.isActive(at: now.addingTimeInterval(2)))
     }
+
+    func testRegistrationRulesEnforceBothMaximumsAndPasswordClasses() {
+        XCTAssertNil(RegistrationRules.nameError("Kevin Álvarez"))
+        XCTAssertNil(RegistrationRules.nameError(String(repeating: "A", count: 15)))
+        XCTAssertNotNil(RegistrationRules.nameError(String(repeating: "A", count: 16)))
+        XCTAssertNotNil(RegistrationRules.nameError("   "))
+        XCTAssertNil(RegistrationRules.passwordError("Clave123!"))
+        XCTAssertNil(RegistrationRules.passwordError("Clave123!" + String(repeating: "x", count: 11)))
+        XCTAssertNotNil(RegistrationRules.passwordError("Clave123!" + String(repeating: "x", count: 12)))
+        for invalid in ["clave123!", "CLAVE123!", "Claveabc!", "Clave1234", "A1!a"] {
+            XCTAssertNotNil(RegistrationRules.passwordError(invalid), invalid)
+        }
+    }
+
+    func testLocationSuggestionUsesActualMenuCoordinatesAndDistanceLimit() {
+        let nearby = DailyMenu(title: "Almuerzo", validUntil: now.addingTimeInterval(3_600),
+                               establishmentName: "Local cercano", area: "Norte", address: "Calle 1",
+                               latitude: 4.603, longitude: -74.064,
+                               items: [MenuDish(name: "Plato", priceCop: 10_000)], lowestPriceCop: 10_000)
+        let suggestion = LocationAreaResolver.suggest(latitude: 4.603, longitude: -74.064,
+                                                      menus: [nearby])
+        XCTAssertEqual(suggestion?.area, "Norte")
+        XCTAssertEqual(suggestion?.distanceMeters, 0)
+        XCTAssertNil(LocationAreaResolver.suggest(latitude: 5, longitude: -75, menus: [nearby]))
+        XCTAssertNil(LocationAreaResolver.suggest(latitude: 100, longitude: 0, menus: [nearby]))
+    }
+
+    func testServerPerformanceDecodesSampleAndSuppressedRates() throws {
+        let json = Data("""
+        {"periodDays":7,"impressions":3,"detailOpens":1,"selections":1,
+         "reportedArrivals":0,"sampleSize":2,"insufficientData":true,"rates":null}
+        """.utf8)
+        let summary = try JSONDecoder().decode(PerformanceSummary.self, from: json)
+        XCTAssertEqual(summary.sampleSize, 2)
+        XCTAssertEqual(summary.insufficientData, true)
+        XCTAssertNil(summary.rates)
+    }
 }

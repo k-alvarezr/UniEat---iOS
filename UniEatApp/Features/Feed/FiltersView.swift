@@ -4,7 +4,9 @@ import UniEatCore
 struct FiltersView: View {
     @EnvironmentObject private var store: AppStore
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var location = LocationContextService()
     @State private var draft = FeedFilters()
+    @State private var locationMessage: String?
     private let areas = ["Centro", "Norte", "Sur", "Fuera del campus"]
 
     var body: some View {
@@ -52,10 +54,22 @@ struct FiltersView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         sectionTitle("Zona del campus", icon: "mappin")
                         Picker("Zona", selection: Binding(get: { draft.area ?? "Centro" },
-                                                       set: { draft.area = $0 })) {
+                                                       set: { draft.area = $0; locationMessage = nil })) {
                             ForEach(areas, id: \.self) { Text($0).tag($0) }
                         }
                         .pickerStyle(.menu)
+                        Button {
+                            locationMessage = nil
+                            location.request()
+                        } label: {
+                            Label("Sugerir zona con mi ubicación", systemImage: "location")
+                        }
+                        .buttonStyle(.bordered)
+                        if let message = locationMessage ?? location.message {
+                            Text(message).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Text("Se consulta el GPS una vez y se compara con los pines publicados. Tu ubicación no se envía ni se guarda.")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 SurfaceCard {
@@ -82,6 +96,17 @@ struct FiltersView: View {
         }
         .background(Palette.cream)
         .onAppear { draft = store.filters }
+        .onReceive(location.$location) { position in
+            guard let position else { return }
+            if let suggestion = LocationAreaResolver.suggest(
+                latitude: position.coordinate.latitude, longitude: position.coordinate.longitude,
+                menus: store.menus) {
+                draft.area = suggestion.area
+                locationMessage = "Zona sugerida: \(suggestion.area) · cerca de \(suggestion.establishmentName) (\(suggestion.distanceMeters) m). Revisa y aplica los filtros."
+            } else {
+                locationMessage = "No hay un local publicado con coordenadas a menos de 800 m. Elige la zona manualmente."
+            }
+        }
     }
 
     private func sectionTitle(_ title: String, icon: String) -> some View {

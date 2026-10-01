@@ -38,9 +38,12 @@ final class SupabaseAuthService {
     }
 
     func signUp(email: String, password: String, name: String, role: String) async throws -> Profile? {
+        if let error = RegistrationRules.nameError(name) ?? RegistrationRules.passwordError(password) {
+            throw AuthFailure.service(error)
+        }
         let data = try await request(path: "auth/v1/signup", body: [
             "email": email, "password": password,
-            "data": ["display_name": name, "role": role]
+            "data": ["display_name": name.trimmingCharacters(in: .whitespacesAndNewlines), "role": role]
         ])
         guard let session = try session(from: data) else { return nil }
         store(session)

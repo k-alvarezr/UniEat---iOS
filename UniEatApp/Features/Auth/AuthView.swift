@@ -1,4 +1,5 @@
 import SwiftUI
+import UniEatCore
 
 struct AuthView: View {
     @EnvironmentObject private var store: AppStore
@@ -36,6 +37,11 @@ struct AuthView: View {
                             TextField("Nombre", text: $displayName)
                                 .textContentType(.name)
                                 .textFieldStyle(.roundedBorder)
+                                .onChange(of: displayName) { _, value in
+                                    displayName = String(value.prefix(RegistrationRules.maximumNameLength))
+                                }
+                            Text("Nombre: \(displayName.count)/15 caracteres")
+                                .font(.caption).foregroundStyle(.secondary)
                             Picker("Tipo de cuenta", selection: $role) {
                                 Text("Estudiante").tag("student")
                                 Text("Restaurante").tag("restaurant")
@@ -55,6 +61,15 @@ struct AuthView: View {
                         SecureField("Contraseña", text: $password)
                             .textContentType(isRegistering ? .newPassword : .password)
                             .textFieldStyle(.roundedBorder)
+                            .onChange(of: password) { _, value in
+                                if isRegistering {
+                                    password = String(value.prefix(RegistrationRules.maximumPasswordLength))
+                                }
+                            }
+                        if isRegistering {
+                            Text("Contraseña: 6–20 caracteres, con mayúscula, minúscula, número y carácter especial. \(password.count)/20")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                         if let message = errorText ?? store.authMessage {
                             Text(message)
                                 .font(.footnote)
@@ -64,7 +79,8 @@ struct AuthView: View {
                                     icon: "arrow.right", color: Palette.yellow) {
                             Task { await submit() }
                         }
-                        .disabled(isSubmitting || email.isEmpty || password.isEmpty)
+                        .disabled(isSubmitting || email.isEmpty || password.isEmpty ||
+                                  (isRegistering && RegistrationRules.nameError(displayName) != nil))
                     }
                 }
 
@@ -93,6 +109,10 @@ struct AuthView: View {
         defer { isSubmitting = false }
         do {
             if isRegistering {
+                if let error = RegistrationRules.nameError(displayName) ?? RegistrationRules.passwordError(password) {
+                    errorText = error
+                    return
+                }
                 try await store.signUp(email: email, password: password, name: displayName, role: role)
             } else {
                 try await store.signIn(email: email, password: password)
