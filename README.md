@@ -1,93 +1,93 @@
-# UniEat para iOS
+# UniEat for iOS
 
-Aplicación SwiftUI para consultar y publicar menús del día cerca de Uniandes. El producto sigue la [wiki de UniEat](https://github.com/EstebanRojas01/Moviles/wiki) y las pantallas MS7 del Sprint 1. La app puede funcionar como demostración local o conectarse al [backend compartido](https://github.com/EstebanRojas01/UniEat---iOS-Back) mediante la API v1 de Supabase.
+UniEat is a SwiftUI app for browsing and publishing daily menus near Universidad de los Andes. It follows the [UniEat project wiki](https://github.com/EstebanRojas01/Moviles/wiki) and the ten MS7 screens from Sprint 1. The app can run as a local demo or connect to the [shared backend](https://github.com/EstebanRojas01/UniEat---iOS-Back) through its Supabase API v1.
 
-La trazabilidad de la rúbrica, los patrones, el pipeline de datos y el recorrido de la sustentación están en [docs/sprint2-sustentacion.md](docs/sprint2-sustentacion.md).
+The rubric mapping, architecture and design patterns, data pipeline, and presentation walkthrough are documented in [docs/sprint2-sustentacion.md](docs/sprint2-sustentacion.md). That supporting document is in Spanish. The app interface is also in Spanish; UI labels below are quoted exactly as they appear on screen.
 
-## Ejecutar en macOS
+## Run on macOS
 
-Requisitos: Xcode con un simulador de iPhone, [XcodeGen](https://github.com/yonaskolb/XcodeGen) y macOS compatible con el Xcode instalado.
+Requirements: Xcode with an iPhone simulator, [XcodeGen](https://github.com/yonaskolb/XcodeGen), and a macOS version supported by your installed Xcode.
 
 ```sh
 brew install xcodegen
 ./scripts/bootstrap-ios.sh
 ```
 
-El script genera `UniEat.xcodeproj` desde `project.yml` y lo abre en Xcode. Elegir el esquema **UniEat**, un simulador de iPhone y **Run**. La app requiere iOS 17 o posterior. No se necesitan cuentas, claves ni backend para recorrer la demo: en la pantalla inicial elegir **Soy estudiante** o **Soy restaurante**.
+The script generates `UniEat.xcodeproj` from `project.yml` and opens it in Xcode. Select the **UniEat** scheme, an iPhone simulator, and **Run**. The app requires iOS 17 or later. You do not need an account, API keys, or a running backend to explore the demo: choose **“Soy estudiante”** (student) or **“Soy restaurante”** (restaurant) on the welcome screen.
 
-Para validar el paquete de reglas de negocio en macOS:
+To run the business-rule package tests on macOS:
 
 ```sh
 swift test --package-path Packages/UniEatCore
 ```
 
-En Windows se puede editar el código y analizar la sintaxis con Swift para Windows, pero la app SwiftUI y el simulador requieren Xcode en un Mac. `scripts/swift-core-windows.ps1` prepara las herramientas de Swift y C++ locales para el paquete cuando el SDK de Windows esté configurado.
+You can edit the code and check Swift syntax on Windows, but running the SwiftUI app or an iPhone simulator requires Xcode on a Mac. When the Windows SDK is configured, `scripts/swift-core-windows.ps1` prepares the local Swift and C++ tools for the core package.
 
-## Recorrido de la demo
+## Demo walkthrough
 
-| Rol | Flujo | Pantallas |
+| Role | Flow | Main screens |
 | --- | --- | --- |
-| Estudiante | Entrar, explorar menús vigentes, filtrar por presupuesto/tiempo/dieta/zona/pago, abrir detalle, reportar un cambio y usar «Elige por mí» | Inicio, filtros, detalle, reporte, recomendación, perfil |
-| Restaurante | Entrar, publicar, editar o cerrar un menú estructurado con platos/precios/vigencia y consultar señales de interés | Inicio, publicar, rendimiento, perfil |
+| Student | Browse current menus, filter by budget, time, diet, area, and payment method; open a menu, report a change, and use **“Elige por mí”** (Pick for me). | Today, filters, menu detail, report, recommendation, profile |
+| Restaurant | Publish, edit, or close a structured menu with dishes, prices, and an expiration time; review engagement signals. | Today, publish, performance, profile |
 
-Desde **Perfil → Explorar las 10 pantallas de MS7** se puede abrir cada vista del prototipo sin preparar datos ni cambiar de rol. El reporte se abre como hoja contextual. Para guardar publicaciones se necesita el rol restaurante de la demo o una cuenta real con un local aprobado.
+From **“Perfil” → “Explorar las 10 pantallas de MS7”** (Profile → Explore the ten MS7 screens), you can open every prototype view without preparing data or switching roles. The report form appears as a contextual sheet. Saving a publication requires either the restaurant demo role or a real account associated with an approved establishment.
 
-| MS7 | Pantalla | Ruta normal |
+| MS7 | Screen | Normal route in the Spanish UI |
 | --- | --- | --- |
-| 01 | Hoy · Menús | Pestaña Hoy |
-| 02 | Filtros | Hoy → Filtros |
-| 03 | Detalle del menú | Hoy → tarjeta de menú |
-| 04 | Elige por mí | Pestaña Elige por mí o Hoy → recomendación |
-| 05 | Publicar menú | Pestaña Publicar con rol restaurante |
-| 06 | Reportar un cambio | Detalle → Reportar un cambio |
-| 07 | Sin conexión | Hoy → ejemplo sin conexión; también desde el aviso al simular falta de red |
-| 08 | Sin menú publicado | Hoy → ejemplo de local sin menú |
-| 09 | Espera sin evidencia | Detalle de un menú sin estimación → Ver por qué |
-| 10 | Rendimiento | Pestaña Rendimiento con rol restaurante |
+| 01 | Today's menus | **“Hoy”** tab |
+| 02 | Filters | **“Hoy” → “Filtros”** |
+| 03 | Menu detail | **“Hoy”** → menu card |
+| 04 | Pick for me | **“Elige por mí”** tab or recommendation from **“Hoy”** |
+| 05 | Publish a menu | **“Publicar”** tab with the restaurant role |
+| 06 | Report a change | Menu detail → **“Reportar un cambio”** |
+| 07 | Offline state | Offline example in **“Hoy”**, or the banner shown when simulating a lost connection |
+| 08 | No published menu | Establishment-without-menu example in **“Hoy”** |
+| 09 | Insufficient queue evidence | Menu detail without a wait estimate → **“Ver por qué”** |
+| 10 | Performance | **“Rendimiento”** tab with the restaurant role |
 
-En **Probar sin servidor**, las publicaciones, reportes y eventos se guardan localmente. Con una **cuenta real**, el feed, las publicaciones, los reportes y las métricas provienen de la API compartida. El perfil ofrece un interruptor para simular falta de conexión. La copia del feed se asocia a la cuenta y a sus filtros, indica cuándo se obtuvo y excluye menús vencidos o cerrados.
+In **“Probar sin servidor”** (Try without a server), publications, reports, and events are stored locally. With a real account, the feed, publications, reports, and performance metrics come from the shared API. The profile has a switch to simulate a lost connection. The cached feed is scoped to the account and its filters, shows when it was fetched, and excludes expired or closed menus.
 
-## Arquitectura
+## Architecture
 
 ```mermaid
 flowchart LR
-    UI[SwiftUI Views] --> VM[AppStore / estado de presentación]
-    VM --> Core[UniEatCore / modelos y decisiones]
+    UI[SwiftUI views] --> VM[AppStore / presentation state]
+    VM --> Core[UniEatCore / models and decisions]
     VM --> Repo[MenuRepository]
-    Repo --> Demo[DemoMenuRepository / almacenamiento local]
+    Repo --> Demo[DemoMenuRepository / local storage]
     VM --> Auth[SupabaseAuthService / Keychain]
-    VM --> API[APIClient / api-v1 compartida]
+    VM --> API[APIClient / shared API v1]
     VM --> Network[NWPathMonitor]
 ```
 
-- **MVVM:** las vistas observan `AppStore`; el estado y las acciones no dependen de la vista concreta.
-- **Observer:** `ObservableObject` y `@Published` actualizan el feed, los reportes y el rendimiento al cambiar el estado.
-- **Repository:** `MenuRepository` mantiene la demostración autónoma en `UserDefaults`. Con una cuenta real, `APIClient` consulta la API compartida.
-- **Strategy:** `ContextualRankingStrategy` evalúa la demostración local. En línea, el backend filtra y ordena con `rank-v1`; iOS conserva ese orden.
-- **DTO/modelos:** `DailyMenu`, `MenuDish`, `FeedFilters`, `Profile` y `PerformanceSummary` son tipos `Codable` del paquete `UniEatCore`.
-- **Adapter:** `SupabaseAuthService` gestiona autenticación y Keychain; `APIClient` adapta los DTO de la API v1. El backend decide el rol efectivo y comprueba los permisos de cada publicación.
+- **MVVM:** SwiftUI views observe `AppStore`; presentation state and actions are separate from individual views.
+- **Observer:** `ObservableObject` and `@Published` update the feed, reports, and performance view when state changes.
+- **Repository:** `MenuRepository` abstracts local demo storage in `UserDefaults`. With a real account, `APIClient` requests data from the shared API.
+- **Strategy:** `ContextualRankingStrategy` ranks the local demo feed. Online, the backend filters and ranks with `rank-v1`, and iOS preserves that order.
+- **DTOs and models:** `DailyMenu`, `MenuDish`, `FeedFilters`, `Profile`, and `PerformanceSummary` are `Codable` types in `UniEatCore`.
+- **Adapter:** `SupabaseAuthService` handles authentication and Keychain storage; `APIClient` adapts the API v1 contract. The backend determines each account's effective role and checks publication permissions.
 
-### Decisiones de negocio del Sprint 2
+### Sprint 2 business questions
 
-| Integrante | BQ elegida | Implementación iOS |
+| Team member | Selected business question | iOS implementation |
 | --- | --- | --- |
-| Kevin Álvarez | **BQ-03:** qué menús vigentes son compatibles con presupuesto, dieta, zona y tiempo; ordenarlos con una explicación | Filtros, feed y recomendación. En línea consume el ranking y la explicación `rank-v1` del backend. |
-| Juan Esteban Rojas | **BQ-04:** estado de vigencia y reportes pendientes de una publicación | Estado de publicación, ocultamiento al vencer o cerrar y reportes ligados a una versión. En línea consume la validez y el estado de moderación del backend. |
+| Kevin Álvarez | **BQ-03:** Which current menus match a student's budget, diet, area, and available time, and how should they be ranked and explained? | Filters, feed, and recommendation. Online, the app uses the backend's `rank-v1` ordering and explanations. |
+| Juan Esteban Rojas | **BQ-04:** What is the current status of a publication, and which changes have been reported for its version? | The detail view fetches `GET /menus/:id`, displays the server's status, version, and pending report summaries, and refreshes after a report. Actions are disabled for unavailable publications. |
 
-Una estimación de fila se muestra solo con al menos tres observaciones y una de los últimos 30 minutos. Las discrepancias quedan pendientes de revisión; `long_line`, `accurate` y `arrival` se registran como observaciones.
+A queue estimate requires at least three recent observations, including one from the past 30 minutes. Reports such as `long_line`, `accurate`, and `arrival` are recorded as observations; discrepancies remain pending review. The precise evidence window still needs to be aligned with the MS7 specification ([issue #8](https://github.com/k-alvarezr/UniEat---iOS/issues/8)).
 
-## Backend compartido y cuentas reales
+## Shared backend and real accounts
 
-`UniEatApp/Resources/BackendConfig.json` contiene la URL del proyecto Supabase y su **clave publicable**. Estas son credenciales de cliente; nunca incluir la clave secreta o de servicio. El cliente guarda los tokens en Keychain y usa `GET /me` para obtener el rol efectivo. `user_metadata.role` no concede permisos.
+`UniEatApp/Resources/BackendConfig.json` contains the Supabase project URL and its **publishable key**. These are client-side configuration values; never add a secret or service-role key. The client stores tokens in Keychain and calls `GET /me` for the effective role. `user_metadata.role` does not grant permissions.
 
-1. Crear cuenta e iniciar sesión. Si se confirmó el correo por email, iniciar sesión después de esa confirmación.
-2. En **Perfil → Solicitar un establecimiento**, registrar nombre, zona, dirección y medios de pago. La solicitud queda pendiente.
-3. Una cuenta con rol **Administrador** puede revisar y aprobar solicitudes desde **Perfil → Solicitudes de restaurantes**. El backend debe tener provisionado al menos un administrador confiable; registrar una cuenta con la opción «Restaurante» no la convierte en admin ni en dueño aprobado.
-4. El dueño toca **Actualizar estado** en Perfil después de la aprobación. Aparecen las pestañas **Publicar** y **Rendimiento**.
-5. Si administra varios locales, elige el local en **Publicar**. La app envía su `establishmentId`; las ediciones conservan el local de la publicación original.
+1. Create an account and sign in. If email confirmation is enabled, confirm the address before signing in.
+2. In **“Perfil” → “Solicitar un establecimiento”** (Profile → Request an establishment), enter its name, area, address, and accepted payment methods. The request remains pending.
+3. An **“Administrador”** (administrator) can review and approve requests in **“Perfil” → “Solicitudes de restaurantes”** (Profile → Restaurant requests). The backend must have at least one trusted administrator provisioned. Choosing **“Restaurante”** during registration does not make an account an administrator or an approved owner.
+4. After approval, the owner taps **“Actualizar estado”** (Refresh status) in the profile. The **“Publicar”** (Publish) and **“Rendimiento”** (Performance) tabs then appear.
+5. If the owner manages multiple establishments, they choose one in **“Publicar”**. The app sends its `establishmentId`; editing a publication keeps it attached to the original establishment.
 
-Los menús, reportes, eventos y estadísticas de cuentas reales pertenecen al backend. Las pruebas y el despliegue del servicio están en el repositorio compartido; la demo local no escribe en él.
+Menus, reports, events, and statistics for real accounts belong to the backend. Its tests and deployment instructions live in the shared backend repository. The local demo does not write to that service.
 
-## Estado de verificación
+## Verification status
 
-GitHub Actions en macOS ejecuta las pruebas de `UniEatCore`, genera el proyecto con XcodeGen y compila el cliente para el simulador. Antes de entregar en clase, recorrer en un iPhone o simulador una cuenta de estudiante, una solicitud y aprobación de local, la publicación en cada local, un reporte y el cierre de un menú. La demo local sigue disponible para mostrar las pantallas sin conexión.
+GitHub Actions on macOS runs the `UniEatCore` tests, generates the Xcode project, and builds the client for an iPhone simulator. Before presenting the app, walk through a student account, an establishment request and approval, publishing for each establishment, reporting a change, and closing a menu on an iPhone or simulator. The local demo remains available for an offline screen tour.
