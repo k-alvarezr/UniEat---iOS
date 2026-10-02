@@ -98,7 +98,7 @@ struct MenuCard: View {
     var body: some View {
         SurfaceCard {
             VStack(alignment: .leading, spacing: 10) {
-                FoodArtwork(name: menu.establishmentName)
+                FoodArtwork(name: menu.establishmentName, photoUrl: menu.photoUrl)
                     .frame(height: 130)
                 HStack(alignment: .firstTextBaseline) {
                     Text(menu.establishmentName)
@@ -134,15 +134,28 @@ struct MenuCard: View {
 
 struct FoodArtwork: View {
     let name: String
+    var photoUrl: String? = nil
 
     var body: some View {
         ZStack {
             LinearGradient(colors: [Palette.yellow, Palette.coral.opacity(0.8)],
                            startPoint: .topLeading, endPoint: .bottomTrailing)
             Circle().fill(.white.opacity(0.45)).frame(width: 140).offset(x: 95, y: -40)
-            Image(systemName: "fork.knife.circle.fill")
-                .font(.system(size: 68))
-                .foregroundStyle(Palette.ink.opacity(0.75))
+            if let photoUrl, let url = URL(string: photoUrl), url.scheme == "https" {
+                AsyncImage(url: url) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    Image(systemName: "fork.knife.circle.fill")
+                        .font(.system(size: 68))
+                        .foregroundStyle(Palette.ink.opacity(0.75))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+            } else {
+                Image(systemName: "fork.knife.circle.fill")
+                    .font(.system(size: 68))
+                    .foregroundStyle(Palette.ink.opacity(0.75))
+            }
             Text(name.uppercased())
                 .font(.system(size: 12, weight: .black, design: .rounded))
                 .padding(7)
@@ -151,7 +164,7 @@ struct FoodArtwork: View {
         }
         .frame(maxWidth: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: 11))
-        .accessibilityLabel("Ilustración de \(name)")
+        .accessibilityLabel(photoUrl == nil ? "Ilustración de \(name)" : "Foto de \(name)")
     }
 }
 

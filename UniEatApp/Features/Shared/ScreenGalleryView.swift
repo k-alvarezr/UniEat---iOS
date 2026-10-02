@@ -38,6 +38,8 @@ struct ScreenGalleryView: View {
                 }
                 if store.isAdmin {
                     row("10", "Rendimiento", icon: "chart.bar") { PerformanceView() }
+                } else if store.isRestaurant {
+                    row("10", "Rendimiento del restaurante", icon: "chart.bar") { RestaurantPerformanceView() }
                 } else {
                     HStack(spacing: 12) {
                         Sticker(text: "10", color: Palette.yellow)

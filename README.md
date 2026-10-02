@@ -27,10 +27,10 @@ You can edit the code and check Swift syntax on Windows, but running the SwiftUI
 
 | Role | Flow | Main screens |
 | --- | --- | --- |
-| Student | Browse current menus, filter by budget, time, diet, area, and payment method; open a menu, report a change, and use **“Elige por mí”** (Pick for me). | Today, filters, menu detail, report, recommendation, profile |
-| Restaurant | Publish, edit, or close a structured menu with dishes, prices, and an expiration time; review engagement signals. | Today, publish, performance, profile |
+| Student | Browse current menus, filter by budget, time, diet, area, and payment method; open and save a menu, recover saved menus from Profile, open directions, report a change, and use **“Elige por mí”** (Pick for me). | Today, filters, menu detail, saved menus, report, recommendation, profile |
+| Restaurant | Publish, edit, or close a structured menu with dishes, prices, and an expiration time; review metrics scoped to approved establishments. | Today, publish, my metrics, profile |
 
-From **“Perfil” → “Explorar las 10 pantallas de MS7”** (Profile → Explore the ten MS7 screens), you can open the non-admin prototype views without preparing data or switching roles. Performance is locked unless a real admin is signed in. The report form appears as a contextual sheet. Saving a publication requires either the restaurant demo role or a real account associated with an approved establishment.
+From **“Perfil” → “Explorar las 10 pantallas de MS7”** (Profile → Explore the ten MS7 screens), you can open the prototype views appropriate to your role without preparing data. Restaurant metrics are scoped to that restaurant's approved establishments; the combined BQ dashboard remains admin only. The report form appears as a contextual sheet. Publishing a menu requires either the restaurant demo role or a real account associated with an approved establishment.
 
 | MS7 | Screen | Normal route in the Spanish UI |
 | --- | --- | --- |
@@ -43,7 +43,7 @@ From **“Perfil” → “Explorar las 10 pantallas de MS7”** (Profile → Ex
 | 07 | Offline state | Offline example in **“Hoy”**, or the banner shown when simulating a lost connection |
 | 08 | No published menu | Establishment-without-menu example in **“Hoy”** |
 | 09 | Insufficient queue evidence | Menu detail without a wait estimate → **“Ver por qué”** |
-| 10 | Performance | **“Rendimiento”** tab with a verified admin account |
+| 10 | Performance | **“Mis métricas”** tab for restaurants; the combined **“Rendimiento”** tab for verified admins |
 
 In **“Probar sin servidor”** (Try without a server), publications, reports, and events are stored locally. With a real account, the feed, publications, reports, and performance metrics come from the shared API. The profile has a switch to simulate a lost connection. The cached feed is scoped to the account and its filters, shows when it was fetched, and excludes expired or closed menus.
 
@@ -74,7 +74,7 @@ flowchart LR
 | Kevin Álvarez | **BQ-03:** Which current menus match a student's budget, diet, area, and available time, and how should they be ranked and explained? | Filters, feed, and recommendation. Online, the app uses the backend's `rank-v1` ordering and explanations. |
 | Juan Esteban Rojas | **BQ-04:** What is the current status of a publication, and which changes have been reported for its version? | The detail view fetches `GET /menus/:id`, displays the server's status, version, and pending report summaries, and refreshes after a report. Actions are disabled for unavailable publications. |
 
-A queue estimate requires at least three recent observations, including one from the past 30 minutes. Reports such as `long_line`, `accurate`, and `arrival` are recorded as observations; discrepancies remain pending review. The precise evidence window still needs to be aligned with the MS7 specification ([issue #8](https://github.com/k-alvarezr/UniEat---iOS/issues/8)).
+A queue estimate requires at least three distinct recent observations from the past 30 minutes. Reports such as `long_line`, `accurate`, and `arrival` are recorded as observations; discrepancies remain pending review. This rule was aligned with MS7 in [issue #8](https://github.com/k-alvarezr/UniEat---iOS/issues/8).
 
 ## Shared backend and real accounts
 
@@ -83,10 +83,14 @@ A queue estimate requires at least three recent observations, including one from
 1. Create an account and sign in. If email confirmation is enabled, confirm the address before signing in.
 2. In **“Perfil” → “Solicitar un establecimiento”** (Profile → Request an establishment), enter its name, area, address, and accepted payment methods. The request remains pending.
 3. An **“Administrador”** (administrator) can approve restaurant requests and grant or revoke admin roles from **“Perfil”** (Profile). The backend must have one trusted administrator provisioned first. New accounts always start as students; restaurant access requires an approved establishment.
-4. After approval, the owner taps **“Actualizar estado”** (Refresh status) in the profile. The **“Publicar”** (Publish) tab then appears. Only admins see **“Rendimiento”** (Performance), with iOS-only server aggregates.
+4. After approval, the owner taps **“Actualizar estado”** (Refresh status) in the profile. **“Publicar”** and **“Mis métricas”** then appear. The restaurant sees only its approved establishments' iOS activity. Only admins see the combined **“Rendimiento”** dashboard with BQ-03, BQ-04, and all engagement signals.
 5. If the owner manages multiple establishments, they choose one in **“Publicar”**. The app sends its `establishmentId`; editing a publication keeps it attached to the original establishment.
 
 Menus, reports, events, and statistics for real accounts belong to the backend. Its tests and deployment instructions live in the shared backend repository. The local demo does not write to that service.
+
+## Visual assets
+
+The app bundles the Quicksand variable font from [Google Fonts](https://github.com/google/fonts/tree/main/ofl/quicksand) for its interface typography. Its SIL Open Font License is included at `UniEatApp/Resources/Fonts/OFL.txt`. A restaurant can submit a public HTTPS photo URL with its establishment request. The backend supplies that photo to the feed and detail view; otherwise the app shows its built-in placeholder. File upload and changing the photo after the request are not yet available.
 
 ## Verification status
 

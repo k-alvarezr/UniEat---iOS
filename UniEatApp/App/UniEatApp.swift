@@ -26,5 +26,6 @@ struct RootView: View {
             }
         }
         .tint(Palette.ink)
+        .font(BrandFont.body)
     }
 }

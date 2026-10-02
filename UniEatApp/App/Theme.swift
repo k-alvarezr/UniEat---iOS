@@ -1,5 +1,13 @@
 import SwiftUI
 
+enum BrandFont {
+    static let body = Font.custom("Quicksand-Light", size: 16, relativeTo: .body)
+
+    static func text(_ size: CGFloat, weight: Font.Weight = .medium) -> Font {
+        .custom("Quicksand-Light", size: size).weight(weight)
+    }
+}
+
 enum Palette {
     static let yellow = Color(red: 1, green: 0.898, blue: 0)
     static let cyan = Color(red: 0.098, green: 0.827, blue: 0.91)
@@ -33,8 +41,8 @@ struct BrandHeader: View {
                 .frame(width: 29, height: 29)
                 .background(Palette.ink, in: RoundedRectangle(cornerRadius: 8))
             VStack(alignment: .leading, spacing: 0) {
-                Text(title).font(.system(size: 16, weight: .heavy, design: .rounded))
-                Text(subtitle).font(.system(size: 10, weight: .medium, design: .rounded))
+                Text(title).font(BrandFont.text(16, weight: .bold))
+                Text(subtitle).font(BrandFont.text(10))
                     .foregroundStyle(.secondary)
             }
             Spacer()
@@ -55,7 +63,7 @@ struct Sticker: View {
             if let icon { Image(systemName: icon) }
             Text(text)
         }
-        .font(.system(size: 11, weight: .bold, design: .rounded))
+        .font(BrandFont.text(11, weight: .bold))
         .padding(.horizontal, 9).padding(.vertical, 6)
         .background(color, in: Capsule())
         .overlay(Capsule().stroke(Palette.ink, lineWidth: 1.4))
@@ -77,7 +85,7 @@ struct SolidButton: View {
                 if let icon { Image(systemName: icon) }
                 Spacer()
             }
-            .font(.system(size: 16, weight: .heavy, design: .rounded))
+            .font(BrandFont.text(16, weight: .bold))
             .foregroundStyle(Palette.ink)
             .padding(.vertical, 15)
             .background(color, in: RoundedRectangle(cornerRadius: 14))
@@ -104,14 +112,18 @@ struct SurfaceCard<Content: View>: View {
 }
 
 struct DemoNotice: View {
+    @EnvironmentObject private var store: AppStore
+
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "info.circle.fill")
-            Text("Modo demostración · contenido generado para probar la app")
+        if !store.isRemote {
+            HStack(spacing: 8) {
+                Image(systemName: "info.circle.fill")
+                Text("Modo demostración · contenido generado para probar la app")
+            }
+            .font(.system(size: 11, weight: .semibold, design: .rounded))
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Palette.cyan.opacity(0.22), in: RoundedRectangle(cornerRadius: 10))
         }
-        .font(.system(size: 11, weight: .semibold, design: .rounded))
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Palette.cyan.opacity(0.22), in: RoundedRectangle(cornerRadius: 10))
     }
 }

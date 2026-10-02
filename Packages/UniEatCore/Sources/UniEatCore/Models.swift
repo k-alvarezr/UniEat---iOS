@@ -134,17 +134,24 @@ public struct PerformanceSummary: Codable, Sendable {
     public let detailOpens: Int
     public let selections: Int
     public let reportedArrivals: Int
+    public let savedMenus: Int
+    public let locationOpens: Int
+    public let reports: Int
     public let sampleSize: Int?
     public let insufficientData: Bool?
     public let rates: PerformanceRates?
 
     public init(periodDays: Int, impressions: Int, detailOpens: Int, selections: Int, reportedArrivals: Int,
-                sampleSize: Int? = nil, insufficientData: Bool? = nil, rates: PerformanceRates? = nil) {
+                 savedMenus: Int = 0, locationOpens: Int = 0, reports: Int = 0,
+                 sampleSize: Int? = nil, insufficientData: Bool? = nil, rates: PerformanceRates? = nil) {
         self.periodDays = periodDays
         self.impressions = impressions
         self.detailOpens = detailOpens
         self.selections = selections
         self.reportedArrivals = reportedArrivals
+        self.savedMenus = savedMenus
+        self.locationOpens = locationOpens
+        self.reports = reports
         self.sampleSize = sampleSize
         self.insufficientData = insufficientData
         self.rates = rates

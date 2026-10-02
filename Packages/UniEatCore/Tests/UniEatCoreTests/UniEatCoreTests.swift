@@ -117,10 +117,13 @@ final class UniEatCoreTests: XCTestCase {
     func testServerPerformanceDecodesSampleAndSuppressedRates() throws {
         let json = Data("""
         {"periodDays":7,"impressions":3,"detailOpens":1,"selections":1,
-         "reportedArrivals":0,"sampleSize":2,"insufficientData":true,"rates":null}
+         "reportedArrivals":0,"savedMenus":1,"locationOpens":1,"reports":0,
+         "sampleSize":2,"insufficientData":true,"rates":null}
         """.utf8)
         let summary = try JSONDecoder().decode(PerformanceSummary.self, from: json)
         XCTAssertEqual(summary.sampleSize, 2)
+        XCTAssertEqual(summary.savedMenus, 1)
+        XCTAssertEqual(summary.locationOpens, 1)
         XCTAssertEqual(summary.insufficientData, true)
         XCTAssertNil(summary.rates)
     }
