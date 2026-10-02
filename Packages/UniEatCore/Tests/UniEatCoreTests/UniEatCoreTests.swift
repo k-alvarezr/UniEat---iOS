@@ -173,4 +173,19 @@ final class UniEatCoreTests: XCTestCase {
         XCTAssertEqual(report.statusLabel, "Confirmado")
         XCTAssertFalse(report.isPending)
     }
+
+    func testDetailStatusAdvancesWithClockWhileViewStaysOpen() throws {
+        // El JSON de prueba vence a las 17:20 y el servidor lo marcó "Por vencer" a las 17:00.
+        let detail = try UniEatDates.decoder().decode(MenuDetail.self, from: Data(detailJSON.utf8))
+        let validUntil = detail.menu.validUntil
+        XCTAssertEqual(detail.status(at: validUntil.addingTimeInterval(-60)), .expiring)
+        XCTAssertTrue(detail.status(at: validUntil.addingTimeInterval(-60)).acceptsActions)
+        // Al llegar a la hora de vencimiento pasa a Vencido sin otra consulta.
+        XCTAssertEqual(detail.status(at: validUntil), .expired)
+        XCTAssertFalse(detail.status(at: validUntil.addingTimeInterval(1)).acceptsActions)
+        // Un menú cerrado sigue cerrado aunque falte tiempo para vencer.
+        let closed = MenuDetail(menu: detail.menu, status: .closed, currentVersion: 2, reports: [],
+                                serverNow: detail.serverNow)
+        XCTAssertEqual(closed.status(at: validUntil.addingTimeInterval(-600)), .closed)
+    }
 }
