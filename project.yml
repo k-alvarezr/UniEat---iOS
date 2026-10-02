@@ -19,6 +19,8 @@ targets:
         CFBundleDisplayName: UniEat
         CFBundleLocalizations:
           - es
+        UIAppFonts:
+          - Quicksand.ttf
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait

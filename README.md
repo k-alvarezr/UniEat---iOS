@@ -88,6 +88,10 @@ A queue estimate requires at least three distinct recent observations from the p
 
 Menus, reports, events, and statistics for real accounts belong to the backend. Its tests and deployment instructions live in the shared backend repository. The local demo does not write to that service.
 
+## Visual assets
+
+The app bundles the Quicksand variable font from [Google Fonts](https://github.com/google/fonts/tree/main/ofl/quicksand) for its interface typography. Its SIL Open Font License is included at `UniEatApp/Resources/Fonts/OFL.txt`. Menu photographs appear only when the backend provides a valid HTTPS `photoUrl`; otherwise the app shows its built-in placeholder.
+
 ## Verification status
 
 GitHub Actions on macOS runs the `UniEatCore` tests, generates the Xcode project, and builds the client for an iPhone simulator. Before presenting the app, walk through a student account, an establishment request and approval, publishing for each establishment, reporting a change, and closing a menu on an iPhone or simulator. The local demo remains available for an offline screen tour.
