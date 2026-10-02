@@ -104,14 +104,18 @@ struct SurfaceCard<Content: View>: View {
 }
 
 struct DemoNotice: View {
+    @EnvironmentObject private var store: AppStore
+
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "info.circle.fill")
-            Text("Modo demostración · contenido generado para probar la app")
+        if !store.isRemote {
+            HStack(spacing: 8) {
+                Image(systemName: "info.circle.fill")
+                Text("Modo demostración · contenido generado para probar la app")
+            }
+            .font(.system(size: 11, weight: .semibold, design: .rounded))
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Palette.cyan.opacity(0.22), in: RoundedRectangle(cornerRadius: 10))
         }
-        .font(.system(size: 11, weight: .semibold, design: .rounded))
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Palette.cyan.opacity(0.22), in: RoundedRectangle(cornerRadius: 10))
     }
 }
