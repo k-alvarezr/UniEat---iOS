@@ -82,6 +82,34 @@ struct CloseResponse: Decodable { let closedAt: Date }
 struct ReportResponse: Decodable { let status: String }
 struct BatchResponse: Decodable { let accepted: Int }
 
+struct AdminDashboardSnapshot: Decodable {
+    let periodDays: Int
+    let generatedAt: Date
+    let platform: String
+    let bq03: BQ03Metrics
+    let bq04: BQ04Metrics
+    let engagement: PerformanceSummary
+}
+
+struct BQ03Metrics: Decodable {
+    let feedRequests: Int
+    let successfulRequests: Int
+    let failedRequests: Int
+    let zeroResultRequests: Int
+    let contextualRequests: Int
+    let averageResults: Double
+}
+
+struct BQ04Metrics: Decodable {
+    let detailRequests: Int
+    let activeShown: Int
+    let expiringShown: Int
+    let expiredShown: Int
+    let closedShown: Int
+    let pendingNoticesShown: Int
+    let confirmedNoticesShown: Int
+}
+
 struct RemoteMembership: Decodable, Identifiable {
     let establishmentId: UUID
     let establishmentName: String

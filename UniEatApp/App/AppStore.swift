@@ -37,6 +37,12 @@ struct SubmittedReport: Codable, Identifiable {
     }
 }
 
+struct SavedMenu: Codable, Identifiable {
+    let menu: DailyMenu
+    let savedAt: Date
+    var id: UUID { menu.id }
+}
+
 private struct CachedRemoteFeed: Codable {
     let userId: UUID
     let filters: FeedFilters
@@ -59,7 +65,10 @@ final class AppStore: ObservableObject {
     @Published private(set) var isRemote = false
     @Published private(set) var serverUnreachable = false
     @Published private(set) var remoteOwnMenus: [DailyMenu] = []
-    @Published private(set) var remotePerformance: [Int: PerformanceSummary] = [:]
+    @Published private(set) var adminDashboard: [Int: AdminDashboardSnapshot] = [:]
+    @Published private(set) var restaurantPerformance: [Int: PerformanceSummary] = [:]
+    @Published private(set) var performanceError: String?
+    @Published private(set) var savedMenus: [SavedMenu] = []
     @Published private(set) var remoteMemberships: [RemoteMembership] = []
     @Published private(set) var remoteEstablishments: [RemoteEstablishment] = []
 
@@ -83,6 +92,7 @@ final class AppStore: ObservableObject {
         static let feedCache = "unieat.remote.feed-cache.v1"
         static let profile = "unieat.remote.profile.v1"
         static let pendingEvents = "unieat.remote.pending-events.v1"
+        static func savedMenus(_ userId: UUID) -> String { "unieat.saved-menus.\(userId.uuidString)" }
     }
 
     init() {
@@ -197,6 +207,7 @@ final class AppStore: ObservableObject {
         isRemote = false
         profile = Profile(id: role == "restaurant" ? demoRestaurantID : demoStudentID,
                           displayName: role == "restaurant" ? "Mi restaurante" : "Estudiante Uniandes", role: role)
+        loadSavedMenus()
         authMessage = nil
         Task { await refresh() }
     }
@@ -219,6 +230,8 @@ final class AppStore: ObservableObject {
     /// El rol privilegiado se verifica con `GET /me`; sin conexión se vuelve a estudiante.
     private func startRemoteSession(fallback: Profile) async {
         isRemote = true
+        profile = fallback
+        loadSavedMenus()
         menus = []
         loadCachedFeed(for: fallback.id)
         do {
@@ -286,7 +299,10 @@ final class AppStore: ObservableObject {
         profile = nil
         isRemote = false
         remoteOwnMenus = []
-        remotePerformance = [:]
+        adminDashboard = [:]
+        restaurantPerformance = [:]
+        performanceError = nil
+        savedMenus = []
         remoteMemberships = []
         remoteEstablishments = []
         pendingEvents = []
@@ -308,21 +324,49 @@ final class AppStore: ObservableObject {
         pendingEvents.append(RemoteEvent(eventId: UUID(), sessionId: sessionID, publicationId: menu.id,
                                          version: menu.version, kind: kind, occurredAt: .now))
         persistPendingEvents()
-        if pendingEvents.count >= 10 { Task { await flushEvents() } }
+        if !isOffline { Task { await flushEvents() } }
     }
 
     func flushEvents() async {
         guard isRemote, !isOffline, !isFlushing, !pendingEvents.isEmpty else { return }
         isFlushing = true
         defer { isFlushing = false }
-        let batch = Array(pendingEvents.prefix(100))
-        do {
-            let _: BatchResponse = try await api.send("POST", "events/batch", body: EventBatch(events: batch))
-            pendingEvents.removeAll { batch.contains($0) }
-            persistPendingEvents()
-        } catch {
-            // Se quedan en la cola local y se reenvían en la próxima actualización.
+        while !pendingEvents.isEmpty && !isOffline {
+            let batch = Array(pendingEvents.prefix(100))
+            do {
+                let _: BatchResponse = try await api.send("POST", "events/batch", body: EventBatch(events: batch))
+                pendingEvents.removeAll { batch.contains($0) }
+                persistPendingEvents()
+            } catch {
+                // Se quedan en la cola local y se reenvían en la próxima actualización.
+                break
+            }
         }
+    }
+
+    func isSaved(_ menu: DailyMenu) -> Bool { savedMenus.contains { $0.id == menu.id } }
+
+    func toggleSaved(_ menu: DailyMenu) {
+        guard let userId = profile?.id else { return }
+        if isSaved(menu) {
+            savedMenus.removeAll { $0.id == menu.id }
+        } else {
+            savedMenus.insert(SavedMenu(menu: menu, savedAt: .now), at: 0)
+            track("menu_save", menu: menu)
+        }
+        if let data = try? UniEatDates.encoder().encode(savedMenus) {
+            UserDefaults.standard.set(data, forKey: Keys.savedMenus(userId))
+        }
+    }
+
+    private func loadSavedMenus() {
+        guard let userId = profile?.id,
+              let data = UserDefaults.standard.data(forKey: Keys.savedMenus(userId)),
+              let saved = try? UniEatDates.decoder().decode([SavedMenu].self, from: data) else {
+            savedMenus = []
+            return
+        }
+        savedMenus = saved
     }
 
     private func trackGlobal(_ kind: String) {
@@ -436,7 +480,7 @@ final class AppStore: ObservableObject {
 
     func performance(days: Int) -> PerformanceSummary {
         if isRemote {
-            return remotePerformance[days]
+            return (isAdmin ? adminDashboard[days]?.engagement : restaurantPerformance[days])
                 ?? PerformanceSummary(periodDays: days, impressions: 0, detailOpens: 0, selections: 0, reportedArrivals: 0)
         }
         let ownIDs = Set(ownMenus.map(\.id))
@@ -445,17 +489,29 @@ final class AppStore: ObservableObject {
                                   impressions: recent.filter { $0.kind == "feed_impression" }.count,
                                   detailOpens: recent.filter { $0.kind == "detail_open" }.count,
                                   selections: recent.filter { $0.kind == "selection" }.count,
-                                  reportedArrivals: recent.filter { $0.kind == "arrival" }.count)
+                                  reportedArrivals: recent.filter { $0.kind == "arrival" }.count,
+                                  savedMenus: recent.filter { $0.kind == "menu_save" }.count,
+                                  locationOpens: recent.filter { $0.kind == "location_open" }.count,
+                                  reports: reports.filter { ownIDs.contains($0.menuID) && $0.date >= .now.addingTimeInterval(Double(-days * 86_400)) }.count)
     }
 
     /// Agregados iOS del servidor, visibles únicamente para administradores.
     func loadPerformance(days: Int) async {
-        guard isAdmin else { remotePerformance = [:]; return }
-        do { try await loadRemoteAccount() } catch { remotePerformance = [:]; return }
-        guard isAdmin else { remotePerformance = [:]; return }
-        await flushEvents()
-        if let summary: PerformanceSummary = try? await api.get("performance", query: [URLQueryItem(name: "days", value: String(days))]) {
-            remotePerformance[days] = summary
+        guard isRemote && !isOffline else { return }
+        performanceError = nil
+        do {
+            try await loadRemoteAccount()
+            await flushEvents()
+            let query = [URLQueryItem(name: "days", value: String(days))]
+            if isAdmin {
+                let snapshot: AdminDashboardSnapshot = try await api.get("admin/dashboard", query: query)
+                adminDashboard[days] = snapshot
+            } else if isRestaurant {
+                let summary: PerformanceSummary = try await api.get("restaurant/performance", query: query)
+                restaurantPerformance[days] = summary
+            }
+        } catch {
+            performanceError = error.localizedDescription
         }
     }
 }

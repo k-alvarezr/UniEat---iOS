@@ -4,6 +4,7 @@ import UniEatCore
 
 struct MenuDetailView: View {
     @EnvironmentObject private var store: AppStore
+    @Environment(\.openURL) private var openURL
     @State private var showingReport = false
     /// Copia que llegó del feed; se muestra mientras llega la versión del servidor.
     private let initialMenu: DailyMenu
@@ -36,7 +37,7 @@ struct MenuDetailView: View {
             VStack(alignment: .leading, spacing: 16) {
                 BrandHeader(title: "Detalle del plato")
                 DemoNotice()
-                FoodArtwork(name: menu.establishmentName)
+                FoodArtwork(name: menu.establishmentName, photoUrl: menu.photoUrl)
                     .frame(height: 180)
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
@@ -117,8 +118,11 @@ struct MenuDetailView: View {
                             .frame(height: 175)
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                             if let mapURL = URL(string: "https://maps.apple.com/?ll=\(latitude),\(longitude)") {
-                                Link("Abrir indicaciones", destination: mapURL)
-                                    .font(.subheadline.weight(.bold))
+                                Button("Abrir indicaciones") {
+                                    store.track("location_open", menu: menu)
+                                    openURL(mapURL)
+                                }
+                                .font(.subheadline.weight(.bold))
                             }
                         } else {
                             Text("Ubicación no confirmada").font(.subheadline)
@@ -136,6 +140,12 @@ struct MenuDetailView: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                if isOpen(at: timeline.date) || store.isSaved(menu) {
+                    SolidButton(title: store.isSaved(menu) ? "Quitar de guardados" : "Guardar menú",
+                                icon: store.isSaved(menu) ? "bookmark.slash" : "bookmark", color: Palette.cyan) {
+                        store.toggleSaved(menu)
+                    }
                 }
                 if isOpen(at: timeline.date) {
                     SolidButton(title: "Elegir este menú", icon: "checkmark", color: Palette.yellow) {

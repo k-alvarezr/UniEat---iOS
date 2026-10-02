@@ -17,6 +17,9 @@ struct MainTabsView: View {
             if store.isAdmin {
                 NavigationStack { PerformanceView() }
                     .tabItem { Label("Rendimiento", systemImage: "chart.bar.fill") }
+            } else if store.isRestaurant {
+                NavigationStack { RestaurantPerformanceView() }
+                    .tabItem { Label("Mis métricas", systemImage: "chart.bar") }
             }
             ProfileView()
                 .tabItem { Label("Perfil", systemImage: "person.crop.circle") }
@@ -65,6 +68,13 @@ struct ProfileView: View {
                             .frame(maxWidth: .infinity, minHeight: 48)
                             .background(Palette.cyan, in: RoundedRectangle(cornerRadius: 12))
                             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Palette.ink, lineWidth: 2))
+                    }
+                    NavigationLink(destination: SavedMenusView()) {
+                        Label("Menús guardados (\(store.savedMenus.count))", systemImage: "bookmark.fill")
+                            .font(.system(size: 15, weight: .heavy, design: .rounded))
+                            .foregroundStyle(Palette.ink)
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                            .background(Palette.paper, in: RoundedRectangle(cornerRadius: 12))
                     }
                     SolidButton(title: "Cerrar sesión", icon: "rectangle.portrait.and.arrow.right", color: Palette.yellow) {
                         store.signOut()
