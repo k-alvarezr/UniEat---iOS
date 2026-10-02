@@ -90,7 +90,7 @@ Menus, reports, events, and statistics for real accounts belong to the backend. 
 
 ## Visual assets
 
-The app bundles the Quicksand variable font from [Google Fonts](https://github.com/google/fonts/tree/main/ofl/quicksand) for its interface typography. Its SIL Open Font License is included at `UniEatApp/Resources/Fonts/OFL.txt`. Menu photographs appear only when the backend provides a valid HTTPS `photoUrl`; otherwise the app shows its built-in placeholder.
+The app bundles the Quicksand variable font from [Google Fonts](https://github.com/google/fonts/tree/main/ofl/quicksand) for its interface typography. Its SIL Open Font License is included at `UniEatApp/Resources/Fonts/OFL.txt`. A restaurant can submit a public HTTPS photo URL with its establishment request. The backend supplies that photo to the feed and detail view; otherwise the app shows its built-in placeholder. File upload and changing the photo after the request are not yet available.
 
 ## Verification status
 

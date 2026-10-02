@@ -145,6 +145,7 @@ struct EstablishmentRequestBody: Encodable {
     let address: String
     let entranceDescription: String
     let paymentMethods: [String]
+    let photoUrl: String?
 }
 
 struct EstablishmentRequestResponse: Decodable { let message: String }

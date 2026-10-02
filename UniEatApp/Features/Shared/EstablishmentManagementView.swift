@@ -7,6 +7,7 @@ struct EstablishmentManagementView: View {
     @State private var area = "Centro"
     @State private var address = ""
     @State private var entranceDescription = ""
+    @State private var photoURL = ""
     @State private var paymentMethods: Set<String> = ["Efectivo"]
     @State private var isWorking = false
     @State private var message: String?
@@ -16,7 +17,15 @@ struct EstablishmentManagementView: View {
 
     private var canSubmit: Bool {
         !isWorking && !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !paymentMethods.isEmpty
+        !address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !paymentMethods.isEmpty &&
+        validPhotoURL
+    }
+
+    private var validPhotoURL: Bool {
+        let value = photoURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.isEmpty { return true }
+        guard value.count <= 500, let url = URLComponents(string: value) else { return false }
+        return url.scheme?.lowercased() == "https" && url.host != nil && url.user == nil && url.password == nil
     }
 
     var body: some View {
@@ -53,6 +62,17 @@ struct EstablishmentManagementView: View {
                             .textFieldStyle(.roundedBorder)
                         TextField("Cómo encontrar la entrada (opcional)", text: $entranceDescription)
                             .textFieldStyle(.roundedBorder)
+                        TextField("Enlace HTTPS de foto (opcional)", text: $photoURL)
+                            .keyboardType(.URL)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .textFieldStyle(.roundedBorder)
+                        Text("La foto del local aparecerá en sus menús. Usa una imagen pública con permiso para mostrarla.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                        if !validPhotoURL {
+                            Text("Usa un enlace HTTPS válido, sin usuario ni contraseña.")
+                                .font(.footnote).foregroundStyle(Palette.coral)
+                        }
                         Text("Medios de pago").font(.subheadline.weight(.semibold))
                         ForEach(methods, id: \.self) { method in
                             Toggle(method, isOn: Binding(
@@ -99,11 +119,13 @@ struct EstablishmentManagementView: View {
                 name: name.trimmingCharacters(in: .whitespacesAndNewlines), area: area,
                 address: address.trimmingCharacters(in: .whitespacesAndNewlines),
                 entranceDescription: entranceDescription.trimmingCharacters(in: .whitespacesAndNewlines),
-                paymentMethods: methods.filter { paymentMethods.contains($0) })
+                paymentMethods: methods.filter { paymentMethods.contains($0) },
+                photoUrl: photoURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : photoURL.trimmingCharacters(in: .whitespacesAndNewlines))
             message = "Solicitud enviada. Podrás publicar cuando un administrador la apruebe."
             name = ""
             address = ""
             entranceDescription = ""
+            photoURL = ""
             showingForm = false
         } catch {
             message = error.localizedDescription

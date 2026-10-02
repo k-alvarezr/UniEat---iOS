@@ -260,10 +260,10 @@ final class AppStore: ObservableObject {
     }
 
     func requestEstablishment(name: String, area: String, address: String,
-                              entranceDescription: String, paymentMethods: [String]) async throws {
+                              entranceDescription: String, paymentMethods: [String], photoUrl: String?) async throws {
         let body = EstablishmentRequestBody(name: name, area: area, address: address,
                                             entranceDescription: entranceDescription,
-                                            paymentMethods: paymentMethods)
+                                            paymentMethods: paymentMethods, photoUrl: photoUrl)
         let _: EstablishmentRequestResponse = try await api.send("POST", "establishments", body: body)
         // La solicitud ya existe si el POST respondió 201. Un fallo al recargar no debe
         // presentarse como fallo de envío ni provocar que el usuario la duplique.
