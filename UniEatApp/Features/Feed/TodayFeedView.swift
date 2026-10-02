@@ -163,7 +163,7 @@ struct OfflineNotice: View {
             Image(systemName: "wifi.slash").font(.title3)
             VStack(alignment: .leading, spacing: 3) {
                 Text("Sin conexión · vista guardada").fontWeight(.heavy)
-                Text("Última carga: \(SpanishPresentation.dateAndTime(cachedAt)). Los menús vencidos se ocultan.")
+                Text("Última carga: \(SpanishPresentation.dateAndTime(cachedAt)); los menús vencidos se ocultan.")
                     .font(.caption)
             }
         }

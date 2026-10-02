@@ -20,13 +20,13 @@ struct MenuDetailView: View {
 
     private func isOpen(at date: Date) -> Bool {
         if isGone { return false }
-        if let detail { return detail.status.acceptsActions }
+        if let detail { return detail.status(at: date).acceptsActions }
         return menu.isActive(at: date)
     }
 
     private func statusLabel(at date: Date) -> String {
         if isGone { return "No disponible" }
-        if let detail { return detail.status.label }
+        if let detail { return detail.status(at: date).label }
         return menu.isActive(at: date) ? "Vigente" : "Vencido"
     }
 
@@ -201,7 +201,7 @@ struct MenuDetailView: View {
                             Text("Los reportes pendientes no cambian el menú oficial hasta que se revisen.")
                                 .font(.caption2).foregroundStyle(.secondary)
                         }
-                        Text("Datos del servidor a las \(SpanishPresentation.time(detail.serverNow)).")
+                        Text("Datos del servidor: \(SpanishPresentation.time(detail.serverNow))")
                             .font(.caption2).foregroundStyle(.secondary)
                     } else if isLoading {
                         ProgressView("Consultando la versión actual…")
@@ -216,7 +216,7 @@ struct MenuDetailView: View {
     private func bannerText(for failure: APIFailure) -> String {
         switch failure.code {
         case "OFFLINE":
-            return "Sin conexión: se muestra la copia guardada a las \(SpanishPresentation.time(store.cachedAt)). Puede haber cambios."
+            return "Sin conexión: se muestra la copia guardada a las \(SpanishPresentation.time(store.cachedAt)); puede haber cambios."
         case "GONE", "NOT_FOUND":
             return failure.message
         default:

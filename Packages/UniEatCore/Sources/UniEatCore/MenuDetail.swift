@@ -96,6 +96,20 @@ public struct MenuDetail: Decodable, Sendable {
         serverNow = try container.decode(Date.self, forKey: .serverNow)
     }
 
+    /// Estado a la hora `date`. Parte del estado que dio el servidor y lo avanza con el reloj
+    /// mientras la vista sigue abierta: un menú "Por vencer" pasa a "Vencido" al llegar a
+    /// `validUntil` sin esperar otra consulta. Cerrado o vencido nunca vuelve atrás.
+    public func status(at date: Date) -> ServerPublicationStatus {
+        switch status {
+        case .closed, .expired:
+            return status
+        case .active, .expiring:
+            if date >= menu.validUntil { return .expired }
+            if menu.validUntil.timeIntervalSince(date) <= 30 * 60 { return .expiring }
+            return status
+        }
+    }
+
     /// Reportes que todavía no revisa un administrador; no cambian el menú oficial.
     public var pendingReports: [ReportSummary] { reports.filter(\.isPending) }
 
