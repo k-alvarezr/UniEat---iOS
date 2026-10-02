@@ -30,7 +30,7 @@ struct InsufficientQueueEvidenceView: View {
                             Text("Último reporte: \(SpanishPresentation.dateAndTime(newest))")
                                 .font(.caption)
                         }
-                        Text("Mostramos un tiempo aproximado solo cuando hay al menos tres reportes recientes. No inventamos una estimación cuando faltan datos.")
+                        Text("Mostramos un tiempo aproximado solo cuando hay al menos tres reportes de los últimos 30 minutos. No inventamos una estimación cuando faltan datos.")
                             .font(.subheadline)
                             .padding(10)
                             .background(Palette.cream, in: RoundedRectangle(cornerRadius: 10))

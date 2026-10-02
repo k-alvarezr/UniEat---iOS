@@ -340,6 +340,14 @@ final class AppStore: ObservableObject {
         return menu.pendingReports + reports.filter { $0.menuID == menu.id && $0.menuVersion == menu.version }.count
     }
 
+    /// BQ-04: versión actual del menú con estado, vigencia y reportes calculados por el servidor.
+    /// Devuelve nil en modo demo; lanza `APIFailure` (OFFLINE, NOT_FOUND, GONE…) si el servidor no lo entrega.
+    func menuDetail(_ menu: DailyMenu) async throws -> MenuDetail? {
+        guard isRemote else { return nil }
+        guard !forceOffline else { throw APIFailure.offline }
+        return try await api.get("menus/\(menu.id.uuidString)")
+    }
+
     @discardableResult
     func submitReport(for menu: DailyMenu, kind: ReportKind, note: String, waitMinutes: Int?) async throws -> String {
         if isRemote {

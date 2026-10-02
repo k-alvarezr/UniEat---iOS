@@ -124,4 +124,53 @@ final class UniEatCoreTests: XCTestCase {
         XCTAssertEqual(summary.insufficientData, true)
         XCTAssertNil(summary.rates)
     }
+
+    // MARK: - BQ-04: detalle del servidor
+
+    private let detailJSON = """
+    {"serverNow":"2026-10-01T17:00:00.000Z","fetchedAt":"2026-10-01T17:00:00.000Z","menu":{
+      "id":"10000000-0000-4000-8000-000000000003","title":"Almuerzo casero","version":2,"currentVersion":2,
+      "validUntil":"2026-10-01T17:20:00.000Z","publishedAt":"2026-10-01T16:00:00.000Z","closedAt":null,
+      "establishmentId":"e0000000-0000-4000-8000-000000000003","establishmentName":"Doña Elvira","area":"Norte",
+      "address":"Calle 21 #2-15","entranceDescription":"Fachada amarilla","latitude":4.6054,"longitude":-74.0628,
+      "photoUrl":null,"paymentMethods":["Efectivo"],"isVerified":false,
+      "items":[{"id":"20000000-0000-4000-8000-000000000001","name":"Sopa","description":"","category":"Almuerzo",
+                "priceCop":9000,"dietaryTags":["vegetarian"],"dietaryKnown":true}],
+      "lowestPriceCop":9000,"waitMinutes":null,"waitSampleCount":1,"waitNewestReportAt":null,"pendingReports":1,
+      "status":"expiring","relevanceScore":0,"explanation":"Este menú vence en 30 minutos o menos","hasWaitEvidence":false,
+      "reports":[
+        {"id":"30000000-0000-4000-8000-000000000001","kind":"price","status":"pending","createdAt":"2026-10-01T16:40:00.000Z","resolvedAt":null},
+        {"id":"30000000-0000-4000-8000-000000000002","kind":"unavailable","status":"dismissed","createdAt":"2026-10-01T16:30:00.000Z","resolvedAt":"2026-10-01T16:50:00.000Z"}
+      ]}}
+    """
+
+    func testMenuDetailDecodesServerStatusVersionAndReports() throws {
+        let detail = try UniEatDates.decoder().decode(MenuDetail.self, from: Data(detailJSON.utf8))
+        XCTAssertEqual(detail.menu.establishmentName, "Doña Elvira")
+        XCTAssertEqual(detail.menu.version, 2)
+        XCTAssertEqual(detail.status, .expiring)
+        XCTAssertEqual(detail.currentVersion, 2)
+        XCTAssertEqual(detail.reports.count, 2)
+        // Solo el reporte sin revisar cuenta como pendiente; el descartado no.
+        XCTAssertEqual(detail.pendingReports.map(\.kindLabel), ["Precio distinto al publicado"])
+        XCTAssertTrue(detail.isNewer(than: 1))
+        XCTAssertFalse(detail.isNewer(than: 2))
+    }
+
+    func testServerStatusLabelsAndAllowedActions() {
+        XCTAssertEqual(ServerPublicationStatus.active.label, "Vigente")
+        XCTAssertEqual(ServerPublicationStatus.expiring.label, "Por vencer")
+        XCTAssertEqual(ServerPublicationStatus.expired.label, "Vencido")
+        XCTAssertEqual(ServerPublicationStatus.closed.label, "Cerrado")
+        XCTAssertTrue(ServerPublicationStatus.expiring.acceptsActions)
+        XCTAssertFalse(ServerPublicationStatus.expired.acceptsActions)
+        XCTAssertFalse(ServerPublicationStatus.closed.acceptsActions)
+    }
+
+    func testReportSummaryLabelsUnknownKindWithoutCrashing() {
+        let report = ReportSummary(id: UUID(), kind: "otro", status: "confirmed", createdAt: now)
+        XCTAssertEqual(report.kindLabel, "Otro cambio")
+        XCTAssertEqual(report.statusLabel, "Confirmado")
+        XCTAssertFalse(report.isPending)
+    }
 }
