@@ -13,7 +13,7 @@ struct RecommendationView: View {
                 Sticker(text: "MODO RÁPIDO", color: Palette.yellow, icon: "sparkles")
                 Text("Elige por mí ⚡")
                     .font(.system(size: 28, weight: .black, design: .rounded))
-                Text("El sorteo inteligente respeta tus filtros activos.")
+                Text("Las opciones se ordenan según tus filtros y la información disponible.")
                     .font(.subheadline)
                 SurfaceCard {
                     VStack(alignment: .leading, spacing: 8) {
@@ -47,7 +47,7 @@ struct RecommendationView: View {
                     .background(Palette.cyan, in: RoundedRectangle(cornerRadius: 16))
                     MenuCard(menu: menu, explanation: store.explanation(for: menu), pendingReports: store.pendingReports(for: menu),
                              assessment: PublicationAssessment(menu: menu))
-                    SolidButton(title: "Elegir otra opción", icon: "arrow.clockwise", color: Palette.yellow) {
+                    SolidButton(title: "Ver siguiente opción", icon: "arrow.clockwise", color: Palette.yellow) {
                         index += 1
                     }
                     NavigationLink(destination: MenuDetailView(menu: menu)) {
