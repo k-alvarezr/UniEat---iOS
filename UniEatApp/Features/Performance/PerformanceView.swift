@@ -4,53 +4,28 @@ import UniEatCore
 struct PerformanceView: View {
     @EnvironmentObject private var store: AppStore
     @State private var days = 7
-    var preview = false
-
-    init(preview: Bool = false) { self.preview = preview }
-
     private var summary: PerformanceSummary {
-        preview
-            ? PerformanceSummary(periodDays: days, impressions: days == 7 ? 214 : 638,
-                                 detailOpens: days == 7 ? 38 : 109,
-                                 selections: days == 7 ? 21 : 61,
-                                 reportedArrivals: days == 7 ? 12 : 34)
-            : store.performance(days: days)
+        store.performance(days: days)
     }
 
     var body: some View {
+        Group {
+        if store.isAdmin {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 BrandHeader(title: "UniEat · Rendimiento")
                 DemoNotice()
                 Text("Señales de interés")
                     .font(.system(size: 27, weight: .heavy, design: .rounded))
-                Text(store.isRemote && !preview
-                     ? "Interacciones agregadas por el servidor. No representan ventas ni visitas verificadas."
-                     : "Interacciones guardadas en este dispositivo. No representan ventas ni visitas verificadas.")
+                Text("Interacciones iOS agregadas por el servidor. No representan ventas ni visitas verificadas.")
                     .font(.subheadline).foregroundStyle(.secondary)
-                if preview {
-                    Sticker(text: "CIFRAS ILUSTRATIVAS", color: Palette.cyan, icon: "info.circle")
-                }
                 Picker("Período", selection: $days) {
                     Text("Últimos 7 días").tag(7)
                     Text("28 días").tag(28)
                 }
                 .pickerStyle(.segmented)
-                if store.isRemote && !preview && store.remotePerformance[days] == nil {
+                if store.remotePerformance[days] == nil {
                     ProgressView("Cargando métricas del servidor…")
-                } else if store.ownMenus.isEmpty && !preview && !store.isRemote {
-                    SurfaceCard {
-                        VStack(spacing: 8) {
-                            Image(systemName: "chart.bar.xaxis").font(.largeTitle)
-                            Text("Publica tu primer menú para ver actividad")
-                                .font(.headline)
-                            Text(store.isRemote
-                                 ? "Las métricas aparecerán cuando alguien interactúe con tu publicación."
-                                 : "Las métricas aparecerán cuando alguien interactúe con tu publicación en esta demostración.")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
                 } else {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                         MetricTile(number: summary.impressions, title: "Impresiones", detail: "Tarjetas vistas", color: Palette.yellow)
@@ -58,7 +33,7 @@ struct PerformanceView: View {
                         MetricTile(number: summary.selections, title: "Selecciones", detail: "Menú elegido", color: Palette.green)
                         MetricTile(number: summary.reportedArrivals, title: "Llegadas", detail: "Reportadas por usuarios", color: Palette.coral)
                     }
-                    if store.isRemote && !preview {
+                    if store.isRemote {
                         SurfaceCard {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Lectura del período").font(.headline)
@@ -88,25 +63,17 @@ struct PerformanceView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
-                NavigationLink(destination: PublishView()) {
-                    HStack {
-                        Spacer()
-                        Text("Ir a publicar un menú")
-                        Image(systemName: "arrow.right")
-                        Spacer()
-                    }
-                    .font(.system(size: 16, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Palette.ink)
-                    .padding(.vertical, 15)
-                    .background(Palette.coral, in: RoundedRectangle(cornerRadius: 14))
-                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Palette.ink, lineWidth: 2))
-                }
             }
             .padding(16)
         }
         .background(Palette.cream)
         // Con cuenta real las cifras vienen agregadas del servidor para el período elegido.
-        .task(id: days) { if !preview { await store.loadPerformance(days: days) } }
+        .task(id: days) { await store.loadPerformance(days: days) }
+        } else {
+            ContentUnavailableView("Solo administradores", systemImage: "lock.fill",
+                                   description: Text("Inicia sesión con una cuenta administradora para ver el rendimiento."))
+        }
+        }
     }
 
     private func bar(_ title: String, value: Int, maxValue: Int, color: Color) -> some View {

@@ -16,7 +16,7 @@ struct ScreenGalleryView: View {
                 BrandHeader(title: "Pantallas MS7")
                 Text("Recorre las diez vistas del prototipo")
                     .font(.system(size: 24, weight: .heavy, design: .rounded))
-                Text("Las pantallas de restaurante se pueden explorar aquí desde cualquier rol. Para guardar menús, entra como restaurante.")
+                Text("Las pantallas de restaurante se pueden explorar aquí desde cualquier rol. Rendimiento requiere una cuenta administradora.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
@@ -36,7 +36,19 @@ struct ScreenGalleryView: View {
                 row("09", "Espera sin evidencia", icon: "hourglass") {
                     InsufficientQueueEvidenceView(menu: exampleMenu)
                 }
-                row("10", "Rendimiento", icon: "chart.bar") { PerformanceView(preview: true) }
+                if store.isAdmin {
+                    row("10", "Rendimiento", icon: "chart.bar") { PerformanceView() }
+                } else {
+                    HStack(spacing: 12) {
+                        Sticker(text: "10", color: Palette.yellow)
+                        Label("Rendimiento · Solo administradores", systemImage: "lock.fill")
+                            .font(.system(size: 15, weight: .heavy, design: .rounded))
+                        Spacer()
+                    }
+                    .padding(14)
+                    .frame(maxWidth: .infinity, minHeight: 54)
+                    .background(Palette.paper, in: RoundedRectangle(cornerRadius: 13))
+                }
             }
             .padding(16)
         }

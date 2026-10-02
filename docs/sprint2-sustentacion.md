@@ -39,12 +39,12 @@ flowchart LR
   C --> D[POST /events/batch]
   D --> E[Validación y deduplicación por eventId]
   E --> F[(interaction_events)]
-  F --> G[Agregación SQL por dueño y período]
+  F --> G[Agregación SQL iOS por período]
   G --> H[GET /performance?days=7 o 28]
   H --> I[Un tablero: impresiones, aperturas, selecciones, llegadas, muestra y tasas]
 ```
 
-Las cuatro señales Type 2 se registran donde ocurren: tarjeta del feed visible, detalle abierto, selección explícita y llegada autorreportada. La cola se reenvía al recuperar conexión; `eventId` evita duplicados. La API agrupa eventos de locales del dueño, devuelve `sampleSize` y omite tasas con menos de cinco sesiones o cero impresiones. La app muestra los cuatro conteos y las tasas disponibles **en la misma pantalla de Rendimiento**. Las selecciones no son ventas; las llegadas no son visitas verificadas. La demo usa datos locales y marca las cifras de la galería como ilustrativas. No se deben presentar como resultados de usuarios reales.
+Las cuatro señales Type 2 se registran donde ocurren: tarjeta del feed visible, detalle abierto, selección explícita y llegada autorreportada. La cola se reenvía al recuperar conexión; `eventId` evita duplicados. La API agrupa eventos iOS, devuelve `sampleSize` y omite tasas con menos de cinco sesiones o cero impresiones. Solo un administrador puede abrir **Rendimiento**. El dashboard HTML del backend reúne también las métricas BQ-03 y BQ-04 a partir de `feed_queries` y `menu_detail_queries`, actualizadas cada tres segundos. Las selecciones no son ventas; las llegadas no son visitas verificadas. El modo demo usa datos locales, pero no concede acceso a Rendimiento.
 
 La BQ-03 usa publicaciones vigentes, precios y declaraciones dietarias de la API junto a filtros elegidos por la persona; `rank-v1` explica el orden. La BQ-04 deriva vigencia de marcas de tiempo y distingue reportes pendientes de actualizaciones confirmadas. El GPS solo sugiere un valor de zona para la BQ-03: no reemplaza la ubicación publicada ni se envía a la API. El umbral de 800 m es una regla de proximidad aproximada, no una medición de caminata o una frontera oficial de campus.
 
@@ -52,11 +52,11 @@ La BQ-03 usa publicaciones vigentes, precios y declaraciones dietarias de la API
 
 | Criterio | Demostración y límite honesto |
 | --- | --- |
-| BQ / dashboard | BQ-03 y BQ-04 arriba; Rendimiento reúne los cuatro conteos y, cuando hay muestra suficiente, dos tasas. Requiere eventos reales para cifras reales. |
+| BQ / dashboard | El HTML admin del backend muestra métricas BQ-03 y BQ-04; Rendimiento iOS muestra cuatro conteos y dos tasas cuando la muestra basta. Todos usan datos reales y solo iOS. |
 | Pipeline de datos | Diagrama anterior; mostrar evento en `AppStore.track`, llamada `/events/batch`, agregación y `/performance`. Sin datos fabricados en modo real. |
 | Patrón arquitectónico por integrante | Kevin: MVVM de iOS; Juan Esteban: capas del backend. Cada uno debe explicar su código y sus commits. |
 | Dos patrones de diseño | Repository y Strategy, con interfaces e implementaciones específicas. |
-| Funcionalidad | Recorrer las 10 pantallas MS7 desde Perfil; luego ejecutar flujos normales de filtro, detalle, reporte, publicación y rendimiento. |
+| Funcionalidad | Recorrer las pantallas MS7 desde Perfil; la décima aparece bloqueada para no admins. Luego ejecutar flujos normales de filtro, detalle, reporte, publicación y rendimiento con el rol apropiado. |
 | Sensor | Filtros → **Sugerir zona con mi ubicación**: lectura puntual con CoreLocation. Probar permiso concedido, denegado e imprecisión. |
 | BQ Type 2 | Feed contextual BQ-03 y vigencia/reporte BQ-04; eventos de interacción alimentan el tablero. |
 | Context aware | Zona sugerida por proximidad a coordenadas publicadas; la persona puede mantener su zona manual. `NWPathMonitor` adapta el flujo a la conectividad. |
@@ -68,8 +68,8 @@ La BQ-03 usa publicaciones vigentes, precios y declaraciones dietarias de la API
 
 1. Ejecutar `swift test --package-path Packages/UniEatCore` y generar/compilar el proyecto como indica el README.
 2. Entrar en demo estudiante. Abrir Filtros, conceder ubicación en simulador y escoger una posición cercana a un pin de menú; comprobar sugerencia. Denegar o alejar la posición y comprobar el camino manual.
-3. Aplicar filtros, abrir detalle, usar «Elige por mí», reportar un cambio y recorrer las 10 pantallas.
+3. Aplicar filtros, abrir detalle, usar «Elige por mí», reportar un cambio y recorrer las pantallas disponibles. Comprobar que Rendimiento está bloqueado para estudiantes y restaurantes.
 4. Probar alta con nombre de 16 caracteres y contraseña sin una clase; debe impedirse. Probar nombre de 15 y contraseña válida de hasta 20. Iniciar sesión real tras confirmar correo si el proyecto lo exige.
-5. Con una cuenta restaurante aprobada, publicar un menú; desde estudiante provocar impresiones, aperturas, selecciones y una llegada; volver a Rendimiento en 7/28 días y comprobar conteos, muestra y supresión de tasas con poca evidencia.
+5. Con una cuenta restaurante aprobada, publicar un menú; desde estudiante provocar impresiones, aperturas, selecciones y una llegada. Entrar como admin para ver Rendimiento y el HTML BQ-03/BQ-04 en 7/28 días; comprobar conteos, muestra y supresión de tasas con poca evidencia.
 
 **Límite de verificación:** Windows no ejecuta SwiftUI ni el simulador. El workflow `iOS` en GitHub Actions compila en macOS; una ejecución humana en simulador/iPhone sigue siendo necesaria para evaluar diseño, permisos, entrada y reabrir la app. El máximo de nombre/contraseña está aplicado en el cliente; para impedir cuentas creadas directamente contra Supabase con otras reglas haría falta una política del servicio de autenticación compartido.

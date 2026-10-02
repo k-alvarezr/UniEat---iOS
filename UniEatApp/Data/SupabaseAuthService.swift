@@ -37,13 +37,13 @@ final class SupabaseAuthService {
         return session.profile
     }
 
-    func signUp(email: String, password: String, name: String, role: String) async throws -> Profile? {
+    func signUp(email: String, password: String, name: String) async throws -> Profile? {
         if let error = RegistrationRules.nameError(name) ?? RegistrationRules.passwordError(password) {
             throw AuthFailure.service(error)
         }
         let data = try await request(path: "auth/v1/signup", body: [
             "email": email, "password": password,
-            "data": ["display_name": name.trimmingCharacters(in: .whitespacesAndNewlines), "role": role]
+            "data": ["display_name": name.trimmingCharacters(in: .whitespacesAndNewlines)]
         ])
         guard let session = try session(from: data) else { return nil }
         store(session)
@@ -139,11 +139,10 @@ final class SupabaseAuthService {
         let metadata = user["user_metadata"] as? [String: Any]
         let email = user["email"] as? String ?? ""
         let name = metadata?["display_name"] as? String ?? email
-        let role = metadata?["role"] as? String == "restaurant" ? "restaurant" : "student"
         let expiresAt = (json["expires_at"] as? Double).map { Date(timeIntervalSince1970: $0) }
             ?? (json["expires_in"] as? Double).map { Date.now.addingTimeInterval($0) }
         return StoredSession(accessToken: access, refreshToken: refresh,
-                             profile: Profile(id: id, displayName: name, role: role), expiresAt: expiresAt)
+                             profile: Profile(id: id, displayName: name, role: "student"), expiresAt: expiresAt)
     }
 
     private func store(_ session: StoredSession) {

@@ -6,7 +6,6 @@ struct AuthView: View {
     @State private var email = ""
     @State private var password = ""
     @State private var displayName = ""
-    @State private var role = "student"
     @State private var isRegistering = false
     @State private var isSubmitting = false
     @State private var errorText: String?
@@ -42,15 +41,8 @@ struct AuthView: View {
                                 }
                             Text("Nombre: \(displayName.count)/15 caracteres")
                                 .font(.caption).foregroundStyle(.secondary)
-                            Picker("Tipo de cuenta", selection: $role) {
-                                Text("Estudiante").tag("student")
-                                Text("Restaurante").tag("restaurant")
-                            }
-                            .pickerStyle(.segmented)
-                            if role == "restaurant" {
-                                Text("Después de crear la cuenta, registra tu local en Perfil. Un administrador debe aprobarlo antes de publicar.")
-                                    .font(.footnote).foregroundStyle(.secondary)
-                            }
+                            Text("Las cuentas nuevas empiezan como estudiante. Solicita un restaurante desde Perfil; un administrador debe aprobarlo.")
+                                .font(.footnote).foregroundStyle(.secondary)
                         }
                         TextField("Correo", text: $email)
                             .textContentType(.emailAddress)
@@ -113,7 +105,7 @@ struct AuthView: View {
                     errorText = error
                     return
                 }
-                try await store.signUp(email: email, password: password, name: displayName, role: role)
+                try await store.signUp(email: email, password: password, name: displayName)
             } else {
                 try await store.signIn(email: email, password: password)
             }

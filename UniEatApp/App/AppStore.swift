@@ -117,6 +117,7 @@ final class AppStore: ObservableObject {
 
     var isOffline: Bool { forceOffline || !isConnected || (isRemote && serverUnreachable) }
     var isRestaurant: Bool { profile?.role == "restaurant" }
+    var isAdmin: Bool { isRemote && profile?.role == "admin" && !isOffline }
     var approvedEstablishments: [RemoteEstablishment] {
         remoteEstablishments.filter(\.approved)
     }
@@ -206,8 +207,8 @@ final class AppStore: ObservableObject {
         authMessage = nil
     }
 
-    func signUp(email: String, password: String, name: String, role: String) async throws {
-        if let signedIn = try await auth.signUp(email: email, password: password, name: name, role: role) {
+    func signUp(email: String, password: String, name: String) async throws {
+        if let signedIn = try await auth.signUp(email: email, password: password, name: name) {
             await startRemoteSession(fallback: signedIn)
             authMessage = nil
         } else {
@@ -215,8 +216,7 @@ final class AppStore: ObservableObject {
         }
     }
 
-    /// El rol que muestra la app es el verificado por el servidor (`GET /me`), nunca
-    /// `user_metadata`. Sin conexión se reutiliza el último perfil verificado.
+    /// El rol privilegiado se verifica con `GET /me`; sin conexión se vuelve a estudiante.
     private func startRemoteSession(fallback: Profile) async {
         isRemote = true
         menus = []
@@ -224,12 +224,7 @@ final class AppStore: ObservableObject {
         do {
             try await loadRemoteAccount()
         } catch {
-            if let data = UserDefaults.standard.data(forKey: Keys.profile),
-               let cached = try? JSONDecoder().decode(Profile.self, from: data), cached.id == fallback.id {
-                profile = cached
-            } else {
-                profile = Profile(id: fallback.id, displayName: fallback.displayName, role: "student")
-            }
+            profile = Profile(id: fallback.id, displayName: fallback.displayName, role: "student")
         }
         await refresh()
     }
@@ -272,6 +267,18 @@ final class AppStore: ObservableObject {
     func approveMembership(_ request: PendingMembership) async throws {
         let _: ApprovalResponse = try await api.send("POST", "admin/memberships/approve", body:
             ApprovalBody(establishmentId: request.establishmentId, userId: request.userId))
+    }
+
+    func adminUsers() async throws -> [AdminUser] {
+        guard isAdmin else { throw APIFailure(code: "FORBIDDEN", message: "Solo administradores.") }
+        let response: AdminUsersResponse = try await api.get("admin/users")
+        return response.users
+    }
+
+    func setAdminRole(for user: AdminUser, enabled: Bool) async throws {
+        guard isAdmin else { throw APIFailure(code: "FORBIDDEN", message: "Solo administradores.") }
+        let _: AdminRoleResponse = try await api.send("PATCH", "admin/users/\(user.id.uuidString)/role",
+                                                  body: AdminRoleBody(role: enabled ? "admin" : "student"))
     }
 
     func signOut() {
@@ -441,9 +448,11 @@ final class AppStore: ObservableObject {
                                   reportedArrivals: recent.filter { $0.kind == "arrival" }.count)
     }
 
-    /// Agregados del servidor para los locales del dueño (nunca eventos individuales de estudiantes).
+    /// Agregados iOS del servidor, visibles únicamente para administradores.
     func loadPerformance(days: Int) async {
-        guard isRemote else { return }
+        guard isAdmin else { remotePerformance = [:]; return }
+        do { try await loadRemoteAccount() } catch { remotePerformance = [:]; return }
+        guard isAdmin else { remotePerformance = [:]; return }
         await flushEvents()
         if let summary: PerformanceSummary = try? await api.get("performance", query: [URLQueryItem(name: "days", value: String(days))]) {
             remotePerformance[days] = summary

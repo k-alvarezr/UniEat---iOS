@@ -50,6 +50,7 @@ final class APIClient {
         request.httpMethod = method
         request.setValue(configuration.publishableKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(try await accessToken())", forHTTPHeaderField: "Authorization")
+        request.setValue("ios", forHTTPHeaderField: "X-UniEat-Platform")
         if let body {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try UniEatDates.encoder().encode(body)
@@ -140,6 +141,16 @@ struct ApprovalResponse: Decodable {
     struct Membership: Decodable { let establishmentId: UUID }
     let membership: Membership
 }
+
+struct AdminUser: Decodable, Identifiable {
+    let id: UUID
+    let displayName: String
+    let role: String
+}
+
+struct AdminUsersResponse: Decodable { let users: [AdminUser] }
+struct AdminRoleBody: Encodable { let role: String }
+struct AdminRoleResponse: Decodable { let id: UUID; let role: String }
 
 struct MenuBody: Encodable {
     struct Dish: Encodable {

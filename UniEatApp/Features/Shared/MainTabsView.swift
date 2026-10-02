@@ -10,11 +10,13 @@ struct MainTabsView: View {
             if store.isRestaurant {
                 PublishView()
                     .tabItem { Label("Publicar", systemImage: "plus.circle.fill") }
-                NavigationStack { PerformanceView() }
-                    .tabItem { Label("Rendimiento", systemImage: "chart.bar.fill") }
             } else {
                 NavigationStack { RecommendationView() }
                     .tabItem { Label("Elige por mí", systemImage: "sparkles") }
+            }
+            if store.isAdmin {
+                NavigationStack { PerformanceView() }
+                    .tabItem { Label("Rendimiento", systemImage: "chart.bar.fill") }
             }
             ProfileView()
                 .tabItem { Label("Perfil", systemImage: "person.crop.circle") }
@@ -44,8 +46,9 @@ struct ProfileView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     if store.isRemote {
-                        if store.profile?.role == "admin" {
+                        if store.isAdmin {
                             AdminApprovalsView()
+                            AdminRolesView()
                         } else {
                             EstablishmentManagementView()
                         }

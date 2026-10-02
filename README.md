@@ -30,7 +30,7 @@ You can edit the code and check Swift syntax on Windows, but running the SwiftUI
 | Student | Browse current menus, filter by budget, time, diet, area, and payment method; open a menu, report a change, and use **“Elige por mí”** (Pick for me). | Today, filters, menu detail, report, recommendation, profile |
 | Restaurant | Publish, edit, or close a structured menu with dishes, prices, and an expiration time; review engagement signals. | Today, publish, performance, profile |
 
-From **“Perfil” → “Explorar las 10 pantallas de MS7”** (Profile → Explore the ten MS7 screens), you can open every prototype view without preparing data or switching roles. The report form appears as a contextual sheet. Saving a publication requires either the restaurant demo role or a real account associated with an approved establishment.
+From **“Perfil” → “Explorar las 10 pantallas de MS7”** (Profile → Explore the ten MS7 screens), you can open the non-admin prototype views without preparing data or switching roles. Performance is locked unless a real admin is signed in. The report form appears as a contextual sheet. Saving a publication requires either the restaurant demo role or a real account associated with an approved establishment.
 
 | MS7 | Screen | Normal route in the Spanish UI |
 | --- | --- | --- |
@@ -43,7 +43,7 @@ From **“Perfil” → “Explorar las 10 pantallas de MS7”** (Profile → Ex
 | 07 | Offline state | Offline example in **“Hoy”**, or the banner shown when simulating a lost connection |
 | 08 | No published menu | Establishment-without-menu example in **“Hoy”** |
 | 09 | Insufficient queue evidence | Menu detail without a wait estimate → **“Ver por qué”** |
-| 10 | Performance | **“Rendimiento”** tab with the restaurant role |
+| 10 | Performance | **“Rendimiento”** tab with a verified admin account |
 
 In **“Probar sin servidor”** (Try without a server), publications, reports, and events are stored locally. With a real account, the feed, publications, reports, and performance metrics come from the shared API. The profile has a switch to simulate a lost connection. The cached feed is scoped to the account and its filters, shows when it was fetched, and excludes expired or closed menus.
 
@@ -82,8 +82,8 @@ A queue estimate requires at least three recent observations, including one from
 
 1. Create an account and sign in. If email confirmation is enabled, confirm the address before signing in.
 2. In **“Perfil” → “Solicitar un establecimiento”** (Profile → Request an establishment), enter its name, area, address, and accepted payment methods. The request remains pending.
-3. An **“Administrador”** (administrator) can review and approve requests in **“Perfil” → “Solicitudes de restaurantes”** (Profile → Restaurant requests). The backend must have at least one trusted administrator provisioned. Choosing **“Restaurante”** during registration does not make an account an administrator or an approved owner.
-4. After approval, the owner taps **“Actualizar estado”** (Refresh status) in the profile. The **“Publicar”** (Publish) and **“Rendimiento”** (Performance) tabs then appear.
+3. An **“Administrador”** (administrator) can approve restaurant requests and grant or revoke admin roles from **“Perfil”** (Profile). The backend must have one trusted administrator provisioned first. New accounts always start as students; restaurant access requires an approved establishment.
+4. After approval, the owner taps **“Actualizar estado”** (Refresh status) in the profile. The **“Publicar”** (Publish) tab then appears. Only admins see **“Rendimiento”** (Performance), with iOS-only server aggregates.
 5. If the owner manages multiple establishments, they choose one in **“Publicar”**. The app sends its `establishmentId`; editing a publication keeps it attached to the original establishment.
 
 Menus, reports, events, and statistics for real accounts belong to the backend. Its tests and deployment instructions live in the shared backend repository. The local demo does not write to that service.
