@@ -56,7 +56,7 @@ La BQ-03 usa publicaciones vigentes, precios y declaraciones dietarias de la API
 | Pipeline de datos | Diagrama anterior; mostrar evento en `AppStore.track`, reporte con plataforma, llamada `/events/batch`, agregación y `/admin/dashboard`. Sin datos fabricados en modo real. |
 | Patrón arquitectónico por integrante | Kevin: MVVM de iOS; Juan Esteban: capas del backend. Cada uno debe explicar su código y sus commits. |
 | Dos patrones de diseño | Repository y Strategy, con interfaces e implementaciones específicas. |
-| Funcionalidad | Recorrer las pantallas MS7 desde Perfil. Estudiantes pueden guardar/recuperar menús y abrir indicaciones; restaurantes ven `Mis métricas`; administradores ven el tablero global. Probar también errores y reintento. |
+| Funcionalidad | Recorrer las pantallas MS7 desde Perfil. Estudiantes pueden guardar/recuperar menús y abrir indicaciones; al solicitar un establecimiento se puede indicar una foto pública HTTPS; restaurantes ven `Mis métricas`; administradores ven el tablero global. Probar también errores y reintento. |
 | Sensor | Filtros → **Sugerir zona con mi ubicación**: lectura puntual con CoreLocation. Probar permiso concedido, denegado e imprecisión. |
 | BQ Type 2 | Feed contextual BQ-03 y vigencia/reporte BQ-04; eventos de interacción alimentan el tablero. |
 | Context aware | Zona sugerida por proximidad a coordenadas publicadas; la persona puede mantener su zona manual. `NWPathMonitor` adapta el flujo a la conectividad. |
