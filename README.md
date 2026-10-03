@@ -30,7 +30,7 @@ You can edit the code and check Swift syntax on Windows, but running the SwiftUI
 | Student | Browse current menus, filter by budget, time, diet, area, and payment method; open and save a menu, recover saved menus from Profile, open directions, report a change, and use **“Elige por mí”** (Pick for me). | Today, filters, menu detail, saved menus, report, recommendation, profile |
 | Restaurant | Publish, edit, or close a structured menu with dishes, prices, and an expiration time; review metrics scoped to approved establishments. | Today, publish, my metrics, profile |
 
-From **“Perfil” → “Explorar las 10 pantallas de MS7”** (Profile → Explore the ten MS7 screens), you can open the prototype views appropriate to your role without preparing data. Restaurant metrics are scoped to that restaurant's approved establishments; the combined BQ dashboard remains admin only. The report form appears as a contextual sheet. Publishing a menu requires either the restaurant demo role or a real account associated with an approved establishment.
+Admins signed in with a real account get **“Perfil” → “Atajo a todas las pantallas de la app”** (Profile → shortcut to every app screen) to open the ten MS7 views without preparing data; students and restaurants reach them through their normal tabs. Restaurant metrics are scoped to that restaurant's approved establishments; the combined BQ dashboard remains admin only. The report form appears as a contextual sheet. Publishing a menu requires either the restaurant demo role or a real account associated with an approved establishment.
 
 | MS7 | Screen | Normal route in the Spanish UI |
 | --- | --- | --- |
