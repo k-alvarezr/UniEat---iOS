@@ -40,12 +40,12 @@ Admins signed in with a real account get **“Perfil” → “Atajo a todas las
 | 04 | Pick for me | **“Elige por mí”** tab or recommendation from **“Hoy”** |
 | 05 | Publish a menu | **“Publicar”** tab with the restaurant role |
 | 06 | Report a change | Menu detail → **“Reportar un cambio”** |
-| 07 | Offline state | Offline example in **“Hoy”**, or the banner shown when simulating a lost connection |
+| 07 | Offline state | Offline example in **“Hoy”** for admins, or the banner shown after an actual connection loss |
 | 08 | No published menu | Establishment-without-menu example in **“Hoy”** |
 | 09 | Insufficient queue evidence | Menu detail without a wait estimate → **“Ver por qué”** |
 | 10 | Performance | **“Mis métricas”** tab for restaurants; the combined **“Rendimiento”** tab for verified admins |
 
-In **“Probar sin servidor”** (Try without a server), publications, reports, and events are stored locally. With a real account, the feed, publications, reports, and performance metrics come from the shared API. The profile has a switch to simulate a lost connection. The cached feed is scoped to the account and its filters, shows when it was fetched, and excludes expired or closed menus.
+In **“Probar sin servidor”** (Try without a server), publications, reports, and events are stored locally. With a real account, the feed, publications, reports, and performance metrics come from the shared API. When connectivity is lost, the cached feed is scoped to the account and its filters, shows when it was fetched, and excludes expired or closed menus.
 
 ## Architecture
 
