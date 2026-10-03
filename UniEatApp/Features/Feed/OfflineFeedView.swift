@@ -21,7 +21,6 @@ struct OfflineFeedView: View {
                         SolidButton(title: "Reintentar conexión", icon: "arrow.clockwise", color: Palette.paper) {
                             Task {
                                 await store.refresh()
-                                if store.isConnected { store.forceOffline = false }
                                 retryMessage = store.isOffline
                                     ? "La copia local sigue disponible. No hay conexión nueva."
                                     : "La vista local se actualizó."
@@ -57,7 +56,7 @@ struct OfflineFeedView: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    Text("Los datos de ejemplo de esta versión son locales; cuando exista el servicio compartido, esta pantalla mostrará la última descarga real.")
+                    Text("Es la última copia descargada; puede haber cambios desde entonces.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

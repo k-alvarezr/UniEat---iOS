@@ -1,7 +1,7 @@
 import SwiftUI
 import UniEatCore
 
-/// A direct route to every MS7 view for reviewing the iOS prototype.
+/// Atajo de administración a todas las pantallas de la app (antes "Pantallas MS7").
 struct ScreenGalleryView: View {
     @EnvironmentObject private var store: AppStore
     @State private var showingReport = false
@@ -13,8 +13,8 @@ struct ScreenGalleryView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                BrandHeader(title: "Pantallas MS7")
-                Text("Recorre las diez vistas del prototipo")
+                BrandHeader(title: "Todas las pantallas")
+                Text("Atajo a todas las pantallas de la app")
                     .font(.system(size: 24, weight: .heavy, design: .rounded))
                 Text("Las pantallas de restaurante se pueden explorar aquí desde cualquier rol. Rendimiento requiere una cuenta administradora.")
                     .font(.subheadline)
@@ -55,7 +55,7 @@ struct ScreenGalleryView: View {
             .padding(16)
         }
         .background(Palette.cream)
-        .navigationTitle("Pantallas MS7")
+        .navigationTitle("Todas las pantallas")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingReport) { ReportSheet(menu: exampleMenu) }
     }

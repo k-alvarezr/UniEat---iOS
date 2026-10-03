@@ -55,7 +55,6 @@ final class AppStore: ObservableObject {
     @Published private(set) var menus: [DailyMenu] = SampleMenus.all
     @Published private(set) var filters: FeedFilters = FeedFilters()
     @Published private(set) var isConnected = true
-    @Published var forceOffline = false
     @Published private(set) var cachedAt = Date.now
     @Published private(set) var reports: [SubmittedReport] = []
     @Published private(set) var events: [InteractionEvent] = []
@@ -125,7 +124,7 @@ final class AppStore: ObservableObject {
         }
     }
 
-    var isOffline: Bool { forceOffline || !isConnected || (isRemote && serverUnreachable) }
+    var isOffline: Bool { !isConnected || (isRemote && serverUnreachable) }
     var isRestaurant: Bool { profile?.role == "restaurant" }
     var isAdmin: Bool { isRemote && profile?.role == "admin" && !isOffline }
     var approvedEstablishments: [RemoteEstablishment] {
@@ -156,7 +155,6 @@ final class AppStore: ObservableObject {
             }
             return
         }
-        guard !forceOffline else { loadCachedFeed(for: profile?.id); return }
         let requestedFilters = filters
         do {
             let feed: FeedResponse = try await api.get("feed", query: requestedFilters.queryItems)
@@ -395,7 +393,6 @@ final class AppStore: ObservableObject {
     /// Devuelve nil en modo demo; lanza `APIFailure` (OFFLINE, NOT_FOUND, GONE…) si el servidor no lo entrega.
     func menuDetail(_ menu: DailyMenu) async throws -> MenuDetail? {
         guard isRemote else { return nil }
-        guard !forceOffline else { throw APIFailure.offline }
         return try await api.get("menus/\(menu.id.uuidString)")
     }
 

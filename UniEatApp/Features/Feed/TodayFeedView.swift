@@ -68,18 +68,22 @@ struct TodayFeedContent: View {
                                 .onAppear { store.track("feed_impression", menu: menu) }
                             }
                         }
-                        NavigationLink(destination: NoMenuPublishedView()) {
-                            Label("Ver ejemplo: local sin menú del día", systemImage: "storefront")
-                                .font(.footnote.weight(.semibold))
-                                .foregroundStyle(Palette.ink)
+                        // Enlaces de ejemplo: solo administradores (issue #15).
+                        // Ningún otro usuario debe ver el local inventado de NoMenuPublishedView.
+                        if store.isAdmin {
+                            NavigationLink(destination: NoMenuPublishedView()) {
+                                Label("Ver ejemplo: local sin menú del día", systemImage: "storefront")
+                                    .font(.footnote.weight(.semibold))
+                                    .foregroundStyle(Palette.ink)
+                            }
+                            .padding(.vertical, 10)
+                            NavigationLink(destination: OfflineFeedView()) {
+                                Label("Ver ejemplo: pantalla sin conexión", systemImage: "wifi.slash")
+                                    .font(.footnote.weight(.semibold))
+                                    .foregroundStyle(Palette.ink)
+                            }
+                            .padding(.bottom, 10)
                         }
-                        .padding(.vertical, 10)
-                        NavigationLink(destination: OfflineFeedView()) {
-                            Label("Ver ejemplo: pantalla sin conexión", systemImage: "wifi.slash")
-                                .font(.footnote.weight(.semibold))
-                                .foregroundStyle(Palette.ink)
-                        }
-                        .padding(.bottom, 10)
                     }
                     .padding(16)
                 }

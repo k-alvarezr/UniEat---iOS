@@ -56,18 +56,18 @@ struct ProfileView: View {
                             EstablishmentManagementView()
                         }
                     }
-                    Toggle("Simular falta de conexión", isOn: $store.forceOffline)
-                        .padding(14)
-                        .background(Palette.paper, in: RoundedRectangle(cornerRadius: 14))
                     Text("La información guardada muestra cuándo se obtuvo y descarta menús vencidos incluso sin conexión.")
                         .font(.footnote).foregroundStyle(.secondary)
-                    NavigationLink(destination: ScreenGalleryView()) {
-                        Label("Explorar las 10 pantallas de MS7", systemImage: "square.grid.2x2")
-                            .font(.system(size: 15, weight: .heavy, design: .rounded))
-                            .foregroundStyle(Palette.ink)
-                            .frame(maxWidth: .infinity, minHeight: 48)
-                            .background(Palette.cyan, in: RoundedRectangle(cornerRadius: 12))
-                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Palette.ink, lineWidth: 2))
+                    // Atajo de revisión: solo administradores con sesión real (issue #15).
+                    if store.isAdmin {
+                        NavigationLink(destination: ScreenGalleryView()) {
+                            Label("Atajo a todas las pantallas de la app", systemImage: "square.grid.2x2")
+                                .font(.system(size: 15, weight: .heavy, design: .rounded))
+                                .foregroundStyle(Palette.ink)
+                                .frame(maxWidth: .infinity, minHeight: 48)
+                                .background(Palette.cyan, in: RoundedRectangle(cornerRadius: 12))
+                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Palette.ink, lineWidth: 2))
+                        }
                     }
                     NavigationLink(destination: SavedMenusView()) {
                         Label("Menús guardados (\(store.savedMenus.count))", systemImage: "bookmark.fill")
