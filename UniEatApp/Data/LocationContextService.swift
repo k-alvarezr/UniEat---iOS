@@ -2,7 +2,7 @@ import Combine
 import CoreLocation
 import Foundation
 
-/// Lectura puntual del sensor. La coordenada vive solo en memoria y no se envía a la API.
+/// lee el gps una sola vez, la coordenada no se guarda ni se manda a la api
 final class LocationContextService: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published private(set) var location: CLLocation?
     @Published private(set) var message: String?

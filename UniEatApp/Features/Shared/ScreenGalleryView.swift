@@ -1,55 +1,41 @@
 import SwiftUI
 import UniEatCore
 
-/// Atajo de administración a todas las pantallas de la app (antes "Pantallas MS7").
+/// atajo de admin a todas las pantallas, las que necesitan un menu usan uno real del feed
+/// asi que solo salen si hay alguno publicado
 struct ScreenGalleryView: View {
     @EnvironmentObject private var store: AppStore
-    @State private var showingReport = false
+    @State private var reportMenu: DailyMenu?
 
-    private var exampleMenu: DailyMenu {
-        store.menus.first(where: { !$0.hasWaitEvidence }) ?? SampleMenus.all[1]
+    private var exampleMenu: DailyMenu? {
+        store.menus.first(where: { !$0.hasWaitEvidence }) ?? store.menus.first
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 BrandHeader(title: "Todas las pantallas")
-                Text("Atajo a todas las pantallas de la app")
-                    .font(.system(size: 24, weight: .heavy, design: .rounded))
-                Text("Las pantallas de restaurante se pueden explorar aquí desde cualquier rol. Rendimiento requiere una cuenta administradora.")
+                Text("Atajo a todas las pantallas de la app").font(.rounded(24))
+                Text("Las pantallas de restaurante se pueden explorar aquí desde cualquier rol.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
                 row("01", "Hoy · Menús", icon: "fork.knife") { TodayFeedContent() }
                 row("02", "Filtros", icon: "slider.horizontal.3") { FiltersView() }
-                row("03", "Detalle del menú", icon: "doc.text.magnifyingglass") {
-                    MenuDetailView(menu: exampleMenu)
-                }
-                row("04", "Elige por mí", icon: "sparkles") { RecommendationView() }
-                row("05", "Publicar menú", icon: "plus.circle") { PublishView() }
-                Button { showingReport = true } label: {
-                    tile("06", "Reportar un cambio", icon: "exclamationmark.bubble")
-                }
-                .buttonStyle(.plain)
-                row("07", "Sin conexión", icon: "wifi.slash") { OfflineFeedView() }
-                row("08", "Sin menú publicado", icon: "storefront") { NoMenuPublishedView() }
-                row("09", "Espera sin evidencia", icon: "hourglass") {
-                    InsufficientQueueEvidenceView(menu: exampleMenu)
-                }
-                if store.isAdmin {
-                    row("10", "Rendimiento", icon: "chart.bar") { PerformanceView() }
-                } else if store.isRestaurant {
-                    row("10", "Rendimiento del restaurante", icon: "chart.bar") { RestaurantPerformanceView() }
-                } else {
-                    HStack(spacing: 12) {
-                        Sticker(text: "10", color: Palette.yellow)
-                        Label("Rendimiento · Solo administradores", systemImage: "lock.fill")
-                            .font(.system(size: 15, weight: .heavy, design: .rounded))
-                        Spacer()
+                row("03", "Elige por mí", icon: "sparkles") { RecommendationView() }
+                row("04", "Publicar menú", icon: "plus.circle") { PublishView() }
+                row("05", "Sin conexión", icon: "wifi.slash") { OfflineFeedView() }
+                row("06", "Rendimiento", icon: "chart.bar") { PerformanceView() }
+                if let menu = exampleMenu {
+                    row("07", "Detalle del menú", icon: "doc.text.magnifyingglass") { MenuDetailView(menu: menu) }
+                    Button { reportMenu = menu } label: {
+                        tile("08", "Reportar un cambio", icon: "exclamationmark.bubble")
                     }
-                    .padding(14)
-                    .frame(maxWidth: .infinity, minHeight: 54)
-                    .background(Palette.paper, in: RoundedRectangle(cornerRadius: 13))
+                    .buttonStyle(.plain)
+                    row("09", "Espera sin evidencia", icon: "hourglass") { InsufficientQueueEvidenceView(menu: menu) }
+                } else {
+                    Text("Publica un menú para ver detalle, reporte y espera.")
+                        .font(.footnote).foregroundStyle(.secondary)
                 }
             }
             .padding(16)
@@ -57,7 +43,7 @@ struct ScreenGalleryView: View {
         .background(Palette.cream)
         .navigationTitle("Todas las pantallas")
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showingReport) { ReportSheet(menu: exampleMenu) }
+        .sheet(item: $reportMenu) { menu in ReportSheet(menu: menu) }
     }
 
     private func row<Destination: View>(
@@ -74,7 +60,7 @@ struct ScreenGalleryView: View {
         HStack(spacing: 12) {
             Sticker(text: number, color: Palette.yellow)
             Label(title, systemImage: icon)
-                .font(.system(size: 15, weight: .heavy, design: .rounded))
+                .font(.rounded(15))
             Spacer()
             Image(systemName: "chevron.right")
         }

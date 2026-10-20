@@ -1,7 +1,7 @@
 import Foundation
 
-/// Estado de vigencia calculado por el servidor con su propia hora (BQ-04).
-/// No depende del reloj del teléfono, que puede estar desajustado.
+/// estado de vigencia que calcula el server con su hora BQ-04
+/// no depende del reloj del celular que puede estar mal
 public enum ServerPublicationStatus: String, Codable, Sendable {
     case active
     case expiring
@@ -17,11 +17,11 @@ public enum ServerPublicationStatus: String, Codable, Sendable {
         }
     }
 
-    /// Solo una publicación visible en el feed admite reportes y elecciones.
+    /// solo si se ve en el feed se puede reportar o elegir
     public var acceptsActions: Bool { self == .active || self == .expiring }
 }
 
-/// Reporte de la versión consultada, sin autor ni nota (privacidad del estudiante que reportó).
+/// reporte de la version, sin autor ni nota para cuidar al estudiante que reporto
 public struct ReportSummary: Codable, Hashable, Identifiable, Sendable {
     public let id: UUID
     public let kind: String
@@ -59,9 +59,9 @@ public struct ReportSummary: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
-/// Respuesta de `GET /menus/:id`: la versión actual del menú más su estado y reportes.
-/// El objeto `menu` se lee dos veces: como `DailyMenu` (lo que ya usan las vistas) y para
-/// los campos que `DailyMenu` no tiene, así el feed y el modo demo no cambian.
+/// respuesta de GET /menus/:id, version actual del menu con estado y reportes
+/// el objeto menu se lee dos veces, una como DailyMenu que es lo que usan las vistas
+/// y otra para lo que solo trae el detalle
 public struct MenuDetail: Decodable, Sendable {
     public let menu: DailyMenu
     public let status: ServerPublicationStatus
@@ -96,9 +96,9 @@ public struct MenuDetail: Decodable, Sendable {
         serverNow = try container.decode(Date.self, forKey: .serverNow)
     }
 
-    /// Estado a la hora `date`. Parte del estado que dio el servidor y lo avanza con el reloj
-    /// mientras la vista sigue abierta: un menú "Por vencer" pasa a "Vencido" al llegar a
-    /// `validUntil` sin esperar otra consulta. Cerrado o vencido nunca vuelve atrás.
+    /// estado a la hora date, arranca con lo que dijo el server y avanza con el reloj
+    /// mientras la pantalla siga abierta, por vencer pasa a vencido al llegar a validUntil
+    /// sin pedir nada, cerrado o vencido nunca se devuelve
     public func status(at date: Date) -> ServerPublicationStatus {
         switch status {
         case .closed, .expired:
@@ -110,9 +110,12 @@ public struct MenuDetail: Decodable, Sendable {
         }
     }
 
-    /// Reportes que todavía no revisa un administrador; no cambian el menú oficial.
+    /// reportes que todavia no revisa un admin
     public var pendingReports: [ReportSummary] { reports.filter(\.isPending) }
 
-    /// true si el estudiante abrió una versión anterior a la que existe ahora en el servidor.
+    /// los descartados no se muestran
+    public var activeNotices: [ReportSummary] { reports.filter { $0.isPending || $0.status == "confirmed" } }
+
+    /// true si el estudiante abrio una version mas vieja que la que hay ahora en el server
     public func isNewer(than version: Int) -> Bool { currentVersion > version }
 }

@@ -7,97 +7,93 @@ struct TodayFeedView: View {
     }
 }
 
+/// pestaña hoy BQ-03, menus vigentes en el orden del server con su motivo
 struct TodayFeedContent: View {
     @EnvironmentObject private var store: AppStore
     var hidesNavigationBar = false
 
     var body: some View {
-            TimelineView(.periodic(from: .now, by: 60)) { timeline in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        BrandHeader(title: "UniEat · Hoy")
-                        DemoNotice()
-                        HStack(spacing: 8) {
-                            Sticker(text: SpanishPresentation.dayAndMonth(timeline.date),
-                                    color: Palette.yellow, icon: "calendar")
-                            Spacer()
-                            if let budget = store.filters.budgetCop {
-                                Sticker(text: "Hasta \(budget.cop)", color: Palette.green)
-                            }
+        // se redibuja cada minuto para que por vencer y vencido cambien solos
+        TimelineView(.periodic(from: .now, by: 60)) { timeline in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    BrandHeader(title: "UniEat · Hoy")
+                    header(date: timeline.date)
+                    if store.isOffline {
+                        NavigationLink(destination: OfflineFeedView()) {
+                            OfflineNotice(fetchedAt: store.fetchedAt)
                         }
-                        if store.isOffline {
-                            NavigationLink(destination: OfflineFeedView()) {
-                                OfflineNotice(cachedAt: store.cachedAt)
+                        .buttonStyle(.plain)
+                    }
+                    recommendationShortcut
+                    sectionTitle
+                    if store.visibleMenus.isEmpty {
+                        EmptyFeedView()
+                    } else {
+                        ForEach(store.visibleMenus) { menu in
+                            NavigationLink(destination: MenuDetailView(menu: menu)) {
+                                MenuCard(menu: menu, at: timeline.date)
                             }
                             .buttonStyle(.plain)
-                        }
-                        NavigationLink(destination: RecommendationView()) {
-                            HStack {
-                                Image(systemName: "sparkles")
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("¿SORTEAR AHORA?").fontWeight(.heavy)
-                                    Text("Una opción que cumple tus filtros")
-                                        .font(.caption)
-                                }
-                                Spacer()
-                                Image(systemName: "arrow.right")
-                            }
-                            .foregroundStyle(Palette.ink)
-                            .padding(13)
-                            .background(Palette.yellow, in: RoundedRectangle(cornerRadius: 14))
-                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Palette.ink, lineWidth: 2))
-                        }
-                        HStack {
-                            Text("Menús vigentes")
-                                .font(.system(size: 25, weight: .heavy, design: .rounded))
-                            Spacer()
-                            NavigationLink(destination: FiltersView()) {
-                                Label("Filtros", systemImage: "slider.horizontal.3")
-                                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                            }
-                        }
-                        if store.rankedMenus.isEmpty {
-                            EmptyFeedView()
-                        } else {
-                            ForEach(store.rankedMenus) { menu in
-                                NavigationLink(destination: MenuDetailView(menu: menu)) {
-                                    MenuCard(menu: menu, explanation: store.explanation(for: menu), pendingReports: store.pendingReports(for: menu),
-                                             assessment: PublicationAssessment(menu: menu, at: timeline.date))
-                                }
-                                .buttonStyle(.plain)
-                                .onAppear { store.track("feed_impression", menu: menu) }
-                            }
-                        }
-                        // Enlaces de ejemplo: solo administradores (issue #15).
-                        // Ningún otro usuario debe ver el local inventado de NoMenuPublishedView.
-                        if store.isAdmin {
-                            NavigationLink(destination: NoMenuPublishedView()) {
-                                Label("Ver ejemplo: local sin menú del día", systemImage: "storefront")
-                                    .font(.footnote.weight(.semibold))
-                                    .foregroundStyle(Palette.ink)
-                            }
-                            .padding(.vertical, 10)
-                            NavigationLink(destination: OfflineFeedView()) {
-                                Label("Ver ejemplo: pantalla sin conexión", systemImage: "wifi.slash")
-                                    .font(.footnote.weight(.semibold))
-                                    .foregroundStyle(Palette.ink)
-                            }
-                            .padding(.bottom, 10)
+                            .onAppear { store.track("feed_impression", menu: menu) }
                         }
                     }
-                    .padding(16)
                 }
+                .padding(16)
             }
-            .background(Palette.cream)
-            .navigationBarHidden(hidesNavigationBar)
+        }
+        .background(Palette.cream)
+        .navigationBarHidden(hidesNavigationBar)
+    }
+
+    private func header(date: Date) -> some View {
+        HStack(spacing: 8) {
+            Sticker(text: SpanishPresentation.dayAndMonth(date), color: Palette.yellow, icon: "calendar")
+            Spacer()
+            if let budget = store.filters.budgetCop {
+                Sticker(text: "Hasta \(budget.cop)", color: Palette.green)
+            }
+        }
+    }
+
+    private var recommendationShortcut: some View {
+        NavigationLink(destination: RecommendationView()) {
+            HStack {
+                Image(systemName: "sparkles")
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("¿SORTEAR AHORA?").fontWeight(.heavy)
+                    Text("Una opción que cumple tus filtros").font(.caption)
+                }
+                Spacer()
+                Image(systemName: "arrow.right")
+            }
+            .foregroundStyle(Palette.ink)
+            .padding(13)
+            .background(Palette.yellow, in: RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Palette.ink, lineWidth: 2))
+        }
+    }
+
+    private var sectionTitle: some View {
+        HStack {
+            Text("Menús vigentes").font(.rounded(25))
+            Spacer()
+            NavigationLink(destination: FiltersView()) {
+                Label("Filtros", systemImage: "slider.horizontal.3").font(.rounded(13, .bold))
+            }
+        }
     }
 }
 
+/// tarjeta del menu, lo que se ve de BQ-03
 struct MenuCard: View {
     let menu: DailyMenu
-    let explanation: String
-    let pendingReports: Int
-    let assessment: PublicationAssessment
+    let date: Date
+
+    init(menu: DailyMenu, at date: Date = .now) {
+        self.menu = menu
+        self.date = date
+    }
 
     var body: some View {
         SurfaceCard {
@@ -105,29 +101,28 @@ struct MenuCard: View {
                 FoodArtwork(name: menu.establishmentName, photoUrl: menu.photoUrl)
                     .frame(height: 130)
                 HStack(alignment: .firstTextBaseline) {
-                    Text(menu.establishmentName)
-                        .font(.system(size: 18, weight: .heavy, design: .rounded))
+                    Text(menu.establishmentName).font(.rounded(18))
                     Spacer()
                     Sticker(text: menu.lowestPriceCop.cop, color: Palette.yellow)
                 }
-                Text(menu.title).font(.system(size: 14, weight: .bold, design: .rounded))
+                Text(menu.title).font(.rounded(14, .bold))
                 HStack(spacing: 7) {
                     Sticker(text: menu.area, color: Palette.cyan, icon: "mappin")
-                    if let wait = menu.waitMinutes, menu.hasWaitEvidence {
+                    if let wait = menu.waitMinutes, menu.hasWaitEvidence(at: date) {
                         Sticker(text: "~\(wait) min de fila", color: Palette.green, icon: "clock")
                     } else {
                         Sticker(text: "Fila sin datos", color: Palette.cream, icon: "clock")
                     }
                 }
-                if pendingReports > 0 {
-                    Label("\(pendingReports) reporte(s) pendiente(s) de verificar", systemImage: "exclamationmark.bubble")
+                if menu.pendingReports > 0 {
+                    Label("\(menu.pendingReports) reporte(s) pendiente(s) de verificar", systemImage: "exclamationmark.bubble")
                         .font(.caption).foregroundStyle(Palette.coral)
                 }
-                if assessment.state == .expiring {
+                if PublicationAssessment(menu: menu, at: date).state == .expiring {
                     Label("Menú por vencer", systemImage: "hourglass")
                         .font(.caption).foregroundStyle(Palette.coral)
                 }
-                Text(explanation)
+                Text(menu.explanation)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -136,51 +131,59 @@ struct MenuCard: View {
     }
 }
 
+/// foto del local si tiene url https, si no un dibujo con el nombre
 struct FoodArtwork: View {
     let name: String
-    var photoUrl: String? = nil
+    var photoUrl: String?
+
+    private var photo: URL? {
+        guard let photoUrl, let url = URL(string: photoUrl), url.scheme == "https" else { return nil }
+        return url
+    }
 
     var body: some View {
         ZStack {
             LinearGradient(colors: [Palette.yellow, Palette.coral.opacity(0.8)],
                            startPoint: .topLeading, endPoint: .bottomTrailing)
             Circle().fill(.white.opacity(0.45)).frame(width: 140).offset(x: 95, y: -40)
-            if let photoUrl, let url = URL(string: photoUrl), url.scheme == "https" {
-                AsyncImage(url: url) { image in
+            if let photo {
+                AsyncImage(url: photo) { image in
                     image.resizable().scaledToFill()
                 } placeholder: {
-                    Image(systemName: "fork.knife.circle.fill")
-                        .font(.system(size: 68))
-                        .foregroundStyle(Palette.ink.opacity(0.75))
+                    placeholderIcon
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .clipped()
             } else {
-                Image(systemName: "fork.knife.circle.fill")
-                    .font(.system(size: 68))
-                    .foregroundStyle(Palette.ink.opacity(0.75))
+                placeholderIcon
             }
             Text(name.uppercased())
-                .font(.system(size: 12, weight: .black, design: .rounded))
+                .font(.rounded(12, .black))
                 .padding(7)
                 .background(Palette.paper, in: Capsule())
                 .offset(x: -75, y: 45)
         }
         .frame(maxWidth: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: 11))
-        .accessibilityLabel(photoUrl == nil ? "Ilustración de \(name)" : "Foto de \(name)")
+        .accessibilityLabel(photo == nil ? "Ilustración de \(name)" : "Foto de \(name)")
+    }
+
+    private var placeholderIcon: some View {
+        Image(systemName: "fork.knife.circle.fill")
+            .font(.system(size: 68))
+            .foregroundStyle(Palette.ink.opacity(0.75))
     }
 }
 
 struct OfflineNotice: View {
-    let cachedAt: Date
+    let fetchedAt: Date
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "wifi.slash").font(.title3)
             VStack(alignment: .leading, spacing: 3) {
                 Text("Sin conexión · vista guardada").fontWeight(.heavy)
-                Text("Última carga: \(SpanishPresentation.dateAndTime(cachedAt)); los menús vencidos se ocultan.")
+                Text("Última carga: \(SpanishPresentation.dateAndTime(fetchedAt)); los menús vencidos se ocultan.")
                     .font(.caption)
             }
         }
@@ -196,78 +199,11 @@ struct EmptyFeedView: View {
         SurfaceCard {
             VStack(spacing: 10) {
                 Image(systemName: "fork.knife.circle").font(.system(size: 48))
-                Text("No hay menús que cumplan estos filtros")
-                    .font(.headline)
+                Text("No hay menús que cumplan estos filtros").font(.headline)
                 Text("Prueba otro presupuesto, zona o preferencia de dieta.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
         }
-    }
-}
-
-struct NoMenuPublishedView: View {
-    @EnvironmentObject private var store: AppStore
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                BrandHeader(title: "Sin menú del día")
-                DemoNotice()
-                SurfaceCard {
-                    VStack(alignment: .leading, spacing: 7) {
-                        Sticker(text: "CAFÉ UNIVERSITARIO", color: Palette.cyan, icon: "cup.and.saucer")
-                        Text("Saudade — Café & Panadería")
-                            .font(.system(size: 25, weight: .heavy, design: .rounded))
-                        Label("Bloque AU · Piso 2", systemImage: "mappin")
-                            .font(.subheadline)
-                        Sticker(text: "Sin menú publicado hoy", color: Palette.cream, icon: "book.closed")
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                SurfaceCard {
-                    VStack(spacing: 14) {
-                        Image(systemName: "bell.slash.fill")
-                            .font(.system(size: 60))
-                            .frame(width: 120, height: 120)
-                            .background(Palette.cream, in: Circle())
-                        Text("Este local no ha publicado el menú del día")
-                            .font(.system(size: 23, weight: .heavy, design: .rounded))
-                            .multilineTextAlignment(.center)
-                        Text("La ausencia de menú no significa que esté cerrado. Puedes revisar otras opciones cercanas.")
-                            .multilineTextAlignment(.center)
-                            .foregroundStyle(.secondary)
-                        SolidButton(title: "Volver a los menús de hoy", icon: "arrow.left", color: Palette.yellow) {
-                            dismiss()
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                Text("Locales cercanos con menú listo")
-                    .font(.system(size: 21, weight: .heavy, design: .rounded))
-                ForEach(Array(store.rankedMenus.prefix(2))) { menu in
-                    NavigationLink(destination: MenuDetailView(menu: menu)) {
-                        SurfaceCard {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 5) {
-                                    Text(menu.establishmentName).font(.headline)
-                                    Text(menu.title).font(.caption)
-                                }
-                                Spacer()
-                                Sticker(text: menu.lowestPriceCop.cop, color: Palette.yellow)
-                                Image(systemName: "chevron.right")
-                            }
-                        }
-                        .foregroundStyle(Palette.ink)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(16)
-        }
-        .background(Palette.cream)
-        .navigationTitle("Sin menú publicado")
-        .navigationBarTitleDisplayMode(.inline)
     }
 }

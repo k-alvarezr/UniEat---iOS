@@ -8,6 +8,13 @@ enum BrandFont {
     }
 }
 
+extension Font {
+    /// letra redondeada para titulos y etiquetas, por defecto gruesa
+    static func rounded(_ size: CGFloat, _ weight: Font.Weight = .heavy) -> Font {
+        .system(size: size, weight: weight, design: .rounded)
+    }
+}
+
 enum Palette {
     static let yellow = Color(red: 1, green: 0.898, blue: 0)
     static let cyan = Color(red: 0.098, green: 0.827, blue: 0.91)
@@ -108,22 +115,5 @@ struct SurfaceCard<Content: View>: View {
             .padding(14)
             .background(Palette.paper, in: RoundedRectangle(cornerRadius: 16))
             .overlay(RoundedRectangle(cornerRadius: 16).stroke(Palette.ink, lineWidth: 2))
-    }
-}
-
-struct DemoNotice: View {
-    @EnvironmentObject private var store: AppStore
-
-    var body: some View {
-        if !store.isRemote {
-            HStack(spacing: 8) {
-                Image(systemName: "info.circle.fill")
-                Text("Modo demostración · contenido generado para probar la app")
-            }
-            .font(.system(size: 11, weight: .semibold, design: .rounded))
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Palette.cyan.opacity(0.22), in: RoundedRectangle(cornerRadius: 10))
-        }
     }
 }

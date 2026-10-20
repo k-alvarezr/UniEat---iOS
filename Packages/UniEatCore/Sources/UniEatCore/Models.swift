@@ -7,9 +7,11 @@ public struct MenuDish: Codable, Hashable, Identifiable, Sendable {
     public let category: String
     public let priceCop: Int
     public let dietaryTags: [String]
+    /// false si el restaurante no dijo la dieta, asi nunca sale como compatible
     public let dietaryKnown: Bool
 
-    public init(id: UUID = UUID(), name: String, description: String = "", category: String = "Almuerzo", priceCop: Int, dietaryTags: [String] = [], dietaryKnown: Bool = false) {
+    public init(id: UUID = UUID(), name: String, description: String = "", category: String = "Almuerzo",
+                priceCop: Int, dietaryTags: [String] = [], dietaryKnown: Bool = false) {
         self.id = id
         self.name = name
         self.description = description
@@ -20,6 +22,7 @@ public struct MenuDish: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
+/// una version del menu del dia tal cual la manda la api
 public struct DailyMenu: Codable, Hashable, Identifiable, Sendable {
     public let id: UUID
     public let title: String
@@ -43,17 +46,16 @@ public struct DailyMenu: Codable, Hashable, Identifiable, Sendable {
     public let waitSampleCount: Int
     public let waitNewestReportAt: Date?
     public let pendingReports: Int
-    public let relevanceScore: Int
+    /// por que el server puso este menu en ese lugar del feed
     public let explanation: String
 
     public init(id: UUID = UUID(), title: String, version: Int = 1, validUntil: Date, publishedAt: Date = .now,
-                closedAt: Date? = nil,
-                establishmentId: UUID = UUID(), establishmentName: String, area: String, address: String,
-                entranceDescription: String = "", latitude: Double? = nil, longitude: Double? = nil,
-                photoUrl: String? = nil, paymentMethods: [String] = [], isVerified: Bool = false,
-                items: [MenuDish], lowestPriceCop: Int, waitMinutes: Int? = nil, waitSampleCount: Int = 0,
-                waitNewestReportAt: Date? = nil, pendingReports: Int = 0, relevanceScore: Int = 0,
-                explanation: String = "Menú vigente") {
+                closedAt: Date? = nil, establishmentId: UUID = UUID(), establishmentName: String,
+                area: String, address: String, entranceDescription: String = "",
+                latitude: Double? = nil, longitude: Double? = nil, photoUrl: String? = nil,
+                paymentMethods: [String] = [], isVerified: Bool = false, items: [MenuDish], lowestPriceCop: Int,
+                waitMinutes: Int? = nil, waitSampleCount: Int = 0, waitNewestReportAt: Date? = nil,
+                pendingReports: Int = 0, explanation: String = "Menú vigente") {
         self.id = id
         self.title = title
         self.version = version
@@ -76,39 +78,22 @@ public struct DailyMenu: Codable, Hashable, Identifiable, Sendable {
         self.waitSampleCount = waitSampleCount
         self.waitNewestReportAt = waitNewestReportAt
         self.pendingReports = pendingReports
-        self.relevanceScore = relevanceScore
         self.explanation = explanation
     }
 
+    /// publicado, sin cerrar y antes de vencer
     public func isActive(at date: Date = .now) -> Bool {
         if let closedAt, closedAt <= date { return false }
         return publishedAt <= date && validUntil > date
     }
+
+    /// la fila solo se estima con 3 reportes o mas y el ultimo de hace 30 min o menos
     public func hasWaitEvidence(at date: Date = .now) -> Bool {
         guard waitSampleCount >= 3, waitMinutes != nil, let newest = waitNewestReportAt else { return false }
         return newest <= date && date.timeIntervalSince(newest) <= 30 * 60
     }
+
     public var hasWaitEvidence: Bool { hasWaitEvidence(at: .now) }
-
-    public func revised(title: String, establishmentName: String, area: String, address: String,
-                        entranceDescription: String,
-                        validUntil: Date, items: [MenuDish], paymentMethods: [String],
-                        at date: Date = .now) -> DailyMenu {
-        DailyMenu(id: id, title: title, version: version + 1, validUntil: validUntil,
-             publishedAt: date, establishmentId: establishmentId,
-             establishmentName: establishmentName, area: area, address: address,
-             entranceDescription: entranceDescription, latitude: latitude, longitude: longitude,
-             photoUrl: photoUrl, paymentMethods: paymentMethods, isVerified: isVerified,
-             items: items, lowestPriceCop: items.map(\.priceCop).min() ?? 0,
-             explanation: "Publicación actualizada")
-    }
-
-    public func closed(at date: Date = .now) -> DailyMenu {
-        revised(title: title, establishmentName: establishmentName, area: area,
-                address: address, entranceDescription: entranceDescription,
-                validUntil: date, items: items,
-                paymentMethods: paymentMethods, at: date)
-    }
 }
 
 public struct FeedFilters: Codable, Hashable, Sendable {
@@ -128,6 +113,7 @@ public struct FeedFilters: Codable, Hashable, Sendable {
     }
 }
 
+/// actividad de ios en un periodo, las tasas llegan vacias si hay muy pocos datos
 public struct PerformanceSummary: Codable, Sendable {
     public let periodDays: Int
     public let impressions: Int
@@ -140,32 +126,11 @@ public struct PerformanceSummary: Codable, Sendable {
     public let sampleSize: Int?
     public let insufficientData: Bool?
     public let rates: PerformanceRates?
-
-    public init(periodDays: Int, impressions: Int, detailOpens: Int, selections: Int, reportedArrivals: Int,
-                 savedMenus: Int = 0, locationOpens: Int = 0, reports: Int = 0,
-                 sampleSize: Int? = nil, insufficientData: Bool? = nil, rates: PerformanceRates? = nil) {
-        self.periodDays = periodDays
-        self.impressions = impressions
-        self.detailOpens = detailOpens
-        self.selections = selections
-        self.reportedArrivals = reportedArrivals
-        self.savedMenus = savedMenus
-        self.locationOpens = locationOpens
-        self.reports = reports
-        self.sampleSize = sampleSize
-        self.insufficientData = insufficientData
-        self.rates = rates
-    }
 }
 
 public struct PerformanceRates: Codable, Sendable {
     public let detailOpenRate: Double
     public let selectionRate: Double
-
-    public init(detailOpenRate: Double, selectionRate: Double) {
-        self.detailOpenRate = detailOpenRate
-        self.selectionRate = selectionRate
-    }
 }
 
 public struct Profile: Codable, Sendable {
@@ -180,20 +145,6 @@ public struct Profile: Codable, Sendable {
     }
 }
 
-public struct Establishment: Codable, Identifiable, Sendable {
-    public let id: UUID
-    public let ownerId: UUID?
-    public let name: String
-    public let area: String
-    public let address: String
-    public let entranceDescription: String
-    public let latitude: Double?
-    public let longitude: Double?
-    public let photoUrl: String?
-    public let paymentMethods: [String]
-    public let isVerified: Bool
-}
-
 public enum ReportKind: String, CaseIterable, Codable, Sendable {
     case unavailable
     case price
@@ -201,19 +152,24 @@ public enum ReportKind: String, CaseIterable, Codable, Sendable {
     case location
     case accurate
     case arrival
+
+    /// las discrepancias quedan pendientes, lo demas son observaciones
+    public var isDiscrepancy: Bool { [.unavailable, .price, .location].contains(self) }
 }
 
+/// fechas iso 8601 con o sin milisegundos como las manda la api
 public enum UniEatDates {
     public static func decoder() -> JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { source in
-            let text = try source.singleValueContainer().decode(String.self)
+            let container = try source.singleValueContainer()
+            let text = try container.decode(String.self)
             let formatter = ISO8601DateFormatter()
             formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
             if let date = formatter.date(from: text) { return date }
             formatter.formatOptions = [.withInternetDateTime]
             if let date = formatter.date(from: text) { return date }
-            throw DecodingError.dataCorruptedError(in: try source.singleValueContainer(), debugDescription: "Invalid ISO8601 date: \(text)")
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid ISO8601 date: \(text)")
         }
         return decoder
     }

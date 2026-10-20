@@ -1,6 +1,6 @@
 import Foundation
 
-/// Keeps visible labels and dates in Spanish while domain values remain stable.
+/// textos y fechas en español para mostrar, los valores internos siguen igual
 enum SpanishPresentation {
     static let locale = Locale(identifier: "es_CO")
 

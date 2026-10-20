@@ -6,7 +6,7 @@ public struct AreaSuggestion: Equatable, Sendable {
     public let distanceMeters: Int
 }
 
-/// Usa los pines publicados por la API, sin límites de barrio inventados ni enviar el GPS.
+/// usa los pines que manda la api, sin inventar barrios y sin mandar el gps
 public enum LocationAreaResolver {
     public static func suggest(latitude: Double, longitude: Double, menus: [DailyMenu],
                                maximumDistanceMeters: Double = 800) -> AreaSuggestion? {

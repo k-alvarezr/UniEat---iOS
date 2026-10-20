@@ -1,5 +1,7 @@
 import SwiftUI
 
+/// pestañas segun el rol que dijo el server, ocultarlas es solo comodidad
+/// igual la api revisa el rol en cada llamada
 struct MainTabsView: View {
     @EnvironmentObject private var store: AppStore
 
@@ -28,53 +30,44 @@ struct MainTabsView: View {
     }
 }
 
+/// perfil, datos de la cuenta, lo de cada rol, guardados y cerrar sesion
 struct ProfileView: View {
     @EnvironmentObject private var store: AppStore
+
+    private var roleName: String {
+        if store.profile?.role == "admin" { return "Administrador" }
+        return store.isRestaurant ? "Restaurante" : "Estudiante"
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     BrandHeader(title: "Mi perfil")
-                    DemoNotice()
                     SurfaceCard {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text(store.profile?.displayName ?? "")
-                                .font(.system(size: 23, weight: .heavy, design: .rounded))
-                            Sticker(text: store.profile?.role == "admin" ? "Administrador" :
-                                    (store.isRestaurant ? "Restaurante" : "Estudiante"), color: Palette.green)
+                            Text(store.profile?.displayName ?? "").font(.rounded(23))
+                            Sticker(text: roleName, color: Palette.green)
                             Text("Las preferencias de presupuesto, dieta, tiempo y zona se conservan al volver a la lista de menús.")
                                 .font(.subheadline).foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    if store.isRemote {
-                        if store.isAdmin {
-                            AdminApprovalsView()
-                            AdminRolesView()
-                        } else {
-                            EstablishmentManagementView()
-                        }
+                    if store.isAdmin {
+                        AdminApprovalsView()
+                        AdminRolesView()
+                    } else {
+                        EstablishmentManagementView()
                     }
                     Text("La información guardada muestra cuándo se obtuvo y descarta menús vencidos incluso sin conexión.")
                         .font(.footnote).foregroundStyle(.secondary)
-                    // Atajo de revisión: solo administradores con sesión real (issue #15).
                     if store.isAdmin {
                         NavigationLink(destination: ScreenGalleryView()) {
-                            Label("Atajo a todas las pantallas de la app", systemImage: "square.grid.2x2")
-                                .font(.system(size: 15, weight: .heavy, design: .rounded))
-                                .foregroundStyle(Palette.ink)
-                                .frame(maxWidth: .infinity, minHeight: 48)
-                                .background(Palette.cyan, in: RoundedRectangle(cornerRadius: 12))
-                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Palette.ink, lineWidth: 2))
+                            profileButton("Atajo a todas las pantallas de la app", icon: "square.grid.2x2", color: Palette.cyan)
                         }
                     }
                     NavigationLink(destination: SavedMenusView()) {
-                        Label("Menús guardados (\(store.savedMenus.count))", systemImage: "bookmark.fill")
-                            .font(.system(size: 15, weight: .heavy, design: .rounded))
-                            .foregroundStyle(Palette.ink)
-                            .frame(maxWidth: .infinity, minHeight: 48)
-                            .background(Palette.paper, in: RoundedRectangle(cornerRadius: 12))
+                        profileButton("Menús guardados (\(store.savedMenus.count))", icon: "bookmark.fill", color: Palette.paper)
                     }
                     SolidButton(title: "Cerrar sesión", icon: "rectangle.portrait.and.arrow.right", color: Palette.yellow) {
                         store.signOut()
@@ -85,5 +78,14 @@ struct ProfileView: View {
             .background(Palette.cream)
             .navigationBarHidden(true)
         }
+    }
+
+    private func profileButton(_ title: String, icon: String, color: Color) -> some View {
+        Label(title, systemImage: icon)
+            .font(.rounded(15))
+            .foregroundStyle(Palette.ink)
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .background(color, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Palette.ink, lineWidth: 2))
     }
 }

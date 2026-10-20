@@ -1,6 +1,7 @@
 import SwiftUI
 import UniEatCore
 
+/// explica por que no hay estimacion de fila y deja reportar la fila
 struct InsufficientQueueEvidenceView: View {
     @State private var showingReport = false
     let menu: DailyMenu
@@ -9,12 +10,11 @@ struct InsufficientQueueEvidenceView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 BrandHeader(title: "Fila de espera")
-                DemoNotice()
                 SurfaceCard {
                     VStack(alignment: .leading, spacing: 6) {
                         Sticker(text: "SIN PROYECCIÓN", color: Palette.cyan, icon: "hourglass")
                         Text(menu.establishmentName)
-                            .font(.system(size: 25, weight: .heavy, design: .rounded))
+                            .font(.rounded(25))
                         Label(menu.address.isEmpty ? menu.area : menu.address, systemImage: "mappin")
                             .font(.subheadline)
                     }
@@ -23,7 +23,7 @@ struct InsufficientQueueEvidenceView: View {
                 SurfaceCard {
                     VStack(alignment: .leading, spacing: 10) {
                         Label("Información insuficiente", systemImage: "hourglass")
-                            .font(.system(size: 21, weight: .heavy, design: .rounded))
+                            .font(.rounded(21))
                         Text("\(menu.waitSampleCount) reporte(s) elegible(s)")
                             .font(.subheadline)
                         if let newest = menu.waitNewestReportAt {
@@ -57,7 +57,7 @@ struct InsufficientQueueEvidenceView: View {
                 }
                 VStack(alignment: .leading, spacing: 8) {
                     Text("¿Ya estás en la fila?")
-                        .font(.system(size: 23, weight: .heavy, design: .rounded))
+                        .font(.rounded(23))
                     Text("Ayuda a otras personas con el tiempo que observas ahora.")
                         .font(.subheadline)
                     SolidButton(title: "Reportar fila actual", icon: "arrow.right", color: Palette.yellow) {
@@ -69,7 +69,7 @@ struct InsufficientQueueEvidenceView: View {
                 .background(Palette.coral, in: RoundedRectangle(cornerRadius: 16))
                 .overlay(RoundedRectangle(cornerRadius: 16).stroke(Palette.ink, lineWidth: 2))
                 Text("Menú publicado")
-                    .font(.system(size: 21, weight: .heavy, design: .rounded))
+                    .font(.rounded(21))
                 ForEach(menu.items) { dish in
                     SurfaceCard {
                         HStack {

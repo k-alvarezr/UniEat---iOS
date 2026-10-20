@@ -1,8 +1,8 @@
 import Foundation
 import UniEatCore
 
-/// Error estable del backend: {"error":{"code","message","traceId"}}. `code` decide la reacción
-/// de la interfaz y `message` ya viene en español.
+/// error que manda el back con code y message, code dice que hace la pantalla
+/// y message ya viene en español
 struct APIFailure: LocalizedError, Decodable {
     let code: String
     let message: String
@@ -21,8 +21,8 @@ struct APIFailure: LocalizedError, Decodable {
 
 struct NoBody: Codable {}
 
-/// Adaptador sobre la API v1 compartida: agrega `apikey` y el token del usuario, y decodifica
-/// JSON camelCase con fechas ISO 8601 (el mismo decodificador de UniEatCore).
+/// adapter de la api v1, pone la apikey y el token del usuario y lee el json
+/// con las fechas igual que UniEatCore
 @MainActor
 final class APIClient {
     private let configuration: AppConfiguration
@@ -69,7 +69,7 @@ final class APIClient {
     }
 }
 
-// MARK: - Modelos del contrato (docs/api-v1.md en UniEat---iOS-Back)
+// MARK: - modelos de la api, ver docs/api-v1.md en el back
 
 struct FeedResponse: Codable {
     let fetchedAt: Date
@@ -146,6 +146,9 @@ struct EstablishmentRequestBody: Encodable {
     let entranceDescription: String
     let paymentMethods: [String]
     let photoUrl: String?
+    /// pin del local, sale de la direccion o del gps y se confirma en el mapa
+    let latitude: Double?
+    let longitude: Double?
 }
 
 struct EstablishmentRequestResponse: Decodable { let message: String }
