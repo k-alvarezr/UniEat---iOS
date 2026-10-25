@@ -239,8 +239,10 @@ final class AppStore: ObservableObject {
 
     /// trae la version actual del menu con el estado y los reportes que calcula el server
     /// si no se puede tira APIFailure tipo OFFLINE NOT_FOUND o GONE
-    func menuDetail(_ menu: DailyMenu) async throws -> MenuDetail {
-        try await api.get("menus/\(menu.id.uuidString)")
+    /// si automatic es true el server no la cuenta en las metricas, son recargas que no hizo el usuario
+    func menuDetail(_ menu: DailyMenu, automatic: Bool = false) async throws -> MenuDetail {
+        let query = automatic ? [URLQueryItem(name: "refresh", value: "auto")] : []
+        return try await api.get("menus/\(menu.id.uuidString)", query: query)
     }
 
     /// manda el reporte pegado a la version que vio el estudiante, nunca cambia el menu oficial

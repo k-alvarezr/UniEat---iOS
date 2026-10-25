@@ -55,7 +55,7 @@ struct MenuDetailView: View {
             .background(Palette.cream)
             .navigationBarTitleDisplayMode(.inline)
             // al cerrar la hoja se recarga para ver el reporte que se acabo de mandar
-            .sheet(isPresented: $showingReport, onDismiss: { Task { await load() } }) {
+            .sheet(isPresented: $showingReport, onDismiss: { Task { await load(automatic: true) } }) {
                 ReportSheet(menu: menu)
             }
             .onAppear { store.track("detail_open", menu: initialMenu) }
@@ -114,7 +114,7 @@ struct MenuDetailView: View {
 
     @ViewBuilder
     private func reportedChanges(_ detail: MenuDetail) -> some View {
-        if detail.menu.version > initialMenu.version {
+        if detail.isNewer(than: initialMenu.version) {
             Text("El restaurante actualizó este menú: estás viendo la versión \(detail.menu.version).")
                 .font(.caption.weight(.semibold))
         }
@@ -275,11 +275,11 @@ struct MenuDetailView: View {
         }
     }
 
-    private func load() async {
+    private func load(automatic: Bool = false) async {
         isLoading = true
         defer { isLoading = false }
         do {
-            detail = try await store.menuDetail(initialMenu)
+            detail = try await store.menuDetail(initialMenu, automatic: automatic)
             loadError = nil
         } catch let failure as APIFailure {
             loadError = failure
@@ -291,7 +291,7 @@ struct MenuDetailView: View {
     /// recarga antes de abrir la hoja para que el reporte quede con la version actual
     /// y si cerraron el menu mientras tanto no se abre
     private func openReport() async {
-        await load()
+        await load(automatic: true)
         if isOpen(at: .now) { showingReport = true }
     }
 }
