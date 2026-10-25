@@ -1,6 +1,8 @@
 import SwiftUI
 import UniEatCore
 
+/// filtros de BQ-03, se edita un borrador y solo aplicar cambia el feed
+/// sugerir zona usa el gps una vez y lo compara con los pines de los locales
 struct FiltersView: View {
     @EnvironmentObject private var store: AppStore
     @Environment(\.dismiss) private var dismiss
@@ -14,12 +16,12 @@ struct FiltersView: View {
             VStack(alignment: .leading, spacing: 15) {
                 BrandHeader(title: "Filtros y presupuesto")
                 Text("Ajusta tus prioridades")
-                    .font(.system(size: 25, weight: .heavy, design: .rounded))
+                    .font(.rounded(25))
                 SurfaceCard {
                     VStack(alignment: .leading, spacing: 10) {
                         sectionTitle("Presupuesto por plato", icon: "banknote")
                         Text((draft.budgetCop ?? 20_000).cop)
-                            .font(.system(size: 25, weight: .black, design: .rounded))
+                            .font(.rounded(25, .black))
                         Slider(value: Binding(get: { Double(draft.budgetCop ?? 20_000) },
                                               set: { draft.budgetCop = Int($0) }),
                                in: 5_000...40_000, step: 1_000)
@@ -111,12 +113,12 @@ struct FiltersView: View {
 
     private func sectionTitle(_ title: String, icon: String) -> some View {
         Label(title, systemImage: icon)
-            .font(.system(size: 16, weight: .heavy, design: .rounded))
+            .font(.rounded(16))
     }
 
     private func choice(_ title: String, value: String?, selected: Binding<String?>) -> some View {
         Button(title) { selected.wrappedValue = value }
-            .font(.system(size: 12, weight: .bold, design: .rounded))
+            .font(.rounded(12, .bold))
             .padding(.horizontal, 9).padding(.vertical, 9)
             .background(selected.wrappedValue == value ? Palette.yellow : Palette.cream,
                         in: RoundedRectangle(cornerRadius: 9))

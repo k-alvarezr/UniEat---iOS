@@ -1,6 +1,6 @@
 import Foundation
 
-/// Reglas de alta de cuenta. Se validan antes de llamar a Supabase y también en el formulario.
+/// reglas para crear cuenta, se revisan antes de llamar a supabase y en el formulario
 public enum RegistrationRules {
     public static let maximumNameLength = 15
     public static let maximumPasswordLength = 20

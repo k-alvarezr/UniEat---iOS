@@ -1,6 +1,7 @@
 import SwiftUI
 import UniEatCore
 
+/// pestaña rendimiento solo admin, BQ-03 BQ-04 y actividad de ios en el mismo panel
 struct PerformanceView: View {
     @EnvironmentObject private var store: AppStore
     @State private var days = 7
@@ -30,12 +31,7 @@ struct PerformanceView: View {
                     .padding(16)
                 }
                 .background(Palette.cream)
-                .task(id: days) {
-                    while !Task.isCancelled {
-                        await store.loadPerformance(days: days)
-                        try? await Task.sleep(nanoseconds: 10_000_000_000)
-                    }
-                }
+                .refreshingPerformance(days: days, store: store)
             } else {
                 ContentUnavailableView("Solo administradores", systemImage: "lock.fill",
                                        description: Text("Inicia sesión con una cuenta administradora para ver el tablero global."))
@@ -44,6 +40,7 @@ struct PerformanceView: View {
     }
 }
 
+/// mis metricas para restaurantes, solo la actividad de sus menus
 struct RestaurantPerformanceView: View {
     @EnvironmentObject private var store: AppStore
     @State private var days = 7
@@ -54,15 +51,14 @@ struct RestaurantPerformanceView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         BrandHeader(title: "Actividad de mis menús")
-                        DemoNotice()
                         Text("Solo publicaciones de tus establecimientos aprobados. Las cifras son actividad iOS, no ventas ni visitas verificadas.")
                             .font(.subheadline).foregroundStyle(.secondary)
                         PeriodPicker(days: $days)
                         if let error = store.performanceError {
                             PerformanceErrorCard(message: error) { Task { await store.loadPerformance(days: days) } }
                         }
-                        if !store.isRemote || store.restaurantPerformance[days] != nil {
-                            EngagementSection(summary: store.performance(days: days))
+                        if let summary = store.restaurantPerformance[days] {
+                            EngagementSection(summary: summary)
                         } else if store.performanceError == nil {
                             ProgressView("Cargando métricas del servidor…")
                         }
@@ -70,15 +66,22 @@ struct RestaurantPerformanceView: View {
                     .padding(16)
                 }
                 .background(Palette.cream)
-                .task(id: days) {
-                    guard store.isRemote else { return }
-                    while !Task.isCancelled {
-                        await store.loadPerformance(days: days)
-                        try? await Task.sleep(nanoseconds: 10_000_000_000)
-                    }
-                }
+                .refreshingPerformance(days: days, store: store)
             } else {
                 ContentUnavailableView("Solo restaurantes", systemImage: "lock.fill")
+            }
+        }
+    }
+}
+
+private extension View {
+    /// carga las metricas y las vuelve a pedir cada 10 segundos mientras la pantalla este abierta
+    /// si se cambia el periodo arranca de nuevo
+    func refreshingPerformance(days: Int, store: AppStore) -> some View {
+        task(id: days) {
+            while !Task.isCancelled {
+                await store.loadPerformance(days: days)
+                try? await Task.sleep(for: .seconds(10))
             }
         }
     }
@@ -192,7 +195,7 @@ private struct MetricTile: View {
     var body: some View {
         SurfaceCard {
             VStack(alignment: .leading, spacing: 5) {
-                Text(number).font(.system(size: 28, weight: .black, design: .rounded))
+                Text(number).font(.rounded(28, .black))
                 Text(title).font(.headline)
                 Text(detail).font(.caption).foregroundStyle(.secondary)
             }

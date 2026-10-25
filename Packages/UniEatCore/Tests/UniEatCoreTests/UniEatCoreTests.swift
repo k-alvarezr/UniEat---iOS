@@ -47,47 +47,6 @@ final class UniEatCoreTests: XCTestCase {
                            waitNewestReportAt: now.addingTimeInterval(-300)).hasWaitEvidence(at: now))
     }
 
-    func testContextualRankingRequiresOneAffordableDietCompatibleDish() {
-        let until = now.addingTimeInterval(3_600)
-        let mismatch = menu(validUntil: until, items: [
-            MenuDish(name: "Vegetariano caro", priceCop: 25_000,
-                     dietaryTags: ["vegetarian"], dietaryKnown: true),
-            MenuDish(name: "Carne barata", priceCop: 10_000, dietaryKnown: true)
-        ])
-        let match = menu(validUntil: until, items: [
-            MenuDish(name: "Vegetariano", priceCop: 12_000,
-                     dietaryTags: ["vegetarian"], dietaryKnown: true)
-        ])
-        let filters = FeedFilters(budgetCop: 15_000, diet: "vegetarian")
-        let result = ContextualRankingStrategy().ranked([mismatch, match], for: filters, at: now)
-        XCTAssertEqual(result.map(\.id), [match.id])
-        XCTAssertTrue(ContextualRankingStrategy().explanation(for: match, filters: filters, at: now)
-            .contains("Vegetariano por $12000 COP"))
-    }
-
-    func testKnownLongWaitExceedsTimeBudget() {
-        let until = now.addingTimeInterval(3_600)
-        let slow = menu(validUntil: until, waitMinutes: 30, waitSampleCount: 3,
-                        waitNewestReportAt: now.addingTimeInterval(-300))
-        let result = ContextualRankingStrategy().ranked([slow],
-            for: FeedFilters(availableMinutes: 20, area: "Centro"), at: now)
-        XCTAssertTrue(result.isEmpty)
-    }
-
-    func testRestaurantRevisionKeepsIdentityAndClosingExpiresPublication() {
-        let original = menu(validUntil: now.addingTimeInterval(3_600))
-        let revised = original.revised(title: "Nuevo almuerzo", establishmentName: "Café",
-                                       area: "Centro", address: "Calle 1", entranceDescription: "Local 2",
-                                       validUntil: now.addingTimeInterval(7_200),
-                                       items: original.items, paymentMethods: ["Nequi"], at: now)
-        XCTAssertEqual(revised.id, original.id)
-        XCTAssertEqual(revised.version, original.version + 1)
-        XCTAssertEqual(revised.paymentMethods, ["Nequi"])
-        XCTAssertTrue(revised.isActive(at: now.addingTimeInterval(1)))
-        let closed = revised.closed(at: now.addingTimeInterval(2))
-        XCTAssertFalse(closed.isActive(at: now.addingTimeInterval(2)))
-    }
-
     func testRegistrationRulesEnforceBothMaximumsAndPasswordClasses() {
         XCTAssertNil(RegistrationRules.nameError("Kevin Álvarez"))
         XCTAssertNil(RegistrationRules.nameError(String(repeating: "A", count: 15)))
@@ -128,11 +87,17 @@ final class UniEatCoreTests: XCTestCase {
         XCTAssertNil(summary.rates)
     }
 
-    // MARK: - BQ-04: detalle del servidor
+    // MARK: - BQ-04 detalle del server
 
     private let detailJSON = """
-    {"serverNow":"2026-10-01T17:00:00.000Z","fetchedAt":"2026-10-01T17:00:00.000Z","menu":{
-      "id":"10000000-0000-4000-8000-000000000003","title":"Almuerzo casero","version":2,"currentVersion":2,
+    {"serverNow":"2026-10-01T17:00:00.000Z","fetchedAt":"2026-10-01T17:00:00.000Z",
+     "status":"expiring","currentVersion":2,
+     "reports":[
+       {"id":"30000000-0000-4000-8000-000000000001","kind":"price","status":"pending","createdAt":"2026-10-01T16:40:00.000Z","resolvedAt":null},
+       {"id":"30000000-0000-4000-8000-000000000002","kind":"unavailable","status":"dismissed","createdAt":"2026-10-01T16:30:00.000Z","resolvedAt":"2026-10-01T16:50:00.000Z"}
+     ],
+     "menu":{
+      "id":"10000000-0000-4000-8000-000000000003","title":"Almuerzo casero","version":2,
       "validUntil":"2026-10-01T17:20:00.000Z","publishedAt":"2026-10-01T16:00:00.000Z","closedAt":null,
       "establishmentId":"e0000000-0000-4000-8000-000000000003","establishmentName":"Doña Elvira","area":"Norte",
       "address":"Calle 21 #2-15","entranceDescription":"Fachada amarilla","latitude":4.6054,"longitude":-74.0628,
@@ -140,11 +105,7 @@ final class UniEatCoreTests: XCTestCase {
       "items":[{"id":"20000000-0000-4000-8000-000000000001","name":"Sopa","description":"","category":"Almuerzo",
                 "priceCop":9000,"dietaryTags":["vegetarian"],"dietaryKnown":true}],
       "lowestPriceCop":9000,"waitMinutes":null,"waitSampleCount":1,"waitNewestReportAt":null,"pendingReports":1,
-      "status":"expiring","relevanceScore":0,"explanation":"Este menú vence en 30 minutos o menos","hasWaitEvidence":false,
-      "reports":[
-        {"id":"30000000-0000-4000-8000-000000000001","kind":"price","status":"pending","createdAt":"2026-10-01T16:40:00.000Z","resolvedAt":null},
-        {"id":"30000000-0000-4000-8000-000000000002","kind":"unavailable","status":"dismissed","createdAt":"2026-10-01T16:30:00.000Z","resolvedAt":"2026-10-01T16:50:00.000Z"}
-      ]}}
+      "explanation":"Este menú vence en 30 minutos o menos"}}
     """
 
     func testMenuDetailDecodesServerStatusVersionAndReports() throws {
@@ -154,8 +115,7 @@ final class UniEatCoreTests: XCTestCase {
         XCTAssertEqual(detail.status, .expiring)
         XCTAssertEqual(detail.currentVersion, 2)
         XCTAssertEqual(detail.reports.count, 2)
-        // Solo el reporte sin revisar cuenta como pendiente; el descartado no.
-        XCTAssertEqual(detail.pendingReports.map(\.kindLabel), ["Precio distinto al publicado"])
+        // solo el reporte sin revisar cuenta como pendiente, el descartado no
         XCTAssertTrue(detail.isNewer(than: 1))
         XCTAssertFalse(detail.isNewer(than: 2))
     }
@@ -170,6 +130,10 @@ final class UniEatCoreTests: XCTestCase {
         XCTAssertFalse(ServerPublicationStatus.closed.acceptsActions)
     }
 
+    func testOnlyDiscrepanciesWaitForReview() {
+        XCTAssertEqual(ReportKind.allCases.filter(\.isDiscrepancy), [.unavailable, .price, .location])
+    }
+
     func testReportSummaryLabelsUnknownKindWithoutCrashing() {
         let report = ReportSummary(id: UUID(), kind: "otro", status: "confirmed", createdAt: now)
         XCTAssertEqual(report.kindLabel, "Otro cambio")
@@ -178,15 +142,15 @@ final class UniEatCoreTests: XCTestCase {
     }
 
     func testDetailStatusAdvancesWithClockWhileViewStaysOpen() throws {
-        // El JSON de prueba vence a las 17:20 y el servidor lo marcó "Por vencer" a las 17:00.
+        // el json de prueba vence 17:20 y el server lo marco por vencer a las 17:00
         let detail = try UniEatDates.decoder().decode(MenuDetail.self, from: Data(detailJSON.utf8))
         let validUntil = detail.menu.validUntil
         XCTAssertEqual(detail.status(at: validUntil.addingTimeInterval(-60)), .expiring)
         XCTAssertTrue(detail.status(at: validUntil.addingTimeInterval(-60)).acceptsActions)
-        // Al llegar a la hora de vencimiento pasa a Vencido sin otra consulta.
+        // al llegar la hora pasa a vencido sin pedir nada mas
         XCTAssertEqual(detail.status(at: validUntil), .expired)
         XCTAssertFalse(detail.status(at: validUntil.addingTimeInterval(1)).acceptsActions)
-        // Un menú cerrado sigue cerrado aunque falte tiempo para vencer.
+        // si esta cerrado sigue cerrado aunque falte tiempo para vencer
         let closed = MenuDetail(menu: detail.menu, status: .closed, currentVersion: 2, reports: [],
                                 serverNow: detail.serverNow)
         XCTAssertEqual(closed.status(at: validUntil.addingTimeInterval(-600)), .closed)

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The API checks the acting admin again for every role change and records an audit row.
+/// la api vuelve a revisar que sea admin en cada cambio de rol y lo deja registrado
 struct AdminRolesView: View {
     @EnvironmentObject private var store: AppStore
     @State private var users: [AdminUser] = []

@@ -1,5 +1,8 @@
+import CoreLocation
+import MapKit
 import SwiftUI
 
+/// perfil de estudiante o restaurante, estado de sus locales y pedir uno nuevo con su ubicacion
 struct EstablishmentManagementView: View {
     @EnvironmentObject private var store: AppStore
     @State private var showingForm = false
@@ -11,18 +14,25 @@ struct EstablishmentManagementView: View {
     @State private var paymentMethods: Set<String> = ["Efectivo"]
     @State private var isWorking = false
     @State private var message: String?
+    // pin del local, sale de la direccion o del gps y el dueño lo confirma en el mapa
+    @StateObject private var location = LocationContextService()
+    @State private var pin: CLLocationCoordinate2D?
+    @State private var pinFromAddress = false
+    @State private var pinMessage: String?
+    @State private var isGeocoding = false
+    @State private var mapPosition: MapCameraPosition = .automatic
 
     private let areas = ["Centro", "Norte", "Sur", "Fuera del campus"]
     private let methods = ["Nequi", "Daviplata", "Efectivo", "Tarjeta"]
 
     private var canSubmit: Bool {
-        !isWorking && !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !paymentMethods.isEmpty &&
+        !isWorking && !name.trimmed.isEmpty &&
+        !address.trimmed.isEmpty && !paymentMethods.isEmpty &&
         validPhotoURL
     }
 
     private var validPhotoURL: Bool {
-        let value = photoURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let value = photoURL.trimmed
         if value.isEmpty { return true }
         guard value.count <= 500, let url = URLComponents(string: value) else { return false }
         return url.scheme?.lowercased() == "https" && url.host != nil && url.user == nil && url.password == nil
@@ -32,11 +42,11 @@ struct EstablishmentManagementView: View {
         SurfaceCard {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Mis establecimientos").font(.headline)
-                if store.remoteMemberships.isEmpty {
+                if store.memberships.isEmpty {
                     Text("Aún no tienes un local registrado. Solicítalo para poder publicar menús.")
                         .font(.subheadline)
                 } else {
-                    ForEach(store.remoteMemberships) { membership in
+                    ForEach(store.memberships) { membership in
                         VStack(alignment: .leading, spacing: 3) {
                             Text(membership.establishmentName).font(.subheadline.weight(.bold))
                             Text("\(membership.area) · \(membership.approved ? "Aprobado para publicar" : "Pendiente de aprobación")")
@@ -60,6 +70,11 @@ struct EstablishmentManagementView: View {
                         }
                         TextField("Dirección", text: $address)
                             .textFieldStyle(.roundedBorder)
+                            .onChange(of: address) { _, _ in
+                                // si cambia la direccion el pin de la direccion ya no sirve, el del gps si se queda
+                                if pinFromAddress { pin = nil; pinMessage = nil }
+                            }
+                        pinPicker
                         TextField("Cómo encontrar la entrada (opcional)", text: $entranceDescription)
                             .textFieldStyle(.roundedBorder)
                         TextField("Enlace HTTPS de foto (opcional)", text: $photoURL)
@@ -99,6 +114,81 @@ struct EstablishmentManagementView: View {
         }
     }
 
+    /// ubicacion del local, buscar la direccion o usar el gps y mover el pin en el mapa si hace falta
+    @ViewBuilder private var pinPicker: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Ubicación del local").font(.subheadline.weight(.semibold))
+            HStack {
+                Button(isGeocoding ? "Buscando…" : "Buscar dirección") {
+                    Task { await showAddressOnMap() }
+                }
+                .disabled(isGeocoding || address.trimmed.isEmpty)
+                Button {
+                    pinMessage = nil
+                    location.request()
+                } label: {
+                    Label("Usar mi ubicación", systemImage: "location")
+                }
+            }
+            .buttonStyle(.bordered)
+            .font(.subheadline)
+            if let pin {
+                MapReader { proxy in
+                    Map(position: $mapPosition) {
+                        Marker(name.isEmpty ? "Tu local" : name, coordinate: pin)
+                    }
+                    .onTapGesture { point in
+                        guard let tapped = proxy.convert(point, from: .local) else { return }
+                        self.pin = tapped
+                        pinFromAddress = false
+                        pinMessage = "Pin movido manualmente."
+                    }
+                }
+                .frame(height: 180)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                Text("¿Es aquí tu local? Toca el mapa para mover el pin.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+            if let text = pinMessage ?? location.message {
+                Text(text).font(.footnote).foregroundStyle(.secondary)
+            }
+            Text("Los estudiantes usan este pin para ver el mapa, abrir indicaciones y sugerir su zona.")
+                .font(.footnote).foregroundStyle(.secondary)
+        }
+        .onReceive(location.$location) { position in
+            guard let position else { return }
+            setPin(position.coordinate, fromAddress: false)
+            pinMessage = "Pin tomado de tu ubicación actual (±\(Int(position.horizontalAccuracy)) m). Úsalo estando en el local."
+        }
+    }
+
+    private func showAddressOnMap() async {
+        isGeocoding = true
+        defer { isGeocoding = false }
+        if let found = await geocode(address) {
+            setPin(found, fromAddress: true)
+            pinMessage = "Ubicación aproximada según la dirección. Revísala en el mapa."
+        } else {
+            pinMessage = "No encontramos esa dirección. Usa tu ubicación estando en el local o mueve el pin."
+        }
+    }
+
+    /// pasa la direccion a coordenadas con el geocodificador de apple, en el celular y sin clave
+    /// se le pone la ciudad porque las direcciones tipo Calle 19 #1-21 no la traen
+    private func geocode(_ text: String) async -> CLLocationCoordinate2D? {
+        let trimmed = text.trimmed
+        guard !trimmed.isEmpty else { return nil }
+        let placemarks = try? await CLGeocoder().geocodeAddressString("\(trimmed), Bogotá, Colombia")
+        return placemarks?.first?.location?.coordinate
+    }
+
+    private func setPin(_ coordinate: CLLocationCoordinate2D, fromAddress: Bool) {
+        pin = coordinate
+        pinFromAddress = fromAddress
+        mapPosition = .region(MKCoordinateRegion(center: coordinate,
+                                                 span: MKCoordinateSpan(latitudeDelta: 0.004, longitudeDelta: 0.004)))
+    }
+
     private func updateStatus() async {
         isWorking = true
         defer { isWorking = false }
@@ -114,18 +204,25 @@ struct EstablishmentManagementView: View {
         guard canSubmit else { return }
         isWorking = true
         defer { isWorking = false }
+        // si no hay pin se intenta con la direccion, si tampoco sale se manda sin coordenadas
+        var coordinate = pin
+        if coordinate == nil { coordinate = await geocode(address) }
+        let photo = photoURL.trimmed
+        let request = EstablishmentRequestBody(
+            name: name.trimmed, area: area, address: address.trimmed,
+            entranceDescription: entranceDescription.trimmed,
+            paymentMethods: methods.filter(paymentMethods.contains),
+            photoUrl: photo.isEmpty ? nil : photo,
+            latitude: coordinate?.latitude, longitude: coordinate?.longitude)
         do {
-            try await store.requestEstablishment(
-                name: name.trimmingCharacters(in: .whitespacesAndNewlines), area: area,
-                address: address.trimmingCharacters(in: .whitespacesAndNewlines),
-                entranceDescription: entranceDescription.trimmingCharacters(in: .whitespacesAndNewlines),
-                paymentMethods: methods.filter { paymentMethods.contains($0) },
-                photoUrl: photoURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : photoURL.trimmingCharacters(in: .whitespacesAndNewlines))
+            try await store.requestEstablishment(request)
             message = "Solicitud enviada. Podrás publicar cuando un administrador la apruebe."
             name = ""
             address = ""
             entranceDescription = ""
             photoURL = ""
+            pin = nil
+            pinMessage = nil
             showingForm = false
         } catch {
             message = error.localizedDescription
@@ -133,6 +230,7 @@ struct EstablishmentManagementView: View {
     }
 }
 
+/// admin aprueba los locales, al aprobar el usuario pasa a restaurante
 struct AdminApprovalsView: View {
     @EnvironmentObject private var store: AppStore
     @State private var requests: [PendingMembership] = []
@@ -188,4 +286,8 @@ struct AdminApprovalsView: View {
             message = error.localizedDescription
         }
     }
+}
+
+private extension String {
+    var trimmed: String { trimmingCharacters(in: .whitespacesAndNewlines) }
 }

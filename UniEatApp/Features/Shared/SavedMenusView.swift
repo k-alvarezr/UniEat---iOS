@@ -1,6 +1,7 @@
 import SwiftUI
 import UniEatCore
 
+/// menus guardados en el celular para esta cuenta
 struct SavedMenusView: View {
     @EnvironmentObject private var store: AppStore
 

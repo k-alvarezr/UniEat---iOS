@@ -20,7 +20,7 @@ private struct StoredSession: Codable {
     let accessToken: String
     let refreshToken: String
     let profile: Profile
-    /// Opcional para que las sesiones guardadas por versiones anteriores sigan decodificando.
+    /// es opcional para que las sesiones viejas sigan funcionando
     let expiresAt: Date?
 }
 
@@ -57,7 +57,7 @@ final class SupabaseAuthService {
         do {
             return try await refresh(cached).profile
         } catch is URLError {
-            // Arranque sin conexión: se conserva la sesión para seguir mostrando el feed guardado.
+            // si abre sin internet se deja la sesion para seguir mostrando el feed guardado
             return cached.profile
         } catch {
             signOut()
@@ -65,7 +65,7 @@ final class SupabaseAuthService {
         }
     }
 
-    /// Token de acceso para llamar a la API; se renueva un minuto antes de vencer.
+    /// token para llamar a la api, se renueva un minuto antes de que venza
     func validAccessToken() async throws -> String {
         guard let data = keychainData(),
               let cached = try? JSONDecoder().decode(StoredSession.self, from: data) else {

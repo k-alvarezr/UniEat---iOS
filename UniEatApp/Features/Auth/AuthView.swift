@@ -1,6 +1,8 @@
 import SwiftUI
 import UniEatCore
 
+/// login y registro, corta el nombre y la contraseña mientras se escribe
+/// y revisa las reglas antes de llamar al server
 struct AuthView: View {
     @EnvironmentObject private var store: AppStore
     @State private var email = ""
@@ -20,10 +22,9 @@ struct AuthView: View {
                     .background(Palette.yellow, in: RoundedRectangle(cornerRadius: 16))
                     .overlay(RoundedRectangle(cornerRadius: 16).stroke(Palette.ink, lineWidth: 3))
                 Text("UniEat")
-                    .font(.system(size: 46, weight: .black, design: .rounded))
+                    .font(.rounded(46, .black))
                 Text("Tu almuerzo, mejor decidido.")
-                    .font(.system(size: 18, weight: .semibold, design: .rounded))
-                DemoNotice()
+                    .font(.rounded(18, .semibold))
 
                 SurfaceCard {
                     VStack(alignment: .leading, spacing: 14) {
@@ -76,18 +77,6 @@ struct AuthView: View {
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 9) {
-                    Text("Probar sin servidor")
-                        .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    HStack(spacing: 10) {
-                        Button("Soy estudiante") { store.enterDemo(role: "student") }
-                            .buttonStyle(DemoChoiceStyle(color: Palette.cyan))
-                        Button("Soy restaurante") { store.enterDemo(role: "restaurant") }
-                            .buttonStyle(DemoChoiceStyle(color: Palette.green))
-                    }
-                    Text("El modo de demostración usa datos locales y no crea una cuenta real.")
-                        .font(.footnote).foregroundStyle(.secondary)
-                }
                 Spacer(minLength: 20)
             }
             .padding(20)
@@ -113,18 +102,5 @@ struct AuthView: View {
             errorText = (error as? AuthFailure)?.localizedDescription ??
                 "No se pudo conectar con el servicio. Inténtalo de nuevo."
         }
-    }
-}
-
-private struct DemoChoiceStyle: ButtonStyle {
-    let color: Color
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: 13, weight: .bold, design: .rounded))
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .background(color, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Palette.ink, lineWidth: 2))
-            .opacity(configuration.isPressed ? 0.7 : 1)
     }
 }
