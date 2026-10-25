@@ -59,9 +59,7 @@ public struct ReportSummary: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
-/// respuesta de GET /menus/:id, version actual del menu con estado y reportes
-/// el objeto menu se lee dos veces, una como DailyMenu que es lo que usan las vistas
-/// y otra para lo que solo trae el detalle
+/// respuesta de GET /menus/:id, el menu y aparte su estado, version actual y reportes
 public struct MenuDetail: Decodable, Sendable {
     public let menu: DailyMenu
     public let status: ServerPublicationStatus
@@ -69,6 +67,7 @@ public struct MenuDetail: Decodable, Sendable {
     public let reports: [ReportSummary]
     public let serverNow: Date
 
+    // para armar un detalle a mano, lo usan las pruebas
     public init(menu: DailyMenu, status: ServerPublicationStatus, currentVersion: Int,
                 reports: [ReportSummary], serverNow: Date) {
         self.menu = menu
@@ -77,25 +76,7 @@ public struct MenuDetail: Decodable, Sendable {
         self.reports = reports
         self.serverNow = serverNow
     }
-
-    private enum CodingKeys: String, CodingKey { case menu, serverNow }
-
-    private struct Extras: Decodable {
-        let status: ServerPublicationStatus
-        let currentVersion: Int
-        let reports: [ReportSummary]?
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        menu = try container.decode(DailyMenu.self, forKey: .menu)
-        let extras = try container.decode(Extras.self, forKey: .menu)
-        status = extras.status
-        currentVersion = extras.currentVersion
-        reports = extras.reports ?? []
-        serverNow = try container.decode(Date.self, forKey: .serverNow)
-    }
-
+    
     /// estado a la hora date, arranca con lo que dijo el server y avanza con el reloj
     /// mientras la pantalla siga abierta, por vencer pasa a vencido al llegar a validUntil
     /// sin pedir nada, cerrado o vencido nunca se devuelve
@@ -109,9 +90,6 @@ public struct MenuDetail: Decodable, Sendable {
             return status
         }
     }
-
-    /// reportes que todavia no revisa un admin
-    public var pendingReports: [ReportSummary] { reports.filter(\.isPending) }
 
     /// los descartados no se muestran
     public var activeNotices: [ReportSummary] { reports.filter { $0.isPending || $0.status == "confirmed" } }
