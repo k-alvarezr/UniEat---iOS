@@ -28,7 +28,7 @@ targets:
           - UIInterfaceOrientationPortrait
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
-        NSLocationWhenInUseUsageDescription: "UniEat usa tu ubicación una sola vez para sugerir la zona de menús cercanos. Puedes elegirla manualmente."
+        NSLocationWhenInUseUsageDescription: "UniEat usa tu ubicación mientras usas la app para sugerir la zona y decirte qué tan lejos queda cada local. No se guarda ni se envía."
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: co.edu.uniandes.unieat
