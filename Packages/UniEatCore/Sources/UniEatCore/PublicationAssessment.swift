@@ -13,11 +13,11 @@ public struct PublicationAssessment: Equatable, Sendable {
 
     public init(menu: DailyMenu, at date: Date = .now) {
         if !menu.isActive(at: date) {
-            state = .expired
+            state = .expired         // vencido si ya no esta activo
         } else if menu.validUntil.timeIntervalSince(date) <= 30 * 60 {
-            state = .expiring
+            state = .expiring        // por vencer si faltan 30min para expirar
         } else {
-            state = .active
+            state = .active          // vigente
         }
         pendingReports = menu.pendingReports
     }

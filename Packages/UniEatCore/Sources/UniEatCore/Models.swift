@@ -115,22 +115,22 @@ public struct FeedFilters: Codable, Hashable, Sendable {
 
 /// actividad de ios en un periodo, las tasas llegan vacias si hay muy pocos datos
 public struct PerformanceSummary: Codable, Sendable {
-    public let periodDays: Int
-    public let impressions: Int
-    public let detailOpens: Int
-    public let selections: Int
-    public let reportedArrivals: Int
-    public let savedMenus: Int
-    public let locationOpens: Int
-    public let reports: Int
-    public let sampleSize: Int?
-    public let insufficientData: Bool?
-    public let rates: PerformanceRates?
+    public let periodDays: Int           // periodo de las cifras, 7 o 28 dias
+    public let impressions: Int          // cuantas veces se vio una tarjeta en el feed
+    public let detailOpens: Int          // cuantas veces se abrio el detalle de un menu
+    public let selections: Int           // cuantas veces se selecciono "elegir este menu"
+    public let reportedArrivals: Int     // cuantas veces dijeron "llegue al local"
+    public let savedMenus: Int           // cuantas personas distintas guardaron un menu en el periodo
+    public let locationOpens: Int        // cuantas veces abrieron "abrir indicaciones"
+    public let reports: Int              // cuantos reportes se enviaron
+    public let sampleSize: Int?          // cuantas sesiones distintas hicieron almenos una accion en el periodo
+    public let insufficientData: Bool?   // true si hay pocos datos para sacar porcentajes (menos de 5 sesiones o cero impresiones)
+    public let rates: PerformanceRates?  // los porcentajes, vacios si hay insufficientData
 }
 
 public struct PerformanceRates: Codable, Sendable {
-    public let detailOpenRate: Double
-    public let selectionRate: Double
+    public let detailOpenRate: Double    // detailOpens / impressions
+    public let selectionRate: Double     // selections / impressions
 }
 
 public struct Profile: Codable, Sendable {
@@ -148,12 +148,12 @@ public struct Profile: Codable, Sendable {
 public enum ReportKind: String, CaseIterable, Codable, Sendable {
     case unavailable
     case price
-    case longLine = "long_line"
+    case longLine = "long_line" // diferente porque en el back es long_line, el resto si se llaman igual que el back
     case location
     case accurate
     case arrival
 
-    /// las discrepancias quedan pendientes, lo demas son observaciones
+    /// las discrepancias (cosas que el restaurante publico que estan mal) quedan pendientes, lo demas son observaciones
     public var isDiscrepancy: Bool { [.unavailable, .price, .location].contains(self) }
 }
 
@@ -165,18 +165,22 @@ public enum UniEatDates {
             let container = try source.singleValueContainer()
             let text = try container.decode(String.self)
             let formatter = ISO8601DateFormatter()
+
+            // primero con milisegundos, asi manda las fechas el server
             formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
             if let date = formatter.date(from: text) { return date }
+
+            // si no, sin milisegundos, asi quedan las que se guardan en el celular
             formatter.formatOptions = [.withInternetDateTime]
             if let date = formatter.date(from: text) { return date }
+
             throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid ISO8601 date: \(text)")
         }
         return decoder
     }
-
     public static func encoder() -> JSONEncoder {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        return encoder
-    }
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            return encoder
+        }
 }
