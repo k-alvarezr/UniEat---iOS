@@ -6,25 +6,32 @@ struct MainTabsView: View {
     @EnvironmentObject private var store: AppStore
 
     var body: some View {
-        TabView {
+        // selection deja cambiar de pestaña desde afuera, por ejemplo el boton de perfil de la cabecera
+        TabView(selection: $store.selectedTab) {
             TodayFeedView()
                 .tabItem { Label("Hoy", systemImage: "fork.knife") }
+                .tag(AppTab.today)
             if store.isRestaurant {
                 PublishView()
                     .tabItem { Label("Publicar", systemImage: "plus.circle.fill") }
+                    .tag(AppTab.second)
             } else {
                 NavigationStack { RecommendationView() }
                     .tabItem { Label("Elige por mí", systemImage: "sparkles") }
+                    .tag(AppTab.second)
             }
             if store.isAdmin {
                 NavigationStack { PerformanceView() }
                     .tabItem { Label("Rendimiento", systemImage: "chart.bar.fill") }
+                    .tag(AppTab.metrics)
             } else if store.isRestaurant {
                 NavigationStack { RestaurantPerformanceView() }
                     .tabItem { Label("Mis métricas", systemImage: "chart.bar") }
+                    .tag(AppTab.metrics)
             }
             ProfileView()
                 .tabItem { Label("Perfil", systemImage: "person.crop.circle") }
+                .tag(AppTab.profile)
         }
         .tint(Palette.ink)
     }
@@ -43,7 +50,7 @@ struct ProfileView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    BrandHeader(title: "Mi perfil")
+                    BrandHeader(title: "Mi perfil", showsProfileButton: false)
                     SurfaceCard {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(store.profile?.displayName ?? "").font(.rounded(23))

@@ -16,6 +16,11 @@ final class LocationContextService: NSObject, ObservableObject, CLLocationManage
         manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
     }
 
+    /// true si el usuario ya dio permiso de ubicacion al usar la app
+    var isAuthorized: Bool {
+        [.authorizedWhenInUse, .authorizedAlways].contains(manager.authorizationStatus)
+    }
+
     func request() {
         location = nil
         guard CLLocationManager.locationServicesEnabled() else {
@@ -27,7 +32,7 @@ final class LocationContextService: NSObject, ObservableObject, CLLocationManage
             waitingForAuthorization = true
             manager.requestWhenInUseAuthorization()
         case .authorizedAlways, .authorizedWhenInUse:
-            message = "Buscando tu zona aproximada…"
+            message = "Buscando tu ubicación…"
             manager.requestLocation()
         case .denied, .restricted:
             message = "Sin permiso de ubicación. Elige la zona manualmente o cambia el permiso en Ajustes."
@@ -50,6 +55,7 @@ final class LocationContextService: NSObject, ObservableObject, CLLocationManage
             return
         }
         location = latest
+        message = nil       // ya hay una lectura buena, se quita el "buscando tu ubicacion"
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {

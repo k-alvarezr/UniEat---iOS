@@ -6,12 +6,17 @@ import UniEatCore
 /// muestra de una la copia del feed y luego la cambia por la version actual del server
 struct MenuDetailView: View {
     @EnvironmentObject private var store: AppStore
-    @Environment(\.openURL) private var openURL
     private let initialMenu: DailyMenu
     @State private var detail: MenuDetail?
     @State private var loadError: APIFailure?
     @State private var isLoading = false
     @State private var showingReport = false
+    // version que se eligio en esta pantalla, para que el boton cambie apenas se toca
+    @State private var chosenVersion: Int?
+    // version en la que marco que llego, para que el boton cambie apenas se toca
+    @State private var arrivedVersion: Int?
+    // gps para decir que tan lejos queda el local, se lee una vez y no se guarda ni se manda
+    @StateObject private var location = LocationContextService()
 
     init(menu: DailyMenu) { initialMenu = menu }
 
@@ -58,7 +63,11 @@ struct MenuDetailView: View {
             .sheet(isPresented: $showingReport, onDismiss: { Task { await load(automatic: true) } }) {
                 ReportSheet(menu: menu)
             }
-            .onAppear { store.track("detail_open", menu: initialMenu) }
+            .onAppear {
+                store.track("detail_open", menu: initialMenu)
+                // si ya dio permiso se calcula la distancia sola, si no queda el boton
+                if location.isAuthorized { location.request() }
+            }
             .task { await load() }
         }
     }
@@ -204,13 +213,12 @@ struct MenuDetailView: View {
                     }
                     .frame(height: 175)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
-                    if let mapURL = URL(string: "https://maps.apple.com/?ll=\(latitude),\(longitude)") {
-                        Button("Abrir indicaciones") {
-                            store.track("location_open", menu: menu)
-                            openURL(mapURL)
-                        }
-                        .font(.subheadline.weight(.bold))
+                    Button("Abrir indicaciones") {
+                        store.track("location_open", menu: menu)
+                        openWalkingDirections(to: coordinate)
                     }
+                    .font(.subheadline.weight(.bold))
+                    distanceRow(to: CLLocation(latitude: latitude, longitude: longitude))
                 } else {
                     Text("Ubicación no confirmada").font(.subheadline)
                 }
@@ -246,8 +254,29 @@ struct MenuDetailView: View {
             }
         }
         if open {
-            SolidButton(title: "Elegir este menú", icon: "checkmark", color: Palette.yellow) {
+            // si ya lo eligio en esta sesion el boton queda como hecho y no se puede volver a tocar
+            let chosen = chosenVersion == menu.version || store.wasChosen(menu)
+            SolidButton(title: chosen ? "Elegiste este menú" : "Elegir este menú",
+                        icon: chosen ? "checkmark.circle.fill" : "checkmark",
+                        color: chosen ? Palette.green : Palette.yellow) {
                 store.track("selection", menu: menu)
+                chosenVersion = menu.version
+            }
+            .disabled(chosen)
+            // despues de elegir aparece llegue al local, cuenta una vez y queda como hecho
+            if chosen {
+                let arrived = arrivedVersion == menu.version || store.hasArrived(menu)
+                SolidButton(title: arrived ? "Llegaste, buen provecho" : "Llegué al local",
+                            icon: arrived ? "checkmark.circle.fill" : "figure.walk",
+                            color: arrived ? Palette.green : Palette.cyan) {
+                    store.track("arrival", menu: menu)
+                    arrivedVersion = menu.version
+                }
+                .disabled(arrived)
+                // ya en el local puede decir cuanta fila hay, al mandarla se recarga para ver la estimacion
+                if arrived {
+                    WaitTimeCard(menu: menu) { await load(automatic: true) }
+                }
             }
             SolidButton(title: "Reportar un cambio", icon: "exclamationmark.bubble", color: Palette.coral) {
                 Task { await openReport() }
@@ -260,6 +289,45 @@ struct MenuDetailView: View {
                 .padding(12)
                 .background(Palette.coral.opacity(0.3), in: RoundedRectangle(cornerRadius: 12))
         }
+    }
+
+    /// abre apple maps con la ruta a pie hasta el local, desde donde este el celular
+    private func openWalkingDirections(to coordinate: CLLocationCoordinate2D) {
+        let local = MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
+        local.name = menu.establishmentName   // para que el pin salga con el nombre del local
+        local.openInMaps(launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeWalking])
+    }
+
+    /// que tan lejos queda el local, o el boton para preguntarlo
+    @ViewBuilder
+    private func distanceRow(to local: CLLocation) -> some View {
+        if let here = location.location {
+            Label(distanceText(here.distance(from: local)), systemImage: "figure.walk")
+                .font(.subheadline.weight(.semibold))
+        } else {
+            Button {
+                location.request()
+            } label: {
+                Label("Ver qué tan lejos queda", systemImage: "location")
+            }
+            .font(.subheadline.weight(.bold))
+            // si no hay permiso o la lectura es mala, el servicio deja el mensaje
+            if let message = location.message {
+                Text(message).font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    /// distancia en linea recta, redondeada porque el gps puede fallar hasta 500 m,
+    /// y minutos caminando contando 80 m por minuto
+    private func distanceText(_ meters: CLLocationDistance) -> String {
+        let minutes = max(1, Int((meters / 80).rounded(.up)))
+        if meters < 1_000 {
+            let rounded = Int((meters / 50).rounded()) * 50
+            return "A unos \(max(50, rounded)) m de ti, ~\(minutes) min caminando"
+        }
+        let km = (meters / 100).rounded() / 10
+        return "A unos \(km) km de ti, ~\(minutes) min caminando"
     }
 
     // MARK: - cargar

@@ -3,7 +3,6 @@ import UniEatCore
 
 /// explica por que no hay estimacion de fila y deja reportar la fila
 struct InsufficientQueueEvidenceView: View {
-    @State private var showingReport = false
     let menu: DailyMenu
 
     var body: some View {
@@ -55,19 +54,14 @@ struct InsufficientQueueEvidenceView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
+                // si ya esta en la fila puede decir cuanto se espera, sin pasar por reportes
                 VStack(alignment: .leading, spacing: 8) {
                     Text("¿Ya estás en la fila?")
                         .font(.rounded(23))
                     Text("Ayuda a otras personas con el tiempo que observas ahora.")
                         .font(.subheadline)
-                    SolidButton(title: "Reportar fila actual", icon: "arrow.right", color: Palette.yellow) {
-                        showingReport = true
-                    }
+                    WaitTimeCard(menu: menu)
                 }
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Palette.coral, in: RoundedRectangle(cornerRadius: 16))
-                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Palette.ink, lineWidth: 2))
                 Text("Menú publicado")
                     .font(.rounded(21))
                 ForEach(menu.items) { dish in
@@ -94,6 +88,5 @@ struct InsufficientQueueEvidenceView: View {
         .background(Palette.cream)
         .navigationTitle("Sin estimación de fila")
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showingReport) { ReportSheet(menu: menu, initialKind: .longLine) }
     }
 }
