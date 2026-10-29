@@ -93,6 +93,7 @@ struct ReportSheet: View {
             confirmationMessage = switch status {
             case "pending": "Gracias. Tu reporte quedó pendiente de revisión."
             case "confirmed": "Gracias. Otros estudiantes reportaron lo mismo: el cambio quedó confirmado."
+            case "queued": "Sin conexión. Tu reporte quedó guardado y se enviará cuando vuelva la conexión."
             default: "Gracias. Tu observación quedó registrada."
             }
         } catch {

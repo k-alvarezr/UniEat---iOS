@@ -41,6 +41,7 @@ final class AppStore: ObservableObject {
     // MARK: - conexion
     @Published private(set) var isConnected = true          // el celular tiene internet
     @Published private(set) var serverUnreachable = false   // hay internet pero el server no responde
+    @Published private(set) var pendingReportCount = 0      // reportes guardados esperando red
 
     // MARK: - navegacion
     @Published var selectedTab: AppTab = .today   // pestaña visible, la cambia por ejemplo el boton de perfil
@@ -57,6 +58,9 @@ final class AppStore: ObservableObject {
         try await self.auth.validAccessToken()
     }
     private let monitor = NWPathMonitor()             // avisa cuando cambia la conexion
+    private let database = LocalDatabase()            // reportes sin mandar, swiftdata
+    private let files = FileStore()                   // detalles y borrador en archivos
+    private var isFlushingReports = false             // para no mandar la cola de reportes dos veces a la vez
     private let sessionID = UUID()                    // id de esta apertura de la app, va en cada evento
     private var countedThisSession: Set<String> = []  // acciones que ya se contaron en esta sesion, para no sumar dos veces
     private let onePerSession: Set<String> = ["feed_impression", "selection", "arrival"]  // acciones que valen una vez por menu y version
@@ -152,6 +156,13 @@ final class AppStore: ObservableObject {
 
     /// borra la sesion, la copia del feed y la cola, y deja todo vacio para el siguiente usuario
     func signOut() {
+        // lo guardado es de esta cuenta, el siguiente usuario no lo debe ver
+        if let userId = profile?.id {
+            database.deleteAll(userId: userId)
+            files.removeAll(userId: userId)
+        }
+        pendingReportCount = 0
+        
         auth.signOut()
         UserDefaults.standard.removeObject(forKey: Keys.feedCache)
         pendingEvents = []
@@ -237,6 +248,7 @@ final class AppStore: ObservableObject {
                 ownMenus = mine.menus
             }
             await flushEvents()
+            await flushReports()
         } catch {
             guard requested == filters else { return }
             serverUnreachable = (error as? APIFailure)?.code == "OFFLINE"
@@ -279,17 +291,70 @@ final class AppStore: ObservableObject {
     /// si automatic es true el server no la cuenta en las metricas, son recargas que no hizo el usuario
     func menuDetail(_ menu: DailyMenu, automatic: Bool = false) async throws -> MenuDetail {
         let query = automatic ? [URLQueryItem(name: "refresh", value: "auto")] : []
-        return try await api.get("menus/\(menu.id.uuidString)", query: query)
+        let detail: MenuDetail = try await api.get("menus/\(menu.id.uuidString)", query: query)
+            // se guarda la copia para poder abrir el detalle sin red
+            if let userId = profile?.id {
+                files.save(detail, name: "detail-\(menu.id.uuidString)", folder: .caches, userId: userId)
+            }
+            return detail
+        }
+    
+    /// ultima copia guardada del detalle, nil si nunca se abrio con red
+    func cachedDetail(for menu: DailyMenu) -> MenuDetail? {
+        guard let userId = profile?.id else { return nil }
+        return files.load(MenuDetail.self, name: "detail-\(menu.id.uuidString)", folder: .caches, userId: userId)
     }
+
 
     /// manda el reporte pegado a la version que vio el estudiante, nunca cambia el menu oficial
     /// devuelve lo que dijo el server, pending confirmed u observation
     func submitReport(for menu: DailyMenu, kind: ReportKind, note: String, waitMinutes: Int?) async throws -> String {
-        let body = ReportBody(publicationId: menu.id, version: menu.version, kind: kind.rawValue,
-                              note: note, observedWaitMinutes: waitMinutes)
-        let response: ReportResponse = try await api.send("POST", "reports", body: body)
-        await refresh()
-        return response.status
+        guard let userId = profile?.id else { throw APIFailure.unexpected }
+        // sin red no se pierde, queda en la base y se manda cuando vuelva
+        if isOffline {
+            queueReport(userId: userId, menu: menu, kind: kind, note: note, waitMinutes: waitMinutes)
+            return "queued"
+        }
+        let body = ReportBody(publicationId: menu.id,
+                              version: menu.version,
+                              kind: kind.rawValue,
+                              note: note,
+                              observedWaitMinutes: waitMinutes)
+        do {
+            let response: ReportResponse = try await api.send("POST", "reports", body: body)
+            await refresh()
+            return response.status
+            } catch let failure as APIFailure where failure.code == "OFFLINE" {
+            // se fue la red justo al mandar
+            queueReport(userId: userId, menu: menu, kind: kind, note: note, waitMinutes: waitMinutes)
+            return "queued"
+        }
+    }
+    
+    private func queueReport(userId: UUID, menu: DailyMenu, kind: ReportKind, note: String, waitMinutes: Int?) {
+        database.enqueueReport(userId: userId, menu: menu, kind: kind.rawValue, note: note, waitMinutes: waitMinutes)
+        pendingReportCount = database.pendingReports(userId: userId).count
+    }
+    
+    /// manda los reportes guardados en orden, si se va la red para y sigue en el proximo refresh
+    private func flushReports() async {
+        guard let userId = profile?.id, !isOffline, !isFlushingReports else {return}
+        isFlushingReports = true
+        defer { isFlushingReports = false }
+        for report in database.pendingReports(userId: userId){
+            guard let body = report.body else { database.remove(report);
+                continue}
+            do {
+                let _: ReportResponse = try await api.send("POST", "reports", body: body)
+                database.remove(report)
+                }
+            catch let failure as APIFailure where failure.code == "OFFLINE" { break }
+            catch {
+                // el server lo rechazo, por ejemplo menu cerrado o version vieja, reintentar no sirve
+                database.remove(report)
+            }
+        }
+        pendingReportCount = database.pendingReports(userId: userId).count
     }
 
     // MARK: - publicar restaurantes
@@ -313,6 +378,22 @@ final class AppStore: ObservableObject {
     func close(_ menu: DailyMenu) async throws {
         let _: CloseResponse = try await api.send("POST", "menus/\(menu.id.uuidString)/close", body: NoBody?.none)
         await refresh()
+    }
+    
+    /// borrador de publicar, va en application support porque es trabajo del restaurante
+    func saveDraft(_ draft: PublishDraft) {
+        guard let userId = profile?.id else { return }
+        files.save(draft, name: "publish-draft", folder: .support, userId: userId)
+    }
+
+    func loadDraft() -> PublishDraft? {
+        guard let userId = profile?.id else { return nil }
+        return files.load(PublishDraft.self, name: "publish-draft", folder: .support, userId: userId)
+    }
+
+    func clearDraft() {
+        guard let userId = profile?.id else { return }
+        files.remove(name: "publish-draft", folder: .support, userId: userId)
     }
 
     // MARK: - eventos y analitica

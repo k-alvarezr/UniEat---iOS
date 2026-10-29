@@ -60,7 +60,7 @@ public struct ReportSummary: Codable, Hashable, Identifiable, Sendable {
 }
 
 /// respuesta de GET /menus/:id, el menu y aparte su estado, version actual y reportes
-public struct MenuDetail: Decodable, Sendable {
+public struct MenuDetail: Codable, Sendable {
     public let menu: DailyMenu
     public let status: ServerPublicationStatus
     public let currentVersion: Int
