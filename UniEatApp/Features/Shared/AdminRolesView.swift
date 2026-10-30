@@ -2,12 +2,7 @@ import SwiftUI
 
 /// la api vuelve a revisar que sea admin en cada cambio de rol y lo deja registrado
 struct AdminRolesView: View {
-    @EnvironmentObject private var store: AppStore
-    @State private var users: [AdminUser] = []
-    @State private var selected: AdminUser?
-    @State private var confirming = false
-    @State private var workingID: UUID?
-    @State private var message: String?
+    @EnvironmentObject private var model: AdminRolesViewModel
 
     var body: some View {
         SurfaceCard {
@@ -15,8 +10,8 @@ struct AdminRolesView: View {
                 Text("Administrar roles").font(.headline)
                 Text("Solo otro administrador puede conceder o quitar el rol de administrador. Los restaurantes se habilitan aprobando su solicitud de local.")
                     .font(.footnote).foregroundStyle(.secondary)
-                Button("Actualizar usuarios") { Task { await load() } }
-                ForEach(users) { user in
+                Button("Actualizar usuarios") { Task { await model.load() } }
+                ForEach(model.users) { user in
                     HStack(spacing: 8) {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(user.displayName).font(.subheadline.weight(.semibold))
@@ -24,29 +19,29 @@ struct AdminRolesView: View {
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
-                        if user.id != store.profile?.id {
+                        if user.id != model.profileID {
                             Button(user.role == "admin" ? "Quitar admin" : "Hacer admin") {
-                                selected = user
-                                confirming = true
+                                model.selected = user
+                                model.confirming = true
                             }
                             .font(.caption.weight(.bold))
-                            .disabled(workingID != nil)
+                            .disabled(model.workingID != nil)
                         }
                     }
                     Divider()
                 }
-                if let message { Text(message).font(.footnote) }
+                if let message = model.message { Text(message).font(.footnote) }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .task { await load() }
-        .alert("Confirmar cambio de rol", isPresented: $confirming) {
-            Button("Cancelar", role: .cancel) { selected = nil }
+        .task { await model.load() }
+        .alert("Confirmar cambio de rol", isPresented: $model.confirming) {
+            Button("Cancelar", role: .cancel) { model.selected = nil }
             Button("Confirmar") {
-                if let selected { Task { await change(selected) } }
+                if let selected = model.selected { Task { await model.change(selected) } }
             }
         } message: {
-            Text(selected.map { "¿\($0.role == "admin" ? "Quitar" : "Conceder") el rol de administrador a \($0.displayName)?" } ?? "")
+            Text(model.selected.map { "¿\($0.role == "admin" ? "Quitar" : "Conceder") el rol de administrador a \($0.displayName)?" } ?? "")
         }
     }
 
@@ -58,25 +53,4 @@ struct AdminRolesView: View {
         }
     }
 
-    private func load() async {
-        guard store.isAdmin else { users = []; return }
-        do {
-            users = try await store.adminUsers()
-            message = nil
-        } catch {
-            message = error.localizedDescription
-        }
-    }
-
-    private func change(_ user: AdminUser) async {
-        workingID = user.id
-        defer { workingID = nil; selected = nil }
-        do {
-            try await store.setAdminRole(for: user, enabled: user.role != "admin")
-            await load()
-            message = "Rol actualizado. El cambio se aplicará al actualizar la cuenta del usuario."
-        } catch {
-            message = error.localizedDescription
-        }
-    }
 }

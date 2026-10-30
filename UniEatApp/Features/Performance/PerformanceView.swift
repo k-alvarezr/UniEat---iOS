@@ -3,8 +3,7 @@ import UniEatCore
 
 /// pestaña rendimiento solo admin, BQ-03 BQ-04 y actividad de ios en el mismo panel
 struct PerformanceView: View {
-    @EnvironmentObject private var store: AppStore
-    @State private var days = 7
+    @EnvironmentObject private var store: PerformanceViewModel
 
     var body: some View {
         Group {
@@ -14,11 +13,11 @@ struct PerformanceView: View {
                         BrandHeader(title: "UniEat · Rendimiento")
                         Text("Panel global de iOS · BQ-03, BQ-04 y actividad en el mismo período.")
                             .font(.subheadline).foregroundStyle(.secondary)
-                        PeriodPicker(days: $days)
+                        PeriodPicker(days: $store.days)
                         if let error = store.performanceError {
-                            PerformanceErrorCard(message: error) { Task { await store.loadPerformance(days: days) } }
+                            PerformanceErrorCard(message: error) { Task { await store.loadPerformance(days: store.days) } }
                         }
-                        if let snapshot = store.adminDashboard[days] {
+                        if let snapshot = store.adminDashboard[store.days] {
                             Text("Actualizado: \(SpanishPresentation.dateAndTime(snapshot.generatedAt))")
                                 .font(.caption).foregroundStyle(.secondary)
                             BQ03Section(metrics: snapshot.bq03)
@@ -31,7 +30,7 @@ struct PerformanceView: View {
                     .padding(16)
                 }
                 .background(Palette.cream)
-                .refreshingPerformance(days: days, store: store)
+                .refreshingPerformance(days: store.days, store: store)
             } else {
                 ContentUnavailableView("Solo administradores", systemImage: "lock.fill",
                                        description: Text("Inicia sesión con una cuenta administradora para ver el tablero global."))
@@ -42,8 +41,7 @@ struct PerformanceView: View {
 
 /// mis metricas para restaurantes, solo la actividad de sus menus
 struct RestaurantPerformanceView: View {
-    @EnvironmentObject private var store: AppStore
-    @State private var days = 7
+    @EnvironmentObject private var store: PerformanceViewModel
 
     var body: some View {
         Group {
@@ -53,11 +51,11 @@ struct RestaurantPerformanceView: View {
                         BrandHeader(title: "Actividad de mis menús")
                         Text("Solo publicaciones de tus establecimientos aprobados. Las cifras son actividad iOS, no ventas ni visitas verificadas.")
                             .font(.subheadline).foregroundStyle(.secondary)
-                        PeriodPicker(days: $days)
+                        PeriodPicker(days: $store.days)
                         if let error = store.performanceError {
-                            PerformanceErrorCard(message: error) { Task { await store.loadPerformance(days: days) } }
+                            PerformanceErrorCard(message: error) { Task { await store.loadPerformance(days: store.days) } }
                         }
-                        if let summary = store.restaurantPerformance[days] {
+                        if let summary = store.restaurantPerformance[store.days] {
                             EngagementSection(summary: summary)
                         } else if store.performanceError == nil {
                             ProgressView("Cargando métricas del servidor…")
@@ -66,7 +64,7 @@ struct RestaurantPerformanceView: View {
                     .padding(16)
                 }
                 .background(Palette.cream)
-                .refreshingPerformance(days: days, store: store)
+                .refreshingPerformance(days: store.days, store: store)
             } else {
                 ContentUnavailableView("Solo restaurantes", systemImage: "lock.fill")
             }
@@ -77,7 +75,7 @@ struct RestaurantPerformanceView: View {
 private extension View {
     /// carga las metricas y las vuelve a pedir cada 10 segundos mientras la pantalla este abierta
     /// si se cambia el periodo arranca de nuevo
-    func refreshingPerformance(days: Int, store: AppStore) -> some View {
+    func refreshingPerformance(days: Int, store: PerformanceViewModel) -> some View {
         task(id: days) {
             while !Task.isCancelled {
                 await store.loadPerformance(days: days)

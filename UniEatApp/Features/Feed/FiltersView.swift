@@ -4,11 +4,9 @@ import UniEatCore
 /// filtros de BQ-03, se edita un borrador y solo aplicar cambia el feed
 /// sugerir zona usa el gps una vez y lo compara con los pines de los locales
 struct FiltersView: View {
-    @EnvironmentObject private var store: AppStore
+    @EnvironmentObject private var model: FiltersViewModel
     @Environment(\.dismiss) private var dismiss
     @StateObject private var location = LocationContextService()
-    @State private var draft = FeedFilters()
-    @State private var locationMessage: String?
     private let areas = ["Centro", "Norte", "Sur", "Fuera del campus"]
 
     var body: some View {
@@ -20,10 +18,10 @@ struct FiltersView: View {
                 SurfaceCard {
                     VStack(alignment: .leading, spacing: 10) {
                         sectionTitle("Presupuesto por plato", icon: "banknote")
-                        Text((draft.budgetCop ?? 20_000).cop)
+                        Text((model.draft.budgetCop ?? 20_000).cop)
                             .font(.rounded(25, .black))
-                        Slider(value: Binding(get: { Double(draft.budgetCop ?? 20_000) },
-                                              set: { draft.budgetCop = Int($0) }),
+                        Slider(value: Binding(get: { Double(model.draft.budgetCop ?? 20_000) },
+                                              set: { model.draft.budgetCop = Int($0) }),
                                in: 5_000...40_000, step: 1_000)
                             .tint(Palette.yellow)
                     }
@@ -31,8 +29,8 @@ struct FiltersView: View {
                 SurfaceCard {
                     VStack(alignment: .leading, spacing: 10) {
                         sectionTitle("Tiempo disponible", icon: "clock")
-                        Picker("Tiempo", selection: Binding(get: { draft.availableMinutes ?? 40 },
-                                                          set: { draft.availableMinutes = $0 })) {
+                        Picker("Tiempo", selection: Binding(get: { model.draft.availableMinutes ?? 40 },
+                                                          set: { model.draft.availableMinutes = $0 })) {
                             ForEach([15, 30, 45, 60], id: \.self) { value in
                                 Text("\(value) min").tag(value)
                             }
@@ -44,9 +42,9 @@ struct FiltersView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         sectionTitle("Preferencia dietaria", icon: "leaf")
                         HStack {
-                            choice("Todas", value: nil, selected: $draft.diet)
-                            choice("Vegetariana", value: "vegetarian", selected: $draft.diet)
-                            choice("Vegana", value: "vegan", selected: $draft.diet)
+                            choice("Todas", value: nil, selected: $model.draft.diet)
+                            choice("Vegetariana", value: "vegetarian", selected: $model.draft.diet)
+                            choice("Vegana", value: "vegan", selected: $model.draft.diet)
                         }
                         Text("La dieta desconocida nunca se presenta como confirmada.")
                             .font(.caption).foregroundStyle(.secondary)
@@ -55,19 +53,19 @@ struct FiltersView: View {
                 SurfaceCard {
                     VStack(alignment: .leading, spacing: 10) {
                         sectionTitle("Zona del campus", icon: "mappin")
-                        Picker("Zona", selection: Binding(get: { draft.area ?? "Centro" },
-                                                       set: { draft.area = $0; locationMessage = nil })) {
+                        Picker("Zona", selection: Binding(get: { model.draft.area ?? "Centro" },
+                                                       set: { model.draft.area = $0; model.locationMessage = nil })) {
                             ForEach(areas, id: \.self) { Text($0).tag($0) }
                         }
                         .pickerStyle(.menu)
                         Button {
-                            locationMessage = nil
+                            model.locationMessage = nil
                             location.request()
                         } label: {
                             Label("Sugerir zona con mi ubicación", systemImage: "location")
                         }
                         .buttonStyle(.bordered)
-                        if let message = locationMessage ?? location.message {
+                        if let message = model.locationMessage ?? location.message {
                             Text(message).font(.caption).foregroundStyle(.secondary)
                         }
                         Text("Se consulta el GPS una vez y se compara con los pines publicados. Tu ubicación no se envía ni se guarda.")
@@ -77,8 +75,8 @@ struct FiltersView: View {
                 SurfaceCard {
                     VStack(alignment: .leading, spacing: 10) {
                         sectionTitle("Medio de pago", icon: "creditcard")
-                        Picker("Pago", selection: Binding(get: { draft.paymentMethod ?? "Todos" },
-                                                       set: { draft.paymentMethod = $0 == "Todos" ? nil : $0 })) {
+                        Picker("Pago", selection: Binding(get: { model.draft.paymentMethod ?? "Todos" },
+                                                       set: { model.draft.paymentMethod = $0 == "Todos" ? nil : $0 })) {
                             ForEach(["Todos", "Nequi", "Daviplata", "Efectivo", "Tarjeta"], id: \.self) {
                                 Text($0).tag($0)
                             }
@@ -86,29 +84,19 @@ struct FiltersView: View {
                         .pickerStyle(.menu)
                     }
                 }
-                Button("Restablecer") { draft = FeedFilters() }
+                Button("Restablecer") { model.draft = FeedFilters() }
                     .font(.subheadline.weight(.bold))
                     .padding(.vertical, 8)
                 SolidButton(title: "Aplicar filtros", icon: "arrow.right", color: Palette.coral) {
-                    store.updateFilters(draft)
+                    model.apply()
                     dismiss()
                 }
             }
             .padding(16)
         }
         .background(Palette.cream)
-        .onAppear { draft = store.filters }
-        .onReceive(location.$location) { position in
-            guard let position else { return }
-            if let suggestion = LocationAreaResolver.suggest(
-                latitude: position.coordinate.latitude, longitude: position.coordinate.longitude,
-                menus: store.menus) {
-                draft.area = suggestion.area
-                locationMessage = "Zona sugerida: \(suggestion.area) · cerca de \(suggestion.establishmentName) (\(suggestion.distanceMeters) m). Revisa y aplica los filtros."
-            } else {
-                locationMessage = "No hay un local publicado con coordenadas a menos de 800 m. Elige la zona manualmente."
-            }
-        }
+        .onAppear { model.reset() }
+        .onReceive(location.$location) { position in model.suggest(position) }
     }
 
     private func sectionTitle(_ title: String, icon: String) -> some View {

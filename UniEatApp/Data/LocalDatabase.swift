@@ -58,7 +58,8 @@ final class PendingReport{
         return ReportBody(publicationId: snapshot.menuId,
                           version: snapshot.version,
                           kind: kind,
-                          note: note, observedWaitMinutes: waitMinutes)
+                          note: note, observedWaitMinutes: waitMinutes,
+                          clientReportId: id, observedAt: createdAt)
     }
 }
 
@@ -69,61 +70,56 @@ final class LocalDatabase {
     let container: ModelContainer // esta es perse la BD local, archivo con esquemas y modelos
     private var context: ModelContext {container.mainContext} // contexto asociado al hilo principal
     
-    init() {
+    init(inMemory: Bool = false) throws {
         // todos los modelos de la app van en esta lista
         let schema = Schema([MenuSnapshot.self, PendingReport.self])
-        let config = ModelConfiguration(schema: schema)
-        do {
-            // se inicializa con normalidad
-            container = try ModelContainer(for: schema, configurations: config)
-        } catch {
-            // se puede caer si no abre la BD local, que puede pasar si se cambiaron cosas del modelo
-            // para el usuario no tiene sentido, esto es offline, como actualizar sin internet
-            // pero si en las actualizaciones mientras desarrollamos movemos algo, esto limpia y vuelve a generar
-            // asi no desinstalamos e instalamos cada vez
-            try? FileManager.default.removeItem(at: config.url)
-            container = try! ModelContainer(for: schema, configurations: config)
-        }
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory)
+        // Never remove an existing store after a migration/open failure: it contains user work.
+        container = try ModelContainer(for: schema, configurations: config)
     }
     
     /// guarda el reporte colgado del snapshot de esa version, si el snapshot no existe se crea
-    func enqueueReport(userId: UUID, menu: DailyMenu, kind: String, note: String, waitMinutes: Int?){
+    func enqueueReport(userId: UUID, menu: DailyMenu, kind: String, note: String, waitMinutes: Int?,
+                       id: UUID = UUID(), observedAt: Date = .now) throws {
         let key = MenuSnapshot.key(userId, menu.id, menu.version)
-        let found = try? context.fetch(FetchDescriptor<MenuSnapshot>(predicate: #Predicate { $0.key == key }))
-        let snapshot = found?.first ?? MenuSnapshot(userId: userId, menu: menu) //crea
-        if found?.first == nil { context.insert(snapshot) } //inserta
+        let found = try context.fetch(FetchDescriptor<MenuSnapshot>(predicate: #Predicate { $0.key == key }))
+        let snapshot = found.first ?? MenuSnapshot(userId: userId, menu: menu)
+        if found.first == nil { context.insert(snapshot) }
         let report = PendingReport(kind: kind, note: note, waitMinutes: waitMinutes)
+        report.id = id
+        report.createdAt = observedAt
         context.insert(report)
         report.snapshot = snapshot
-        try? context.save()
+        do { try context.save() } catch { context.rollback(); throw error }
     }
     
     /// reportes sin mandar de este usuario, del mas viejo al mas nuevo
     /// se buscan los snapshots del usuario y se recorren sus reportes por la relacion
-    func pendingReports(userId: UUID) -> [PendingReport] {
-        let snapshots = (try? context.fetch(FetchDescriptor<MenuSnapshot>(predicate: #Predicate { $0.userId == userId }))) ?? []
+    func pendingReports(userId: UUID) throws -> [PendingReport] {
+        let snapshots = try context.fetch(FetchDescriptor<MenuSnapshot>(predicate: #Predicate { $0.userId == userId }))
         var reports: [PendingReport] = []
         for snapshot in snapshots { reports += snapshot.reports }
         return reports.sorted { $0.createdAt < $1.createdAt }
     }
     
     /// borra un reporte ya mandado, si su snapshot queda sin reportes tambien se borra
-    func remove(_ report: PendingReport) {
+    func remove(_ report: PendingReport) throws {
         let snapshot = report.snapshot
         context.delete(report)
         if let snapshot, snapshot.reports.allSatisfy({ $0.id == report.id }) {
             context.delete(snapshot)
         }
-        try? context.save()
+        do { try context.save() } catch { context.rollback(); throw error }
     }
 
     /// borra por id, para cuando el reporte se mando desde otro hilo y solo se tiene su id
-    func remove(id:UUID) {
-        let found = try? context.fetch(FetchDescriptor<PendingReport>(predicate: #Predicate { $0.id == id }))
-        if let report = found?.first { remove(report) }
+    func remove(id:UUID) throws {
+        let found = try context.fetch(FetchDescriptor<PendingReport>(predicate: #Predicate { $0.id == id }))
+        if let report = found.first { try remove(report) }
     }
     
-    /// al cerrar sesion se borra todo lo del usuario, el cascade se lleva los reportes
+    /// Borrado explícito de datos del usuario: la relación elimina los reportes en cascada.
+    /// El cierre de sesión conserva ahora los pendientes aislados por su dueño para no perder trabajo.
     func deleteAll(userId: UUID) {
         let snapshots = (try? context.fetch(FetchDescriptor<MenuSnapshot>(predicate: #Predicate { $0.userId == userId }))) ?? []
         for snapshot in snapshots { context.delete(snapshot) }

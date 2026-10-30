@@ -4,6 +4,7 @@ import SwiftUI
 /// igual la api revisa el rol en cada llamada
 struct MainTabsView: View {
     @EnvironmentObject private var store: AppStore
+    @EnvironmentObject private var session: SessionStore
 
     var body: some View {
         // selection deja cambiar de pestaña desde afuera, por ejemplo el boton de perfil de la cabecera
@@ -11,7 +12,7 @@ struct MainTabsView: View {
             TodayFeedView()
                 .tabItem { Label("Hoy", systemImage: "fork.knife") }
                 .tag(AppTab.today)
-            if store.isRestaurant {
+            if session.isRestaurant {
                 PublishView()
                     .tabItem { Label("Publicar", systemImage: "plus.circle.fill") }
                     .tag(AppTab.second)
@@ -20,11 +21,11 @@ struct MainTabsView: View {
                     .tabItem { Label("Elige por mí", systemImage: "sparkles") }
                     .tag(AppTab.second)
             }
-            if store.isAdmin {
+            if session.isAdmin {
                 NavigationStack { PerformanceView() }
                     .tabItem { Label("Rendimiento", systemImage: "chart.bar.fill") }
                     .tag(AppTab.metrics)
-            } else if store.isRestaurant {
+            } else if session.isRestaurant {
                 NavigationStack { RestaurantPerformanceView() }
                     .tabItem { Label("Mis métricas", systemImage: "chart.bar") }
                     .tag(AppTab.metrics)
@@ -39,7 +40,7 @@ struct MainTabsView: View {
 
 /// perfil, datos de la cuenta, lo de cada rol, guardados y cerrar sesion
 struct ProfileView: View {
-    @EnvironmentObject private var store: AppStore
+    @EnvironmentObject private var store: ProfileViewModel
 
     private var roleName: String {
         if store.profile?.role == "admin" { return "Administrador" }
@@ -65,6 +66,16 @@ struct ProfileView: View {
                         AdminRolesView()
                     } else {
                         EstablishmentManagementView()
+                    }
+                    if let error = store.accountError {
+                        Text(error).font(.footnote)
+                        Button("Actualizar cuenta") { Task { await store.refreshAccount() } }
+                    }
+                    if let error = store.storageError { Text(error).font(.footnote).foregroundStyle(Palette.coral) }
+                    if store.reports.pendingReportCount > 0 {
+                        Text("Reportes guardados: \(store.reports.pendingReportCount)").font(.footnote)
+                        if let message = store.reports.syncMessage { Text(message).font(.footnote) }
+                        Button("Reintentar reportes pendientes") { Task { await store.retryReports() } }
                     }
                     Text("La información guardada muestra cuándo se obtuvo y descarta menús vencidos incluso sin conexión.")
                         .font(.footnote).foregroundStyle(.secondary)

@@ -1,0 +1,40 @@
+import Foundation
+import UniEatCore
+
+@MainActor
+final class MenuDetailService {
+    private let api: APIRequesting
+    private let session: SessionStore
+    private let files: FileStore
+    private let clock: ServerClock
+    init(api: APIRequesting, session: SessionStore, files: FileStore, clock: ServerClock) {
+        self.api = api; self.session = session; self.files = files; self.clock = clock
+    }
+    func load(_ menu: DailyMenu, automatic: Bool, generation: UUID? = nil) async throws -> MenuDetail {
+        guard let userID = session.profile?.id else { throw AuthFailure.expired }
+        if let generation, generation != session.generation { throw CancellationError() }
+        let expected = session.generation
+        let query = automatic ? [URLQueryItem(name: "refresh", value: "auto")] : []
+        let detail: MenuDetail = try await api.get("menus/\(menu.id.uuidString)", query: query)
+        try Task.checkCancellation()
+        guard session.matches(userID, generation: expected) else { throw CancellationError() }
+        clock.synchronize(detail.serverNow)
+        files.save(detail, name: "detail-\(menu.id.uuidString)", folder: .caches, userId: userID)
+        files.save(clock.snapshot(), name: "detail-clock-\(menu.id.uuidString)", folder: .caches, userId: userID)
+        return detail
+    }
+    /// Conserva la lectura utility de Juan: disco y decodificación ocurren fuera de MainActor.
+    /// Solo el valor Sendable vuelve a presentación; una sesión que cambió descarta el resultado.
+    func cached(_ menu: DailyMenu, generation: UUID? = nil) async -> MenuDetail? {
+        guard let userID = session.profile?.id else { return nil }
+        if let generation, generation != session.generation { return nil }
+        let expected = session.generation, files = files, id = menu.id
+        let (detail, reference) = await Task.detached(priority: .utility) {
+            (files.load(MenuDetail.self, name: "detail-\(id.uuidString)", folder: .caches, userId: userID),
+             files.load(ServerTimeReference.self, name: "detail-clock-\(id.uuidString)", folder: .caches, userId: userID))
+        }.value
+        guard session.matches(userID, generation: expected), !Task.isCancelled else { return nil }
+        if let reference { clock.restore(reference) }
+        return detail
+    }
+}

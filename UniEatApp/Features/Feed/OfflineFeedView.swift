@@ -3,7 +3,7 @@ import UniEatCore
 
 /// sin internet, muestra la ultima copia con su fecha y oculta lo vencido
 struct OfflineFeedView: View {
-    @EnvironmentObject private var store: AppStore
+    @EnvironmentObject private var store: FeedViewModel
     @State private var retryMessage: String?
 
     var body: some View {
@@ -24,7 +24,7 @@ struct OfflineFeedView: View {
                     } else {
                         ForEach(store.visibleMenus) { menu in
                             NavigationLink(destination: MenuDetailView(menu: menu)) {
-                                MenuCard(menu: menu, at: timeline.date).opacity(0.78)
+                                MenuCard(menu: menu, at: store.clock.now).opacity(0.78)
                             }
                             .buttonStyle(.plain)
                         }

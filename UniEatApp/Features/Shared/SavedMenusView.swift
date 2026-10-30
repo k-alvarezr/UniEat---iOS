@@ -3,7 +3,7 @@ import UniEatCore
 
 /// menus guardados en el celular para esta cuenta
 struct SavedMenusView: View {
-    @EnvironmentObject private var store: AppStore
+    @EnvironmentObject private var store: SavedMenusViewModel
 
     var body: some View {
         ScrollView {
@@ -23,7 +23,7 @@ struct SavedMenusView: View {
                                     Text(entry.menu.title)
                                     Text("Guardado: \(SpanishPresentation.dateAndTime(entry.savedAt))")
                                         .font(.caption).foregroundStyle(.secondary)
-                                    if !entry.menu.isActive(at: .now) {
+                                    if !entry.menu.isActive(at: store.clock.now) {
                                         Text("La copia guardada ya venció; consulta el detalle para ver su estado actual.")
                                             .font(.caption).foregroundStyle(Palette.coral)
                                     }

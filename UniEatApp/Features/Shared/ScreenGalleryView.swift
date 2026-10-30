@@ -4,7 +4,7 @@ import UniEatCore
 /// atajo de admin a todas las pantallas, las que necesitan un menu usan uno real del feed
 /// asi que solo salen si hay alguno publicado
 struct ScreenGalleryView: View {
-    @EnvironmentObject private var store: AppStore
+    @EnvironmentObject private var store: FeedViewModel
     @State private var reportMenu: DailyMenu?
 
     private var exampleMenu: DailyMenu? {

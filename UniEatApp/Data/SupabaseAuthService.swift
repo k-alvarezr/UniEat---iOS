@@ -3,12 +3,14 @@ import Security
 import UniEatCore
 
 enum AuthFailure: LocalizedError {
+    case expired
     case unconfigured
     case invalidResponse
     case service(String)
 
     var errorDescription: String? {
         switch self {
+        case .expired: return "Tu sesión terminó. Inicia sesión de nuevo."
         case .unconfigured: return "Configura Supabase en BackendConfig.json para usar una cuenta real."
         case .invalidResponse: return "El servicio de autenticación devolvió una respuesta inesperada."
         case .service(let message): return message
@@ -25,19 +27,33 @@ private struct StoredSession: Codable {
 }
 
 @MainActor
-final class SupabaseAuthService {
+protocol SessionAuthenticating {
+    func signIn(email: String, password: String) async throws -> Profile
+    func signUp(email: String, password: String, name: String) async throws -> Profile?
+    func restore() async -> Profile?
+    func signOut()
+}
+
+@MainActor
+final class SupabaseAuthService: SessionAuthenticating {
+    private(set) var generation = UUID()
     private let config = AppConfiguration.current
     private let keychainService = "co.edu.uniandes.unieat.auth"
 
     func signIn(email: String, password: String) async throws -> Profile {
+        generation = UUID(); renewing?.cancel(); renewing = nil; renewalID = nil
+        let expected = generation
         let data = try await request(path: "auth/v1/token", query: "grant_type=password",
                                      body: ["email": email, "password": password])
         guard let session = try session(from: data) else { throw AuthFailure.invalidResponse }
+        guard generation == expected else { throw CancellationError() }
         store(session)
         return session.profile
     }
 
     func signUp(email: String, password: String, name: String) async throws -> Profile? {
+        generation = UUID(); renewing?.cancel(); renewing = nil; renewalID = nil
+        let expected = generation
         if let error = RegistrationRules.nameError(name) ?? RegistrationRules.passwordError(password) {
             throw AuthFailure.service(error)
         }
@@ -46,6 +62,7 @@ final class SupabaseAuthService {
             "data": ["display_name": name.trimmingCharacters(in: .whitespacesAndNewlines)]
         ])
         guard let session = try session(from: data) else { return nil }
+        guard generation == expected else { throw CancellationError() }
         store(session)
         return session.profile
     }
@@ -59,9 +76,14 @@ final class SupabaseAuthService {
         } catch is URLError {
             // si abre sin internet se deja la sesion para seguir mostrando el feed guardado
             return cached.profile
-        } catch {
+        } catch is CancellationError {
+            return nil
+        } catch AuthFailure.expired {
             signOut()
             return nil
+        } catch {
+            // A temporary Auth outage must not destroy the device's cached session.
+            return cached.profile
         }
     }
 
@@ -69,7 +91,7 @@ final class SupabaseAuthService {
     func validAccessToken() async throws -> String {
         guard let data = keychainData(),
               let cached = try? JSONDecoder().decode(StoredSession.self, from: data) else {
-            throw AuthFailure.service("Tu sesión terminó. Inicia sesión de nuevo.")
+            throw AuthFailure.expired
         }
         if let expiresAt = cached.expiresAt, expiresAt > .now.addingTimeInterval(60) {
             return cached.accessToken
@@ -79,22 +101,32 @@ final class SupabaseAuthService {
 
     // si ya se esta renovando, las demas llamadas esperan esa misma renovacion
     private var renewing: Task<StoredSession, Error>?
+    private var renewalID: UUID?
 
     private func refresh(_ cached: StoredSession) async throws -> StoredSession {
         if let renewing { return try await renewing.value }
+        let expected = generation
+        let id = UUID()
         let task = Task {
             let response = try await request(path: "auth/v1/token", query: "grant_type=refresh_token",
                                              body: ["refresh_token": cached.refreshToken])
             guard let renewed = try session(from: response) else { throw AuthFailure.invalidResponse }
+            try Task.checkCancellation()
+            guard generation == expected else { throw CancellationError() }
             store(renewed)
             return renewed
         }
         renewing = task
-        defer { renewing = nil }
+        renewalID = id
+        defer { if renewalID == id { renewing = nil; renewalID = nil } }
         return try await task.value
     }
 
     func signOut() {
+        generation = UUID()
+        renewing?.cancel()
+        renewing = nil
+        renewalID = nil
         let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
                                     kSecAttrService as String: keychainService]
         SecItemDelete(query as CFDictionary)
@@ -122,6 +154,11 @@ final class SupabaseAuthService {
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw AuthFailure.invalidResponse }
         guard (200..<300).contains(http.statusCode) else {
+            let details = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+            let code = (details?["error_code"] as? String) ?? (details?["code"] as? String) ?? ""
+            if ["refresh_token_not_found", "refresh_token_already_used", "session_not_found", "bad_jwt"].contains(code) {
+                throw AuthFailure.expired
+            }
             throw AuthFailure.service(errorMessage(from: data, status: http.statusCode))
         }
         return data

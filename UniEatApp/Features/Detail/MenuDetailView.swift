@@ -5,38 +5,36 @@ import UniEatCore
 /// detalle del menu BQ-04, sigue vigente y que cambios reportaron
 /// muestra de una la copia del feed y luego la cambia por la version actual del server
 struct MenuDetailView: View {
-    @EnvironmentObject private var store: AppStore
-    private let initialMenu: DailyMenu
-    @State private var detail: MenuDetail?
-    @State private var loadError: APIFailure?
-    @State private var isLoading = false
+    @EnvironmentObject private var app: AppStore
+    let menu: DailyMenu
+    var body: some View { MenuDetailScreen(model: app.makeDetail(menu)) }
+}
+
+private struct MenuDetailScreen: View {
+    @StateObject private var store: MenuDetailViewModel
     @State private var showingReport = false
-    // version que se eligio en esta pantalla, para que el boton cambie apenas se toca
-    @State private var chosenVersion: Int?
-    // version en la que marco que llego, para que el boton cambie apenas se toca
-    @State private var arrivedVersion: Int?
     // gps para decir que tan lejos queda el local, se lee una vez y no se guarda ni se manda
     @StateObject private var location = LocationContextService()
 
-    init(menu: DailyMenu) { initialMenu = menu }
+    init(model: MenuDetailViewModel) { _store = StateObject(wrappedValue: model) }
+    private var initialMenu: DailyMenu { store.initialMenu }
+    private var detail: MenuDetail? { store.detail }
+    private var loadError: APIFailure? { store.loadError }
+    private var isLoading: Bool { store.isLoading }
 
     /// la version del server si ya llego, si no la de la tarjeta
-    private var menu: DailyMenu { detail?.menu ?? initialMenu }
+    private var menu: DailyMenu { store.menu }
 
     /// el server dijo 410 vencido o cerrado o 404
-    private var isGone: Bool { ["GONE", "NOT_FOUND"].contains(loadError?.code ?? "") }
+    private var isGone: Bool { store.isGone }
 
     /// se puede elegir o reportar ahora, usa el estado del server avanzado con el reloj
     private func isOpen(at date: Date) -> Bool {
-        if isGone { return false }
-        if let detail { return detail.status(at: date).acceptsActions }
-        return menu.isActive(at: date)
+        store.isOpen()
     }
 
     private func statusLabel(at date: Date) -> String {
-        if isGone { return "No disponible" }
-        if let detail { return detail.status(at: date).label }
-        return menu.isActive(at: date) ? "Vigente" : "Vencido"
+        store.statusLabel()
     }
 
     var body: some View {
@@ -47,13 +45,13 @@ struct MenuDetailView: View {
                     BrandHeader(title: "Detalle del plato")
                     FoodArtwork(name: menu.establishmentName, photoUrl: menu.photoUrl).frame(height: 180)
                     titleRow
-                    statusRow(at: timeline.date)
+                    statusRow(at: store.clock.now)
                     validityCard
-                    waitCard(at: timeline.date)
+                    waitCard(at: store.clock.now)
                     dishesSection
                     locationCard
                     paymentCard
-                    actions(at: timeline.date)
+                    actions(at: store.clock.now)
                 }
                 .padding(16)
             }
@@ -255,22 +253,20 @@ struct MenuDetailView: View {
         }
         if open {
             // si ya lo eligio en esta sesion el boton queda como hecho y no se puede volver a tocar
-            let chosen = chosenVersion == menu.version || store.wasChosen(menu)
+            let chosen = store.wasChosen(menu)
             SolidButton(title: chosen ? "Elegiste este menú" : "Elegir este menú",
                         icon: chosen ? "checkmark.circle.fill" : "checkmark",
                         color: chosen ? Palette.green : Palette.yellow) {
-                store.track("selection", menu: menu)
-                chosenVersion = menu.version
+                store.choose()
             }
             .disabled(chosen)
             // despues de elegir aparece llegue al local, cuenta una vez y queda como hecho
             if chosen {
-                let arrived = arrivedVersion == menu.version || store.hasArrived(menu)
+                let arrived = store.hasArrived(menu)
                 SolidButton(title: arrived ? "Llegaste, buen provecho" : "Llegué al local",
                             icon: arrived ? "checkmark.circle.fill" : "figure.walk",
                             color: arrived ? Palette.green : Palette.cyan) {
-                    store.track("arrival", menu: menu)
-                    arrivedVersion = menu.version
+                    store.arrive()
                 }
                 .disabled(arrived)
                 // ya en el local puede decir cuanta fila hay, al mandarla se recarga para ver la estimacion
@@ -324,10 +320,10 @@ struct MenuDetailView: View {
         let minutes = max(1, Int((meters / 80).rounded(.up)))
         if meters < 1_000 {
             let rounded = Int((meters / 50).rounded()) * 50
-            return "A unos \(max(50, rounded)) m de ti, ~\(minutes) min caminando"
+            return "A unos \(max(50, rounded)) m en línea recta; caminata orientativa de ~\(minutes) min"
         }
         let km = (meters / 100).rounded() / 10
-        return "A unos \(km) km de ti, ~\(minutes) min caminando"
+        return "A unos \(km) km en línea recta; caminata orientativa de ~\(minutes) min"
     }
 
     // MARK: - cargar
@@ -343,30 +339,12 @@ struct MenuDetailView: View {
         }
     }
 
-    private func load(automatic: Bool = false) async {
-        isLoading = true
-        defer { isLoading = false }
-        // arrancan las dos a la vez: leer la copia del disco y pedir la version al server
-        async let cached = store.cachedDetail(for: initialMenu)
-        async let fresh = store.menuDetail(initialMenu, automatic: automatic)
-        
-        // la copia casi siempre llega primero, se muestra mientras responde el server
-        if detail == nil, let copy = await cached{ detail = copy }
-        do {
-            detail = try await fresh
-            loadError = nil
-        } catch let failure as APIFailure {
-            loadError = failure
-        } catch {
-            loadError = .unexpected
-        }
-    }
+    private func load(automatic: Bool = false) async { await store.load(automatic: automatic) }
 
     /// recarga antes de abrir la hoja para que el reporte quede con la version actual
     /// y si cerraron el menu mientras tanto no se abre
     private func openReport() async {
-        await load(automatic: true)
-        if isOpen(at: .now) { showingReport = true }
+        if await store.canReport() { showingReport = true }
     }
 }
 
