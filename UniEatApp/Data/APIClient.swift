@@ -253,8 +253,26 @@ struct EventBatch: Encodable {
     let events: [RemoteEvent]
 }
 
-/// respuesta del lote, cuantos eventos acepto el server
-struct BatchResponse: Decodable { let accepted: Int }
+/// respuesta del lote: aceptados, duplicados ya registrados y rechazos individuales
+struct BatchResponse: Decodable {
+    let accepted: Int
+    let duplicates: Int
+    let rejected: [BatchEventRejection]
+
+    private enum CodingKeys: String, CodingKey { case accepted, duplicates, rejected }
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        accepted = try values.decode(Int.self, forKey: .accepted)
+        // El contrato anterior solo entregaba accepted; se mantiene su lectura.
+        duplicates = try values.decodeIfPresent(Int.self, forKey: .duplicates) ?? 0
+        rejected = try values.decodeIfPresent([BatchEventRejection].self, forKey: .rejected) ?? []
+    }
+}
+
+struct BatchEventRejection: Decodable {
+    let eventId: UUID?
+    let reason: String
+}
 
 // MARK: - cuenta y locales
 

@@ -115,6 +115,7 @@ struct ProfileView: View {
                             Task { await store.signOut() }
                         }
                     }
+                    .disabled(store.isSigningOut)
                     .confirmationDialog("Tienes \(store.unsentReports) reporte(s) sin enviar. Se intentarán enviar ahora; si no hay conexión se borrarán del celular.",
                                         isPresented: $confirmingSignOut, titleVisibility: .visible) {
                         Button("Cerrar sesión", role: .destructive) { Task { await store.signOut() } }

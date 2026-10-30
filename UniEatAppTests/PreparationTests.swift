@@ -8,20 +8,24 @@ final class PreparationTests: XCTestCase {
     func testServerClockUsesServerTimeEvenIfThePhoneClockIsWrong() {
         // el celular dice una hora muy distinta a la del server
         var wall = Date(timeIntervalSince1970: 5_000_000)
-        let clock = ServerClock(wallTime: { wall })
+        var uptime: TimeInterval = 100
+        let clock = ServerClock(uptime: { uptime }, wallTime: { wall })
         let server = Date(timeIntervalSince1970: 1_000)
         clock.synchronize(server)
         XCTAssertEqual(clock.now, server)
         // pasa un minuto en el celular, la hora sigue la del server
         wall = wall.addingTimeInterval(60)
+        uptime += 60
         XCTAssertEqual(clock.now, server.addingTimeInterval(60))
+        wall = wall.addingTimeInterval(-86_400)
+        XCTAssertEqual(clock.now, server.addingTimeInterval(60), "Cambiar la hora local no altera la hora observada")
     }
 
     func testExpiredSessionKeepsLocalDataButManualSignOutForgetsIt() async throws {
         let h = try await Harness.make()
         let userID = h.auth.profile.id
         var forgotten: [UUID] = []
-        h.session.onForget = { forgotten.append($0) }
+        h.session.onForget = { userID, _ in forgotten.append(userID) }
         h.connectivity.update(isConnected: false)
         _ = try await h.reports.submitReport(for: h.menu, kind: .price, note: "", waitMinutes: nil)
         // la sesion vencio sola: no se borra nada, el reporte espera a que vuelva a entrar
@@ -30,7 +34,7 @@ final class PreparationTests: XCTestCase {
         XCTAssertEqual(try h.database.pending(userID: userID).count, 1)
         // a mano: se avisa a AppStore con el id de la cuenta y la base borra sus reportes
         try await h.session.signIn(email: "test@example.invalid", password: "test")
-        h.session.signOut(forgetData: true)
+        await h.session.signOutAndForget()
         XCTAssertEqual(forgotten, [userID])
         // la copia del feed de la cuenta tambien se borra
         let content = LocalContentService(container: h.database.container)
@@ -181,7 +185,7 @@ final class PreparationTests: XCTestCase {
 
 @MainActor
 final class FakeAuth: SessionAuthenticating {
-    let profile = Profile(displayName: "Test", role: "student")
+    var profile = Profile(displayName: "Test", role: "student")
     func signIn(email: String, password: String) async throws -> Profile { profile }
     func signUp(email: String, password: String, name: String) async throws -> Profile? { profile }
     func restore() async -> Profile? { nil }
@@ -190,10 +194,11 @@ final class FakeAuth: SessionAuthenticating {
 
 @MainActor
 final class FakeAPI: APIRequesting {
-    let userID: UUID
+    var userID: UUID
     var failure: APIFailure?
     var reportBodies: [Data] = []
     var onReport: (() -> Void)?
+    var onReportAsync: (() async -> Void)?
     var assignmentData: Data?
     var feed: (() async throws -> Data)?
     init(userID: UUID) { self.userID = userID }
@@ -214,6 +219,7 @@ final class FakeAPI: APIRequesting {
         }
         if let body { reportBodies.append(try UniEatDates.encoder().encode(body)) }
         onReport?()
+        await onReportAsync?()
         if let failure { throw failure }
         return try JSONDecoder().decode(Response.self, from: Data("{\"status\":\"observation\"}".utf8))
     }

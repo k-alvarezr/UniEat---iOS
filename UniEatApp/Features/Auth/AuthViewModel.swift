@@ -22,6 +22,7 @@ final class AuthViewModel: FeatureViewModel {
     }
     /// aviso de la sesion, ej revisar el correo para confirmar
     var authMessage: String? { session.authMessage }
+    var isClosingSession: Bool { session.isForgetting }
     /// al cambiar de cuenta se borra la contraseña escrita y cualquier error
     func reset() {
         password = ""
@@ -31,6 +32,7 @@ final class AuthViewModel: FeatureViewModel {
     /// entra o crea la cuenta, al registrarse primero valida nombre y contraseña en el celular
     /// cada tipo de error tiene su mensaje, asi se sabe si es la red, el server o la cuenta
     func submit() async {
+        guard !isSubmitting, !session.isForgetting else { return }
         isSubmitting = true
         errorText = nil
         defer { isSubmitting = false }
@@ -48,6 +50,8 @@ final class AuthViewModel: FeatureViewModel {
             // otro inicio o cierre de sesion le gano a este, no hay nada que mostrar
         } catch let failure as AuthFailure {
             errorText = failure.localizedDescription
+        } catch let failure as APIFailure {
+            errorText = failure.message
         } catch is URLError {
             errorText = "Sin conexión. Revisa tu internet e inténtalo de nuevo."
         } catch {
