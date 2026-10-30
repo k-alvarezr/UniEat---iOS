@@ -10,6 +10,7 @@ final class RecommendationViewModel: FeatureViewModel {
     var visibleMenus: [DailyMenu] { feed.visibleMenus }
     var filters: FeedFilters { feed.filters }
     var isShowingCachedFeed: Bool { feed.isShowingCachedFeed || feed.isOffline }
+    var hasSnapshot: Bool { feed.hasSnapshot }
     var fetchedAt: Date { feed.fetchedAt }
     var now: Date { feed.clock.now }
     var loadError: String? { feed.loadError }

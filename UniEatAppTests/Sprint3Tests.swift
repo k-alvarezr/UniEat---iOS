@@ -95,6 +95,7 @@ final class Sprint3Tests: XCTestCase {
         XCTAssertEqual(feed.visibleMenus.map(\.id), [cheap.id])
         XCTAssertEqual(feed.locationMenus.count, 2)
         XCTAssertTrue(feed.isShowingCachedFeed)
+        XCTAssertTrue(feed.hasSnapshot)
         XCTAssertNotNil(feed.loadError)
     }
 

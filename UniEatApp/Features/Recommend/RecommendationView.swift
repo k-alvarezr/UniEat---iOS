@@ -21,7 +21,7 @@ struct RecommendationView: View {
                 Text("Las opciones se ordenan según tus filtros y la información disponible.")
                     .font(.subheadline)
                 filtersSummary
-                if store.isShowingCachedFeed { OfflineNotice(fetchedAt: store.fetchedAt) }
+                if store.isShowingCachedFeed && store.hasSnapshot { OfflineNotice(fetchedAt: store.fetchedAt) }
                 if let error = store.loadError {
                     Text(error).font(.footnote).foregroundStyle(Palette.coral)
                     Button("Actualizar opciones") { Task { await store.refresh() } }

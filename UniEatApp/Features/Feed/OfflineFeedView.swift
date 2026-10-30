@@ -44,7 +44,7 @@ struct OfflineFeedView: View {
     private var statusCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label("Sin conexión", systemImage: "wifi.slash").font(.rounded(25))
-            Text("Mostrando datos guardados el \(SpanishPresentation.dateAndTime(store.fetchedAt))")
+            Text(store.hasSnapshot ? "Mostrando datos guardados el \(SpanishPresentation.dateAndTime(store.fetchedAt))" : "Aún no hay una copia descargada para estos filtros.")
                 .font(.subheadline.weight(.semibold))
             Text("Los menús vencidos se ocultan aunque sigan en la copia local.")
                 .font(.subheadline)

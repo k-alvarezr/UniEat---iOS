@@ -11,6 +11,7 @@ final class FiltersViewModel: FeatureViewModel {
     init(feed: FeedViewModel) { self.feed = feed; super.init(); observe(feed) }
     var filters: FeedFilters { feed.filters }
     var usesCachedCatalog: Bool { feed.isOffline || feed.isShowingCachedFeed }
+    var hasSnapshot: Bool { feed.hasSnapshot }
     var fetchedAt: Date { feed.fetchedAt }
     func reset() { draft = feed.filters; locationMessage = nil }
     func apply() { feed.updateFilters(draft) }

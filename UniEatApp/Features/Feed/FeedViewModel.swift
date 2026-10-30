@@ -11,6 +11,7 @@ final class FeedViewModel: FeatureViewModel {
     @Published private(set) var fetchedAt = Date.now
     @Published private(set) var isLoading = false
     @Published private(set) var isShowingCachedFeed = false
+    @Published private(set) var hasSnapshot = false
     @Published private(set) var loadError: String?
     @Published private(set) var cacheWarning: String?
     @Published private(set) var contentRevision = UUID()
@@ -42,7 +43,7 @@ final class FeedViewModel: FeatureViewModel {
     func accountChanged() {
         refreshTask?.cancel(); catalogTask?.cancel(); catalogTask = nil; catalogAt = nil
         requestID = UUID(); memory.clear()
-        menus = []; locationMenus = []; isLoading = false; loadError = nil; cacheWarning = nil; isShowingCachedFeed = false
+        menus = []; locationMenus = []; isLoading = false; loadError = nil; cacheWarning = nil; isShowingCachedFeed = false; hasSnapshot = false
         guard session.profile != nil else { return }
         filters = LocalValues.load(FeedFilters.self, key: "unieat.filters") ?? FeedFilters()
         refreshTask = Task { await refresh() }
@@ -93,7 +94,7 @@ final class FeedViewModel: FeatureViewModel {
     }
     private func apply(_ snapshot: CachedFeedSnapshot, stored: Bool) {
         if let reference = snapshot.timeReference { clock.restore(reference) }
-        menus = snapshot.response.menus; fetchedAt = snapshot.response.fetchedAt; isShowingCachedFeed = stored
+        menus = snapshot.response.menus; fetchedAt = snapshot.response.fetchedAt; isShowingCachedFeed = stored; hasSnapshot = true
         contentRevision = UUID() // remount cards after a pilot/context change so exposure is recorded.
         if locationMenus.isEmpty { locationMenus = menus }
     }
@@ -120,7 +121,7 @@ final class FeedViewModel: FeatureViewModel {
             }
         }
         if let snapshot { apply(snapshot, stored: true) }
-        else { menus = []; isShowingCachedFeed = false }
+        else { menus = []; isShowingCachedFeed = false; hasSnapshot = false }
     }
     private func refreshCatalog(userID: UUID, generation: UUID) {
         guard let content, catalogTask == nil,

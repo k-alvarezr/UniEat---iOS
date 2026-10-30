@@ -22,11 +22,14 @@ struct TodayFeedContent: View {
                     header(date: timeline.date)
                     // al abrir se muestra la copia mientras llega el server, eso no es estar sin conexion
                     // el aviso sale solo si no hay red o si la carga ya termino y no se pudo actualizar
-                    if store.isOffline || (store.isShowingCachedFeed && !store.isLoading) {
+                    if (store.isOffline || (store.isShowingCachedFeed && !store.isLoading)) && store.hasSnapshot {
                         NavigationLink(destination: OfflineFeedView()) {
                             OfflineNotice(fetchedAt: store.fetchedAt)
                         }
                         .buttonStyle(.plain)
+                    } else if store.isOffline && !store.hasSnapshot {
+                        Text("Sin conexión. Descarga los menús cuando vuelva la red para tener una copia disponible.")
+                            .font(.footnote)
                     } else if store.isShowingCachedFeed {
                         HStack(spacing: 8) {
                             ProgressView()
