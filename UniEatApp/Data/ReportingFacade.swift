@@ -46,7 +46,7 @@ final class ReportingFacade: FeatureViewModel {
     private let session: SessionStore
     private let connectivity: ConnectivityService
     private let clock: ServerClock
-    private var isFlushing = false
+    private var flushingGeneration: UUID?
     private var failures: [String: String] = [:]
     init(api: APIRequesting, outbox: ReportOutbox?, session: SessionStore,
          connectivity: ConnectivityService, clock: ServerClock) {
@@ -79,11 +79,11 @@ final class ReportingFacade: FeatureViewModel {
         return try await deliver(report, userID: userID) ?? "queued"
     }
     func flushReports(retryRejected: Bool = false) async {
-        guard let userID = session.profile?.id, !connectivity.isOffline, !isFlushing, let outbox else { return }
+        guard let userID = session.profile?.id, !connectivity.isOffline, flushingGeneration != session.generation, let outbox else { return }
         let expected = session.generation
         if retryRejected { failures = [:]; LocalValues.save(failures, key: failureKey) }
-        isFlushing = true
-        defer { isFlushing = false; updateCount() }
+        flushingGeneration = expected
+        defer { if flushingGeneration == expected { flushingGeneration = nil }; updateCount() }
         do {
             var waiting = try outbox.pending(userID: userID)
                 .filter { failures[$0.id.uuidString] == nil }.makeIterator()

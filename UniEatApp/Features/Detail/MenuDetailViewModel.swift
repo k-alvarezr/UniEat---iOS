@@ -19,7 +19,7 @@ final class MenuDetailViewModel: FeatureViewModel {
          saved: SavedMenusViewModel, connectivity: ConnectivityService, clock: ServerClock) {
         initialMenu = menu; self.service = service; self.session = session; self.events = events
         self.saved = saved; self.connectivity = connectivity; self.clock = clock
-        super.init(); observe(saved); observe(session); observe(connectivity); observe(clock)
+        super.init(); observe(saved); observe(session); observe(connectivity); observe(clock); observe(events)
     }
     var menu: DailyMenu { detail?.menu ?? initialMenu }
     var isGone: Bool { ["GONE", "NOT_FOUND"].contains(loadError?.code ?? "") }
@@ -33,6 +33,18 @@ final class MenuDetailViewModel: FeatureViewModel {
     func statusLabel() -> String {
         if isGone { return "No disponible" }
         return detail?.status(at: clock.now).label ?? (menu.isActive(at: clock.now) ? "Vigente" : "Vencido")
+    }
+    func canReport() async -> Bool {
+        await load(automatic: true)
+        return isOpen()
+    }
+    func choose() {
+        guard isOpen() else { return }
+        events.track("selection", menu: menu)
+    }
+    func arrive() {
+        guard isOpen(), wasChosen(menu) else { return }
+        events.track("arrival", menu: menu)
     }
     func load(automatic: Bool = false) async {
         guard let userID = session.profile?.id else { return }

@@ -63,6 +63,10 @@ final class AppStore: ObservableObject {
         api.onUnauthorized = { [weak session] in session?.signOut(message: "Tu sesión terminó. Inicia sesión de nuevo.") }
         session.onChange = { [weak self] in self?.accountChanged() }
         connectivity.onReconnect = { [weak self] in self?.synchronize() }
+        // A service outage can recover without NWPathMonitor changing its network path.
+        feed.onServiceAvailable = { [weak events, weak reports] in
+            Task { await events?.flush(); await reports?.flushReports() }
+        }
         Task { await session.restore() }
     }
 

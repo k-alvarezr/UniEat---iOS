@@ -118,7 +118,8 @@ final class LocalDatabase {
         if let report = found.first { try remove(report) }
     }
     
-    /// al cerrar sesion se borra todo lo del usuario, el cascade se lleva los reportes
+    /// Borrado explícito de datos del usuario: la relación elimina los reportes en cascada.
+    /// El cierre de sesión conserva ahora los pendientes aislados por su dueño para no perder trabajo.
     func deleteAll(userId: UUID) {
         let snapshots = (try? context.fetch(FetchDescriptor<MenuSnapshot>(predicate: #Predicate { $0.userId == userId }))) ?? []
         for snapshot in snapshots { context.delete(snapshot) }

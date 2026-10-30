@@ -1,8 +1,9 @@
+import Combine
 import Foundation
 import UniEatCore
 
 @MainActor
-final class EventService {
+final class EventService: ObservableObject {
     private let api: APIRequesting
     private let session: SessionStore
     private let connectivity: ConnectivityService
@@ -10,12 +11,13 @@ final class EventService {
     private(set) var sessionID = UUID()
     private var counted: Set<String> = []
     private var pending: [RemoteEvent] = []
-    private var isFlushing = false
+    private var flushingGeneration: UUID?
     init(api: APIRequesting, session: SessionStore, connectivity: ConnectivityService, clock: ServerClock) {
         self.api = api; self.session = session; self.connectivity = connectivity; self.clock = clock
     }
     private var key: String { "unieat.remote.pending-events.\(session.profile?.id.uuidString ?? "signed-out")" }
     func accountChanged() {
+        objectWillChange.send()
         sessionID = UUID(); counted = []
         pending = session.profile == nil ? [] : LocalValues.load([RemoteEvent].self, key: key) ?? []
     }
@@ -23,6 +25,7 @@ final class EventService {
     func hasCounted(_ kind: String, menu: DailyMenu) -> Bool { counted.contains(eventKey(kind, menu)) }
     func track(_ kind: String, menu: DailyMenu) {
         guard session.profile != nil else { return }
+        objectWillChange.send()
         if ["feed_impression", "selection", "arrival"].contains(kind), !counted.insert(eventKey(kind, menu)).inserted { return }
         pending.append(RemoteEvent(eventId: UUID(), sessionId: sessionID, publicationId: menu.id,
                                     version: menu.version, kind: kind, occurredAt: clock.now))
@@ -31,10 +34,10 @@ final class EventService {
         if !connectivity.isOffline { Task { await flush() } }
     }
     func flush() async {
-        guard let userID = session.profile?.id, !connectivity.isOffline, !isFlushing else { return }
+        guard let userID = session.profile?.id, !connectivity.isOffline, flushingGeneration != session.generation else { return }
         let expected = session.generation
-        isFlushing = true
-        defer { isFlushing = false }
+        flushingGeneration = expected
+        defer { if flushingGeneration == expected { flushingGeneration = nil } }
         while !pending.isEmpty && !connectivity.isOffline && session.matches(userID, generation: expected) {
             let batch = Array(pending.prefix(100))
             do {

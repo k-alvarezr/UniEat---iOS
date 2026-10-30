@@ -25,6 +25,7 @@ final class FeedViewModel: FeatureViewModel {
     private let events: EventService
     private var requestID = UUID()
     private var refreshTask: Task<Void, Never>?
+    var onServiceAvailable: (() -> Void)?
     init(api: APIRequesting, session: SessionStore, connectivity: ConnectivityService,
          clock: ServerClock, events: EventService) {
         self.api = api; self.session = session; self.connectivity = connectivity
@@ -62,6 +63,7 @@ final class FeedViewModel: FeatureViewModel {
             connectivity.serverUnreachable = false; isShowingCachedFeed = false
             LocalValues.save(CachedFeed(userId: userID, filters: requested, response: feed,
                                         timeReference: clock.snapshot()), key: "unieat.remote.feed-cache.v1")
+            onServiceAvailable?()
         } catch is CancellationError { }
         catch {
             guard session.matches(userID, generation: generation), requestID == id, requested == filters else { return }

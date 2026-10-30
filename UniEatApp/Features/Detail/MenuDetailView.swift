@@ -13,10 +13,6 @@ struct MenuDetailView: View {
 private struct MenuDetailScreen: View {
     @StateObject private var store: MenuDetailViewModel
     @State private var showingReport = false
-    // version que se eligio en esta pantalla, para que el boton cambie apenas se toca
-    @State private var chosenVersion: Int?
-    // version en la que marco que llego, para que el boton cambie apenas se toca
-    @State private var arrivedVersion: Int?
     // gps para decir que tan lejos queda el local, se lee una vez y no se guarda ni se manda
     @StateObject private var location = LocationContextService()
 
@@ -27,22 +23,18 @@ private struct MenuDetailScreen: View {
     private var isLoading: Bool { store.isLoading }
 
     /// la version del server si ya llego, si no la de la tarjeta
-    private var menu: DailyMenu { detail?.menu ?? initialMenu }
+    private var menu: DailyMenu { store.menu }
 
     /// el server dijo 410 vencido o cerrado o 404
-    private var isGone: Bool { ["GONE", "NOT_FOUND"].contains(loadError?.code ?? "") }
+    private var isGone: Bool { store.isGone }
 
     /// se puede elegir o reportar ahora, usa el estado del server avanzado con el reloj
     private func isOpen(at date: Date) -> Bool {
-        if isGone { return false }
-        if let detail { return detail.status(at: store.clock.now).acceptsActions }
-        return menu.isActive(at: store.clock.now)
+        store.isOpen()
     }
 
     private func statusLabel(at date: Date) -> String {
-        if isGone { return "No disponible" }
-        if let detail { return detail.status(at: store.clock.now).label }
-        return menu.isActive(at: store.clock.now) ? "Vigente" : "Vencido"
+        store.statusLabel()
     }
 
     var body: some View {
@@ -261,22 +253,20 @@ private struct MenuDetailScreen: View {
         }
         if open {
             // si ya lo eligio en esta sesion el boton queda como hecho y no se puede volver a tocar
-            let chosen = chosenVersion == menu.version || store.wasChosen(menu)
+            let chosen = store.wasChosen(menu)
             SolidButton(title: chosen ? "Elegiste este menú" : "Elegir este menú",
                         icon: chosen ? "checkmark.circle.fill" : "checkmark",
                         color: chosen ? Palette.green : Palette.yellow) {
-                store.track("selection", menu: menu)
-                chosenVersion = menu.version
+                store.choose()
             }
             .disabled(chosen)
             // despues de elegir aparece llegue al local, cuenta una vez y queda como hecho
             if chosen {
-                let arrived = arrivedVersion == menu.version || store.hasArrived(menu)
+                let arrived = store.hasArrived(menu)
                 SolidButton(title: arrived ? "Llegaste, buen provecho" : "Llegué al local",
                             icon: arrived ? "checkmark.circle.fill" : "figure.walk",
                             color: arrived ? Palette.green : Palette.cyan) {
-                    store.track("arrival", menu: menu)
-                    arrivedVersion = menu.version
+                    store.arrive()
                 }
                 .disabled(arrived)
                 // ya en el local puede decir cuanta fila hay, al mandarla se recarga para ver la estimacion
@@ -354,8 +344,7 @@ private struct MenuDetailScreen: View {
     /// recarga antes de abrir la hoja para que el reporte quede con la version actual
     /// y si cerraron el menu mientras tanto no se abre
     private func openReport() async {
-        await load(automatic: true)
-        if isOpen(at: store.clock.now) { showingReport = true }
+        if await store.canReport() { showingReport = true }
     }
 }
 
