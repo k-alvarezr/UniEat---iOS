@@ -15,7 +15,7 @@ final class FiltersViewModel: FeatureViewModel {
     func suggest(_ position: CLLocation?) {
         guard let position else { return }
         if let suggestion = LocationAreaResolver.suggest(latitude: position.coordinate.latitude,
-            longitude: position.coordinate.longitude, menus: feed.menus) {
+            longitude: position.coordinate.longitude, menus: feed.locationMenus.isEmpty ? feed.menus : feed.locationMenus) {
             draft.area = suggestion.area
             locationMessage = "Zona sugerida: \(suggestion.area), cerca de \(suggestion.establishmentName) (~\(suggestion.distanceMeters) m). Puedes cambiarla."
         } else {

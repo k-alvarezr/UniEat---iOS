@@ -1,4 +1,5 @@
 import SwiftUI
+import Kingfisher
 import UniEatCore
 
 struct TodayFeedView: View {
@@ -31,7 +32,7 @@ struct TodayFeedContent: View {
                         SurfaceCard {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text(error).font(.footnote)
-                                Button("Reintentar actualización") { Task { await store.refresh() } }
+                                Button("Reintentar actualización") { Task { await store.refresh(force: true) } }
                             }
                         }
                     }
@@ -57,7 +58,7 @@ struct TodayFeedContent: View {
         }
         .background(Palette.cream)
         .navigationBarHidden(hidesNavigationBar)
-        .refreshable { await store.refresh() }
+        .refreshable { await store.refresh(force: true) }
     }
 
     private func header(date: Date) -> some View {
@@ -147,6 +148,8 @@ struct MenuCard: View {
 
 /// foto del local si tiene url https, si no un dibujo con el nombre
 struct FoodArtwork: View {
+    @EnvironmentObject private var app: AppStore
+    @State private var localPhoto: URL?
     let name: String
     var photoUrl: String?
 
@@ -166,11 +169,15 @@ struct FoodArtwork: View {
         // con scaledToFill adentro del zstack la foto crecia y tapaba la tarjeta de abajo
         .overlay {
             if let photo {
-                AsyncImage(url: photo) { image in
-                    image.resizable().scaledToFill()
-                } placeholder: {
-                    placeholderIcon
-                }
+                KFImage(source: localPhoto.map {
+                    .provider(LocalFileImageDataProvider(fileURL: $0, cacheKey: photo.absoluteString))
+                } ?? .network(ImageResource(downloadURL: photo)))
+                .placeholder { placeholderIcon }
+                .setProcessor(DownsamplingImageProcessor(size: CGSize(width: 720, height: 480)))
+                .cacheOriginalImage()
+                .onlyFromCache(app.connectivity.isOffline && localPhoto == nil)
+                .cancelOnDisappear(true)
+                .resizable().scaledToFill()
             }
         }
         // el nombre va encima de la foto para que se siga viendo
@@ -184,6 +191,10 @@ struct FoodArtwork: View {
         .frame(maxWidth: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: 11))
         .accessibilityLabel(photo == nil ? "Ilustración de \(name)" : "Foto de \(name)")
+        .task(id: photo?.absoluteString) {
+            localPhoto = nil
+            if let photo { localPhoto = await app.images.localFile(photo) }
+        }
     }
 
     private var placeholderIcon: some View {

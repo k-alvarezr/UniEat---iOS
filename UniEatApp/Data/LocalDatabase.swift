@@ -72,7 +72,7 @@ final class LocalDatabase {
     
     init(inMemory: Bool = false) throws {
         // todos los modelos de la app van en esta lista
-        let schema = Schema([MenuSnapshot.self, PendingReport.self])
+        let schema = Schema([MenuSnapshot.self, PendingReport.self, SavedMenu.self, SavedDish.self, FeedCacheRecord.self])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory)
         // Never remove an existing store after a migration/open failure: it contains user work.
         container = try ModelContainer(for: schema, configurations: config)

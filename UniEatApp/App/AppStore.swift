@@ -14,6 +14,7 @@ final class AppStore: ObservableObject {
     /// One container for Juan's report models and the future models in issue #34.
     let database: LocalDatabase?
     let storageError: String?
+    let images: FeedImageStore
     let feed: FeedViewModel
     let saved: SavedMenusViewModel
     let authentication: AuthViewModel
@@ -29,6 +30,7 @@ final class AppStore: ObservableObject {
     private let events: EventService
     private let details: MenuDetailService
     private var synchronization: Task<Void, Never>?
+    private var imageTask: Task<Void, Never>?
 
     init() {
         let auth = SupabaseAuthService()
@@ -42,9 +44,14 @@ final class AppStore: ObservableObject {
         let database: LocalDatabase?
         do { database = try LocalDatabase(); storageError = nil }
         catch { database = nil; storageError = "No se pudieron cargar los datos guardados. Se conservaron para intentar recuperarlos; los reportes nuevos aún no se pueden guardar." }
+        let content = database.map { LocalContentService(container: $0.container) }
+        let images = FeedImageStore()
+        self.images = images
+        ImageLibraryConfiguration.configure()
+        Task { await images.clean() }
         let events = EventService(api: api, session: session, connectivity: connectivity, clock: clock)
-        let saved = SavedMenusViewModel(session: session, events: events, clock: clock)
-        let feed = FeedViewModel(api: api, session: session, connectivity: connectivity, clock: clock, events: events)
+        let saved = SavedMenusViewModel(session: session, events: events, clock: clock, content: content)
+        let feed = FeedViewModel(api: api, session: session, connectivity: connectivity, clock: clock, events: events, content: content)
         let reports = ReportingFacade(api: api, outbox: database, session: session, connectivity: connectivity, clock: clock)
         let accounts = AccountService(api: api, session: session)
         self.session = session; self.connectivity = connectivity; self.clock = clock; self.database = database
@@ -63,6 +70,7 @@ final class AppStore: ObservableObject {
         api.onUnauthorized = { [weak session] in session?.signOut(message: "Tu sesión terminó. Inicia sesión de nuevo.") }
         session.onChange = { [weak self] in self?.accountChanged() }
         connectivity.onReconnect = { [weak self] in self?.synchronize() }
+        feed.onMenusLoaded = { [weak self] menus in self?.prefetchImages(menus) }
         // A service outage can recover without NWPathMonitor changing its network path.
         feed.onServiceAvailable = { [weak events, weak reports] in
             Task { await events?.flush(); await reports?.flushReports() }
@@ -71,6 +79,7 @@ final class AppStore: ObservableObject {
     }
 
     private func accountChanged() {
+        imageTask?.cancel()
         synchronization?.cancel(); selectedTab = .today
         connectivity.serverUnreachable = false
         events.accountChanged(); saved.accountChanged(); reports.accountChanged()
@@ -81,6 +90,12 @@ final class AppStore: ObservableObject {
         establishments.reset()
         feed.accountChanged()
         synchronize(refreshFeed: false)
+    }
+
+    private func prefetchImages(_ menus: [DailyMenu]) {
+        guard !connectivity.isOffline else { return }
+        imageTask?.cancel()
+        imageTask = Task(priority: .utility) { [images] in _ = await images.prefetch(menus) }
     }
 
     private func synchronize(refreshFeed: Bool = true) {

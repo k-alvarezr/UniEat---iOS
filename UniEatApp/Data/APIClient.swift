@@ -54,7 +54,16 @@ final class APIClient: APIRequesting {
     private let transport: URLSession
     var onUnauthorized: (() -> Void)?
 
-    init(configuration: AppConfiguration, session: URLSession = .shared,
+    /// Authenticated JSON must never be replayed from a URL-only shared HTTP cache.
+    private static let uncachedSession: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.httpShouldSetCookies = false
+        return URLSession(configuration: configuration)
+    }()
+
+    init(configuration: AppConfiguration, session: URLSession = APIClient.uncachedSession,
          sessionIdentity: @escaping () -> UUID = { UUID.zero },
          accessToken: @escaping () async throws -> String) {
         self.configuration = configuration
@@ -137,7 +146,7 @@ final class APIClient: APIRequesting {
 // MARK: - feed
 
 /// respuesta del feed, los menus de hoy y la hora en que el server los mando, tambien se guarda como copia sin internet
-struct FeedResponse: Codable {
+struct FeedResponse: Codable, Sendable {
     let fetchedAt: Date
     let menus: [DailyMenu]
     var serverNow: Date? = nil

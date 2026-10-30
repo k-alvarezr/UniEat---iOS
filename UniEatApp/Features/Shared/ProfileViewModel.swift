@@ -16,7 +16,7 @@ final class ProfileViewModel: FeatureViewModel {
     var profile: Profile? { session.profile }
     var isAdmin: Bool { session.isAdmin }
     var isRestaurant: Bool { session.isRestaurant }
-    var savedMenus: [SavedMenu] { saved.savedMenus }
+    var savedMenus: [SavedMenuEntry] { saved.savedMenus }
     var accountError: String? { session.accountError }
     func signOut() { session.signOut() }
     func refreshAccount() async { try? await session.refreshAccount() }
