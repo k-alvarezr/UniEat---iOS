@@ -13,6 +13,9 @@ final class SessionStore: ObservableObject {
     @Published private(set) var accountError: String?                      // error al cargar la cuenta
     @Published var authMessage: String?                                    // aviso en el login, ej confirmar correo
     @Published private(set) var isForgetting = false
+    /// Una cuenta guardada permite navegar y editar borradores, nunca conceder permisos sin verificar.
+    @Published private(set) var isAccountVerified = false
+    @Published private(set) var cachedAccountDate: Date?
     /// id de esta sesion, cambia al entrar o salir
     /// las tareas guardan la generacion con la que arrancaron y si al terminar es otra botan el resultado
     /// asi una respuesta vieja nunca le llega al usuario siguiente
@@ -63,9 +66,19 @@ final class SessionStore: ObservableObject {
     // arranca la sesion: generacion nueva, limpia lo anterior, avisa a AppStore y pide la cuenta al server
     private func start(_ signedIn: Profile) async {
         generation = UUID()
-        profile = signedIn
-        memberships = []
-        establishments = []
+        let cached = LocalValues.load(CachedAccountSnapshot.self, key: Self.accountCacheKey(signedIn.id))
+        if let cached, cached.profile.id == signedIn.id {
+            profile = cached.profile
+            memberships = cached.memberships
+            establishments = cached.establishments
+            cachedAccountDate = cached.savedAt
+        } else {
+            profile = signedIn
+            memberships = []
+            establishments = []
+            cachedAccountDate = nil
+        }
+        isAccountVerified = false
         authMessage = nil
         accountError = nil
         onChange?()
@@ -91,6 +104,11 @@ final class SessionStore: ObservableObject {
         profile = me.profile
         memberships = me.establishments
         establishments = mine.establishments
+        isAccountVerified = true
+        let savedAt = Date()
+        cachedAccountDate = savedAt
+        LocalValues.save(CachedAccountSnapshot(profile: me.profile, memberships: me.establishments,
+            establishments: mine.establishments, savedAt: savedAt), key: Self.accountCacheKey(userID))
         accountError = nil
     }
     /// cierra sesion: generacion nueva para cortar lo que estaba en camino, borra el keychain y limpia todo
@@ -101,6 +119,8 @@ final class SessionStore: ObservableObject {
         profile = nil
         memberships = []
         establishments = []
+        isAccountVerified = false
+        cachedAccountDate = nil
         accountError = nil
         authMessage = message
         onChange?()
@@ -110,6 +130,7 @@ final class SessionStore: ObservableObject {
     func signOutAndForget() async {
         guard !isForgetting, let leaving = profile?.id else { return }
         let departingGeneration = generation
+        LocalValues.remove(key: Self.accountCacheKey(leaving))
         isForgetting = true
         signOut()
         defer { isForgetting = false }
@@ -127,5 +148,22 @@ final class SessionStore: ObservableObject {
     /// corta antes de llamar si no es admin, igual el server lo vuelve a revisar
     func requireAdmin() throws {
         guard isAdmin else { throw APIFailure(code: "FORBIDDEN", message: "Solo administradores.") }
+        try requireVerifiedAccount()
     }
+
+    func requireVerifiedAccount() throws {
+        guard isAccountVerified else {
+            throw APIFailure(code: "OFFLINE", message: "Actualiza tu cuenta con conexión antes de cambiar permisos o publicaciones.")
+        }
+    }
+
+    static func accountCacheKey(_ userID: UUID) -> String { "unieat.account.v1.\(userID.uuidString)" }
+}
+
+/// Datos de presentación recibidos de /me; no contiene tokens ni se usa como autorización del backend.
+struct CachedAccountSnapshot: Codable {
+    let profile: Profile
+    let memberships: [RemoteMembership]
+    let establishments: [RemoteEstablishment]
+    let savedAt: Date
 }

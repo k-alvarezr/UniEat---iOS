@@ -29,6 +29,8 @@ final class ProfileViewModel: FeatureViewModel {
     var isRestaurant: Bool { session.isRestaurant }
     var savedMenus: [SavedMenuEntry] { saved.savedMenus }
     var accountError: String? { session.accountError }
+    var isAccountVerified: Bool { session.isAccountVerified }
+    var cachedAccountDate: Date? { session.cachedAccountDate }
     /// reportes que se borrarian al cerrar sesion, perfil avisa antes
     var unsentReports: Int { reports.pendingReportCount + reports.needsReviewCount }
     /// cierra sesion a mano: primero intenta mandar los reportes pendientes (si no hay red no hace nada)

@@ -85,6 +85,12 @@ struct ProfileView: View {
                         Text(error).font(.footnote)
                         Button("Actualizar cuenta") { Task { await store.refreshAccount() } }
                     }
+                    if !store.isAccountVerified {
+                        Text(store.cachedAccountDate.map {
+                            "Datos de cuenta guardados el \(SpanishPresentation.dateAndTime($0)). Los permisos se verificarán al recuperar el servicio."
+                        } ?? "Los permisos de la cuenta están pendientes de verificación con el servidor.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                    }
                     if let error = store.storageError { Text(error).font(.footnote).foregroundStyle(Palette.coral) }
                     // reportes guardados en el celular: los que esperan red y los que el server rechazo
                     if store.reports.pendingReportCount + store.reports.needsReviewCount > 0 {
@@ -126,6 +132,7 @@ struct ProfileView: View {
             }
             .background(Palette.cream)
             .navigationBarHidden(true)
+            .connectionStatus(store.isAdmin ? .administration : .profile)
         }
     }
 

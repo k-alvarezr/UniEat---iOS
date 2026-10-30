@@ -86,6 +86,7 @@ struct InsufficientQueueEvidenceView: View {
             .padding(16)
         }
         .background(Palette.cream)
+        .connectionStatus(.waitTime)
         .navigationTitle("Sin estimación de fila")
         .navigationBarTitleDisplayMode(.inline)
     }

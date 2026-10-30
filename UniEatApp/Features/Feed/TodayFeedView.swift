@@ -78,6 +78,7 @@ struct TodayFeedContent: View {
             }
         }
         .background(Palette.cream)
+        .connectionStatus(.today)
         .navigationBarHidden(hidesNavigationBar)
         .refreshable { await store.refresh(force: true) }
     }

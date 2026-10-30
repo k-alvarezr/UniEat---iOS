@@ -16,12 +16,14 @@ final class PublishingService {
     }
     /// menus del restaurante, para editarlos o cerrarlos
     func mine() async throws -> [DailyMenu] {
+        try session.requireVerifiedAccount()
         let response: MenusResponse = try await api.get("menus/mine")
         return response.menus
     }
     /// crea un menu o una version nueva de old, al editar va la version que vio el dueño
     /// si alguien mas lo edito el server responde VERSION_CONFLICT y no se pisan los cambios
     func publish(_ body: MenuBody, replacing old: DailyMenu?) async throws {
+        try session.requireVerifiedAccount()
         guard let id = body.establishmentId, session.approvedEstablishments.contains(where: { $0.id == id }) else {
             throw APIFailure(code: "VALIDATION_ERROR", message: "Selecciona un establecimiento aprobado.")
         }
@@ -30,6 +32,7 @@ final class PublishingService {
     }
     /// cierra el menu antes de que venza, el historial se queda
     func close(_ menu: DailyMenu) async throws {
+        try session.requireVerifiedAccount()
         let _: CloseResponse = try await api.send("POST", "menus/\(menu.id.uuidString)/close", body: NoBody?.none)
     }
     /// La foto del formulario queda ligada a la cuenta y generación que la originó.

@@ -25,8 +25,12 @@ struct PerformanceView: View {
                             BQ04Section(metrics: snapshot.bq04)
                             if let metrics = snapshot.bq08 { BQ08Section(metrics: metrics) }
                             EngagementSection(summary: snapshot.engagement)
-                        } else if store.performanceError == nil {
+                        } else if store.isLoading && !store.isOffline {
                             ProgressView("Cargando métricas del servidor…")
+                        } else if store.isOffline {
+                            OfflinePerformanceEmptyView()
+                        } else if store.performanceError == nil {
+                            Button("Consultar métricas") { Task { await store.loadPerformance(days: store.days) } }
                         }
                     }
                     .padding(16)
@@ -38,6 +42,7 @@ struct PerformanceView: View {
                                        description: Text("Inicia sesión con una cuenta administradora para ver el tablero global."))
             }
         }
+        .connectionStatus(.performance)
     }
 }
 
@@ -59,9 +64,17 @@ struct RestaurantPerformanceView: View {
                             PerformanceErrorCard(message: error) { Task { await store.loadPerformance(days: store.days) } }
                         }
                         if let summary = store.restaurantPerformance[store.days] {
+                            if store.isOffline {
+                                Text("Último panel recibido para este período; no se está actualizando.")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
                             EngagementSection(summary: summary)
-                        } else if store.performanceError == nil {
+                        } else if store.isLoading && !store.isOffline {
                             ProgressView("Cargando métricas del servidor…")
+                        } else if store.isOffline {
+                            OfflinePerformanceEmptyView()
+                        } else if store.performanceError == nil {
+                            Button("Consultar métricas") { Task { await store.loadPerformance(days: store.days) } }
                         }
                     }
                     .padding(16)
@@ -72,6 +85,7 @@ struct RestaurantPerformanceView: View {
                 ContentUnavailableView("Solo restaurantes", systemImage: "lock.fill")
             }
         }
+        .connectionStatus(.performance)
     }
 }
 
@@ -79,12 +93,25 @@ private extension View {
     /// carga las metricas y las vuelve a pedir cada 10 segundos mientras la pantalla este abierta
     /// si se cambia el periodo arranca de nuevo
     func refreshingPerformance(days: Int, store: PerformanceViewModel) -> some View {
-        task(id: days) {
+        task(id: PerformanceRefreshKey(days: days, connected: store.isConnected)) {
+            guard store.isConnected else { return }
             while !Task.isCancelled {
                 await store.loadPerformance(days: days)
                 try? await Task.sleep(for: .seconds(10))
             }
         }
+    }
+}
+
+private struct PerformanceRefreshKey: Hashable {
+    let days: Int
+    let connected: Bool
+}
+
+private struct OfflinePerformanceEmptyView: View {
+    var body: some View {
+        ContentUnavailableView("No hay una copia de este período", systemImage: "wifi.slash",
+            description: Text("Puedes cambiar de período o navegar por la app. El panel se consultará al recuperar conexión."))
     }
 }
 

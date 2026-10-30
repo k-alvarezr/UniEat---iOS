@@ -13,6 +13,7 @@ final class PerformanceViewModel: FeatureViewModel {
     // metricas del restaurante por periodo
     @Published private(set) var restaurantPerformance: [Int: PerformanceSummary] = [:]
     @Published private(set) var performanceError: String?
+    @Published private(set) var isLoading = false
     private let api: APIRequesting
     private let session: SessionStore
     private let events: EventService
@@ -31,33 +32,42 @@ final class PerformanceViewModel: FeatureViewModel {
     var isAdmin: Bool { session.isAdmin }
     var isRestaurant: Bool { session.isRestaurant }
     var isOffline: Bool { connectivity.isOffline }
+    var isConnected: Bool { connectivity.isConnected }
     /// al cambiar de cuenta se borra todo para que nadie vea metricas de otro
     func reset() {
         requestID = UUID()
         adminDashboard = [:]
         restaurantPerformance = [:]
         performanceError = nil
+        isLoading = false
         days = 7
     }
     /// recarga la cuenta por si cambio el rol, manda la cola de eventos y pide las metricas
     /// si cambio la sesion o arranco otra carga mientras tanto se bota la respuesta
     func loadPerformance(days: Int) async {
-        guard let userID = session.profile?.id, !connectivity.isOffline else { return }
+        guard let userID = session.profile?.id else { return }
         let expected = session.generation, id = UUID()
         requestID = id
+        // Sin internet se conservan las cifras disponibles y no se inicia un spinner ni una petición.
+        guard connectivity.isConnected else { isLoading = false; return }
+        isLoading = true
+        defer { if requestID == id { isLoading = false } }
         performanceError = nil
         do {
             try await session.refreshAccount()
             await events.flush()
-            guard session.matches(userID, generation: expected), requestID == id else { return }
+            guard session.matches(userID, generation: expected), requestID == id,
+                  connectivity.isConnected, !Task.isCancelled else { return }
             let query = [URLQueryItem(name: "days", value: String(days))]
             if isAdmin {
                 let value: AdminDashboardSnapshot = try await api.get("admin/dashboard", query: query)
-                guard session.matches(userID, generation: expected), requestID == id else { return }
+                guard session.matches(userID, generation: expected), requestID == id,
+                      connectivity.isConnected, !Task.isCancelled else { return }
                 adminDashboard[days] = value
             } else if isRestaurant {
                 let value: PerformanceSummary = try await api.get("restaurant/performance", query: query)
-                guard session.matches(userID, generation: expected), requestID == id else { return }
+                guard session.matches(userID, generation: expected), requestID == id,
+                      connectivity.isConnected, !Task.isCancelled else { return }
                 restaurantPerformance[days] = value
             }
         } catch is CancellationError { }

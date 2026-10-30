@@ -83,7 +83,7 @@ final class AppStore: ObservableObject {
         let saved = SavedMenusViewModel(session: session, events: events, clock: clock, content: content)
         let feed = FeedViewModel(api: api, session: session, connectivity: connectivity, clock: clock, events: events, content: content)
         let reports = ReportingFacade(api: api, outbox: database, session: session, connectivity: connectivity, clock: clock)
-        let accounts = AccountService(api: api, session: session)
+        let accounts = AccountService(api: api, session: session, connectivity: connectivity)
         self.session = session
         self.connectivity = connectivity
         self.clock = clock
@@ -93,7 +93,7 @@ final class AppStore: ObservableObject {
         self.feed = feed
         self.reports = reports
         details = MenuDetailService(api: api, session: session, files: files, clock: clock)
-        authentication = AuthViewModel(session: session)
+        authentication = AuthViewModel(session: session, connectivity: connectivity)
         filters = FiltersViewModel(feed: feed)
         recommendation = RecommendationViewModel(feed: feed)
         publication = PublishViewModel(service: PublishingService(api: api, session: session, files: files),
@@ -106,12 +106,18 @@ final class AppStore: ObservableObject {
 
         // 4. conexiones: que pasa cuando vence la sesion, cambia la cuenta o vuelve la red
         api.onUnauthorized = { [weak session] in session?.signOut(message: "Tu sesión terminó. Inicia sesión de nuevo.") }
+        api.onServiceAvailability = { [weak connectivity] in connectivity?.serviceResponded($0) }
+        connectivity.checkService = { [weak api, weak self] in
+            guard let api else { throw CancellationError() }
+            try await api.checkHealth()
+            self?.synchronize(refreshAccount: true)
+        }
         session.onChange = { [weak self] in self?.accountChanged() }
         session.onForget = { [weak self] userID, generation in
             guard let self else { return }
             try await self.forget(userID, generation: generation)
         }
-        connectivity.onReconnect = { [weak self] in self?.synchronize() }
+        connectivity.onReconnect = { [weak self] in self?.synchronize(refreshAccount: true) }
         // cuando llega el feed se bajan sus fotos
         feed.onMenusLoaded = { [weak self] menus in self?.prefetchImages(menus) }
         // piloto de la BQ-08: antes de pedir el feed se asigna la variante de esta sesion
@@ -207,15 +213,20 @@ final class AppStore: ObservableObject {
 
     /// manda la cola de eventos, luego la de reportes y luego refresca el feed, en ese orden
     /// si llega otra sincronizacion se cancela la anterior para no mandar dos veces lo mismo
-    private func synchronize(refreshFeed: Bool = true) {
+    private func synchronize(refreshFeed: Bool = true, refreshAccount: Bool = false) {
         synchronization?.cancel()
         synchronization = Task { [weak self] in
-            guard let self, session.profile != nil else { return }
+            guard let self, let userID = session.profile?.id else { return }
+            let generation = session.generation
+            if refreshAccount { try? await session.refreshAccount() }
+            guard session.matches(userID, generation: generation), !Task.isCancelled else { return }
             await events.flush()
-            guard !Task.isCancelled else { return }
+            guard session.matches(userID, generation: generation), !Task.isCancelled else { return }
             await reports.flushReports()
-            guard !Task.isCancelled else { return }
+            guard session.matches(userID, generation: generation), !Task.isCancelled else { return }
             if refreshFeed { await feed.refresh() }
+            guard session.matches(userID, generation: generation), !Task.isCancelled else { return }
+            if session.isRestaurant { await publication.refresh() }
         }
     }
 

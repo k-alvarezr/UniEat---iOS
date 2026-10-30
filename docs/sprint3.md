@@ -123,9 +123,21 @@ invalida memoria y frescura de catálogo antes de forzar red.
 |---|---|---|
 | iPhone: abrir online, guardar, activar modo avión, cerrar/abrir app, recorrer cuatro vistas y recuperar red | Kevin | Pendiente de dispositivo |
 | iPhone: detalle/reportar/publicar sin conexión, concurrencia y cachés propias | Juan | Pendiente de su implementación y dispositivo |
-| Control/tratamiento con datos reales y tabla del mismo período en iOS/HTML | Ambos | Pendiente de despliegue y participantes |
+| Control/tratamiento con datos reales y tabla del mismo período en iOS/HTML | Ambos | Backend desplegado/verificado en api-v1 v12; participantes y resultados reales pendientes |
 | Capturas identificadas por vista/estrategia, dispositivo, versión y commit | Cada autor | Pendiente |
 | Video ético de seis minutos, acceso a enlaces y coordinación de entrega en Teams | Ambos | Pendiente de grabación/entrega humana |
 
 No se han medido participantes ni rendimiento físico. Cada integrante debe poder explicar las decisiones
 y el código del compañero; los comentarios y enlaces de arquitectura forman parte de la documentación viva.
+
+## Cobertura por vista y revisión individual (#61)
+
+La [matriz de conectividad](offline-screens.md) describe navegación local, recuperación y límites de toda
+la app, no solo un aviso compartido. La [auditoría de entrega](sprint3-delivery-audit.md) enlaza criterios,
+autoría, código y pendientes humanos del entregable/viva voce. La copia de cuenta mantiene pestañas tras
+relanzar offline, pero no autoriza publicaciones ni cambios de roles hasta verificar la cuenta con el servidor.
+
+Kevin incorpora además `OfflineFilterCache`: LRU de cuatro resultados de filtros locales, TTL máximo
+30 s, hasta 1 MiB de JSON por entrada, caducidad anterior a cambios de vigencia/fila e invalidación por
+cuenta/catálogo/publicación. Complementa NSCache de respuestas online y Kingfisher, sin otro almacén de
+imágenes. No sustituye la LRU del panel de Juan (#37) ni representa una medición de rendimiento físico.

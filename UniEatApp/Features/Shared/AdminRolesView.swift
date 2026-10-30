@@ -12,6 +12,8 @@ struct AdminRolesView: View {
                 Text("Solo otro administrador puede conceder o quitar el rol de administrador. Los restaurantes se habilitan aprobando su solicitud de local.")
                     .font(.footnote).foregroundStyle(.secondary)
                 Button("Actualizar usuarios") { Task { await model.load() } }
+                    .disabled(!model.canUseNetwork || model.isLoading)
+                if model.isLoading { ProgressView("Consultando usuarios…") }
                 ForEach(model.users) { user in
                     HStack(spacing: 8) {
                         VStack(alignment: .leading, spacing: 3) {
@@ -26,7 +28,7 @@ struct AdminRolesView: View {
                                 model.confirming = true
                             }
                             .font(.caption.weight(.bold))
-                            .disabled(model.workingID != nil)
+                            .disabled(!model.canUseNetwork || model.workingID != nil)
                         }
                     }
                     Divider()

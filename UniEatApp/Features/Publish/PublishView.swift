@@ -45,14 +45,14 @@ struct PublishView: View {
                             icon: "arrow.right", color: Palette.coral) {
                     Task { await model.publish() }
                 }
-                .disabled(!model.isValid || model.isSaving || model.isOffline)
-                if model.isOffline { Text("Sin conexión. Tu borrador se conserva; publicar y cerrar requieren conexión.").font(.footnote) }
+                .disabled(!model.isValid || model.isSaving || !model.canPublishOnline)
                 myMenus
             }
             .padding(16)
         }
         .disabled(model.isSaving)
         .background(Palette.cream)
+        .connectionStatus(.publishing)
         .task {
             await model.restoreDraft()
             model.selectFirstEstablishment()
@@ -60,6 +60,9 @@ struct PublishView: View {
         }
         .onAppear(perform: model.selectFirstEstablishment)
         .onChange(of: model.approvedEstablishments.map(\.id)) { _, _ in model.selectFirstEstablishment() }
+        .onChange(of: model.canPublishOnline) { _, available in
+            if available { Task { await model.refresh() } }
+        }
         .onChange(of: model.currentDraft) { _, _ in model.scheduleDraftSave() }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { Task { await model.flushDraft() } }
@@ -151,12 +154,20 @@ struct PublishView: View {
     }
 
     @ViewBuilder private var myMenus: some View {
-        if model.ownMenus.isEmpty {
+        HStack {
+            Text("Mis publicaciones").font(.rounded(21))
+            Spacer()
+            Button(model.isRefreshingOwnMenus ? "Actualizando…" : "Actualizar") { Task { await model.refresh() } }
+                .disabled(!model.canPublishOnline || model.isRefreshingOwnMenus)
+        }
+        if !model.hasLoadedOwnMenus {
+            Text("Aún no hay una lista descargada de tus publicaciones. Puedes trabajar en el borrador y actualizar la lista al recuperar el servicio.")
+                .font(.footnote).foregroundStyle(.secondary)
+        } else if model.ownMenus.isEmpty {
             SurfaceCard {
                 Label("Aún no has publicado un menú del día.", systemImage: "storefront").font(.subheadline)
             }
         } else {
-            Text("Mis publicaciones").font(.rounded(21))
             ForEach(model.ownMenus) { menu in
                 SurfaceCard {
                     VStack(alignment: .leading, spacing: 8) {
@@ -169,7 +180,7 @@ struct PublishView: View {
                             }
                             if menu.isActive() {
                                 Button("Cerrar publicación", role: .destructive) { Task { await model.close(menu) } }
-                                    .disabled(model.isOffline || model.isSaving)
+                                    .disabled(!model.canPublishOnline || model.isSaving)
                                     .buttonStyle(.bordered)
                             }
                         }

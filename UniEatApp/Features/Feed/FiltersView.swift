@@ -102,6 +102,7 @@ struct FiltersView: View {
             .padding(16)
         }
         .background(Palette.cream)
+        .connectionStatus(.filters)
         .onAppear { model.reset() }
         .onReceive(location.$location) { position in model.suggest(position) }
     }

@@ -15,14 +15,18 @@ final class AuthViewModel: FeatureViewModel {
     @Published var isSubmitting = false
     @Published var errorText: String?
     private let session: SessionStore
-    init(session: SessionStore) {
+    private let connectivity: ConnectivityService
+    init(session: SessionStore, connectivity: ConnectivityService) {
         self.session = session
+        self.connectivity = connectivity
         super.init()
         observe(session)
+        observe(connectivity)
     }
     /// aviso de la sesion, ej revisar el correo para confirmar
     var authMessage: String? { session.authMessage }
     var isClosingSession: Bool { session.isForgetting }
+    var canUseNetwork: Bool { !connectivity.isOffline }
     /// al cambiar de cuenta se borra la contraseña escrita y cualquier error
     func reset() {
         password = ""
@@ -33,6 +37,10 @@ final class AuthViewModel: FeatureViewModel {
     /// cada tipo de error tiene su mensaje, asi se sabe si es la red, el server o la cuenta
     func submit() async {
         guard !isSubmitting, !session.isForgetting else { return }
+        guard canUseNetwork else {
+            errorText = "Iniciar sesión o crear una cuenta requiere conexión. Puedes conservar el formulario y reintentar."
+            return
+        }
         isSubmitting = true
         errorText = nil
         defer { isSubmitting = false }
@@ -52,8 +60,12 @@ final class AuthViewModel: FeatureViewModel {
             errorText = failure.localizedDescription
         } catch let failure as APIFailure {
             errorText = failure.message
-        } catch is URLError {
-            errorText = "Sin conexión. Revisa tu internet e inténtalo de nuevo."
+        } catch let error as URLError {
+            guard !Task.isCancelled, error.code != .cancelled else { return }
+            connectivity.serviceResponded(false)
+            errorText = connectivity.isConnected
+                ? "No pudimos contactar al servicio de acceso. Reintenta cuando esté disponible."
+                : "Sin conexión. Revisa tu internet e inténtalo de nuevo."
         } catch {
             errorText = "El servicio respondió algo inesperado. Inténtalo de nuevo."
         }

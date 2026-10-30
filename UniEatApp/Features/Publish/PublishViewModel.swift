@@ -77,6 +77,8 @@ final class PublishViewModel: FeatureViewModel {
     @Published private(set) var draftSavedAt: Date?
     // menus del restaurante, antes estaban en el AppStore viejo
     @Published private(set) var ownMenus: [DailyMenu] = []
+    @Published private(set) var hasLoadedOwnMenus = false
+    @Published private(set) var isRefreshingOwnMenus = false
     let paymentChoices = ["Nequi", "Daviplata", "Efectivo", "Tarjeta"]
     private let service: PublishingService
     private let feed: FeedViewModel
@@ -100,6 +102,7 @@ final class PublishViewModel: FeatureViewModel {
     }
     var approvedEstablishments: [RemoteEstablishment] { session.approvedEstablishments }
     var isOffline: Bool { connectivity.isOffline }
+    var canPublishOnline: Bool { !isOffline && session.isAccountVerified }
     /// Agrupa cambios breves: cada tecla cambia estado ligero, no escribe disco en MainActor.
     func scheduleDraftSave() {
         draftTask?.cancel()
@@ -163,6 +166,8 @@ final class PublishViewModel: FeatureViewModel {
         draftError = nil
         draftSavedAt = nil
         ownMenus = []
+        hasLoadedOwnMenus = false
+        isRefreshingOwnMenus = false
         selectedEstablishmentID = nil
         restaurantName = ""
         area = "Centro"
@@ -179,12 +184,15 @@ final class PublishViewModel: FeatureViewModel {
     /// pide los menus propios del restaurante
     /// si cambio la sesion mientras tanto se bota la respuesta
     func refresh() async {
-        guard let userID = session.profile?.id else { return }
+        guard canPublishOnline, !isRefreshingOwnMenus, let userID = session.profile?.id else { return }
         let generation = session.generation
+        isRefreshingOwnMenus = true
+        defer { if session.matches(userID, generation: generation) { isRefreshingOwnMenus = false } }
         do {
             let value = try await service.mine()
             guard session.matches(userID, generation: generation) else { return }
             ownMenus = value
+            hasLoadedOwnMenus = true
         } catch is CancellationError { return } catch {
             guard session.matches(userID, generation: generation) else { return }
             message = error.localizedDescription
@@ -288,7 +296,7 @@ final class PublishViewModel: FeatureViewModel {
     }
     /// cierra el menu antes de que venza, sin red no se intenta
     func close(_ menu: DailyMenu) async {
-        guard let userID = session.profile?.id, !isOffline else { return }
+        guard let userID = session.profile?.id, canPublishOnline else { return }
         let generation = session.generation
         do {
             try await service.close(menu)
@@ -306,7 +314,7 @@ final class PublishViewModel: FeatureViewModel {
     /// crea o edita el menu, sin red no se intenta y el borrador se conserva
     /// si otro edito primero el server dice VERSION_CONFLICT y se recarga la version actual
     func publish() async {
-        guard isValid, !isSaving, !isOffline, let userID = session.profile?.id else { return }
+        guard isValid, !isSaving, canPublishOnline, let userID = session.profile?.id else { return }
         let generation = session.generation
         draftTask?.cancel()
         draftRequest = UUID()

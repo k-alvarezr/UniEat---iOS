@@ -11,6 +11,7 @@ struct UniEatApp: App {
             RootView()
                 .environmentObject(store)
                 .environmentObject(store.session)
+                .environmentObject(store.connectivity)
                 .environmentObject(store.feed)
                 .environmentObject(store.saved)
                 .environmentObject(store.authentication)
