@@ -8,6 +8,7 @@ final class PublishingService {
     private let api: APIRequesting
     let session: SessionStore
     private let files: FileStore
+    private var draftRevision: UInt64 = 0
     init(api: APIRequesting, session: SessionStore, files: FileStore) {
         self.api = api
         self.session = session
@@ -31,26 +32,30 @@ final class PublishingService {
     func close(_ menu: DailyMenu) async throws {
         let _: CloseResponse = try await api.send("POST", "menus/\(menu.id.uuidString)/close", body: NoBody?.none)
     }
-    /// guarda el borrador directo en el hilo principal (#33)
-    func saveDraft(_ draft: PublishDraft) {
-        guard let id = session.profile?.id else { return }
-        files.save(draft, name: "publish-draft", folder: .support, userId: id)
+    /// La foto del formulario queda ligada a la cuenta y generación que la originó.
+    func saveDraft(_ draft: PublishDraft, userID: UUID, generation: UUID) async throws {
+        guard session.matches(userID, generation: generation) else { throw CancellationError() }
+        draftRevision += 1
+        let revision = draftRevision
+        try await files.save(draft, name: "publish-draft", folder: .support, userId: userID, generation: generation, revision: revision)
+        guard session.matches(userID, generation: generation) else { throw CancellationError() }
     }
-    /// lee el borrador en segundo plano con Task.detached utility (#31), guardar va directo
-    /// para que nunca un borrador viejo pise uno nuevo
+    /// El actor ordena lectura/escritura; una sesión distinta descarta la lectura.
     /// si cambio la sesion mientras se leia se bota el resultado
-    func loadDraft() async -> PublishDraft? {
+    func loadDraft() async throws -> PublishDraft? {
         guard let id = session.profile?.id else { return nil }
         let expected = session.generation, files = files
-        let draft = await Task.detached(priority: .utility) {
-            files.load(PublishDraft.self, name: "publish-draft", folder: .support, userId: id)
+        let draft = try await Task.detached(priority: .utility) {
+            try await files.load(PublishDraft.self, name: "publish-draft", folder: .support, userId: id)
         }.value
         guard session.matches(id, generation: expected), !Task.isCancelled else { return nil }
         return draft
     }
     /// borra el borrador despues de publicar
-    func clearDraft() {
-        guard let id = session.profile?.id else { return }
-        files.remove(name: "publish-draft", folder: .support, userId: id)
+    func clearDraft(userID: UUID, generation: UUID) async throws {
+        guard session.matches(userID, generation: generation) else { throw CancellationError() }
+        draftRevision += 1
+        let revision = draftRevision
+        try await files.remove(name: "publish-draft", folder: .support, userId: userID, generation: generation, revision: revision)
     }
 }

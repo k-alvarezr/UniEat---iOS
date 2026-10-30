@@ -7,6 +7,7 @@ import UniEatCore
 struct PublishView: View {
     // el formulario ahora vive en PublishViewModel, aca solo se dibuja
     @EnvironmentObject private var model: PublishViewModel
+    @Environment(\.scenePhase) private var scenePhase
 
     private let areas = ["Centro", "Norte", "Sur", "Fuera del campus"]
     private let paymentChoices = ["Nequi", "Daviplata", "Efectivo", "Tarjeta"]
@@ -33,6 +34,13 @@ struct PublishView: View {
                         .padding(12)
                         .background(Palette.cyan, in: RoundedRectangle(cornerRadius: 12))
                 }
+                if let error = model.draftError {
+                    Text(error).font(.footnote).foregroundStyle(Palette.coral)
+                    Button("Reintentar guardar borrador") { Task { await model.flushDraft() } }
+                } else if model.draftSavedAt != nil, model.editingMenu == nil, model.hasDraftContent {
+                    Label("Borrador guardado en este dispositivo", systemImage: "checkmark.circle")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
                 SolidButton(title: model.isSaving ? "Guardando…" : (model.editingMenu == nil ? "Publicar menú ahora" : "Guardar cambios"),
                             icon: "arrow.right", color: Palette.coral) {
                     Task { await model.publish() }
@@ -43,6 +51,7 @@ struct PublishView: View {
             }
             .padding(16)
         }
+        .disabled(model.isSaving)
         .background(Palette.cream)
         .task {
             await model.restoreDraft()
@@ -51,7 +60,11 @@ struct PublishView: View {
         }
         .onAppear(perform: model.selectFirstEstablishment)
         .onChange(of: model.approvedEstablishments.map(\.id)) { _, _ in model.selectFirstEstablishment() }
-        .onDisappear { if model.editingMenu == nil && model.hasDraftContent { model.saveDraft(model.currentDraft) } }
+        .onChange(of: model.currentDraft) { _, _ in model.scheduleDraftSave() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active { Task { await model.flushDraft() } }
+        }
+        .onDisappear { Task { await model.flushDraft() } }
 
     }
 

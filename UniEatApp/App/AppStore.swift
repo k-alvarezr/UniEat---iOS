@@ -38,6 +38,7 @@ final class AppStore: ObservableObject {
     private let events: EventService              // cola de eventos de analitica
     private let details: MenuDetailService        // pide y guarda detalles, se usa al crear cada detalle
     private let files: FileStore                  // archivos de detalle y borrador, se borran al cerrar sesion
+    private let content: LocalContentService?
     private var synchronization: Task<Void, Never>?   // tarea que manda colas y refresca, una a la vez
     private var imageTask: Task<Void, Never>?         // descarga de fotos del feed en segundo plano
 
@@ -66,6 +67,7 @@ final class AppStore: ObservableObject {
         }
         // guardados y copias del feed se leen y escriben con un actor en segundo plano sobre la misma base
         let content = database.map { LocalContentService(container: $0.container) }
+        self.content = content
         // fotos del feed en disco, al abrir se borran las viejas
         let images = FeedImageStore()
         self.images = images
@@ -103,7 +105,10 @@ final class AppStore: ObservableObject {
         // 4. conexiones: que pasa cuando vence la sesion, cambia la cuenta o vuelve la red
         api.onUnauthorized = { [weak session] in session?.signOut(message: "Tu sesión terminó. Inicia sesión de nuevo.") }
         session.onChange = { [weak self] in self?.accountChanged() }
-        session.onForget = { [weak self] userID in self?.forget(userID) }
+        session.onForget = { [weak self] userID, generation in
+            guard let self else { return }
+            try await self.forget(userID, generation: generation)
+        }
         connectivity.onReconnect = { [weak self] in self?.synchronize() }
         // cuando llega el feed se bajan sus fotos
         feed.onMenusLoaded = { [weak self] menus in self?.prefetchImages(menus) }
@@ -141,6 +146,8 @@ final class AppStore: ObservableObject {
     private func accountChanged() {
         imageTask?.cancel()
         synchronization?.cancel()
+        content?.setSession(userID: session.profile?.id, generation: session.generation)
+        files.setSession(userID: session.profile?.id, generation: session.generation)
         selectedTab = .today
         connectivity.serverUnreachable = false
         // cada pieza limpia lo suyo, AppStore no toca el interior de las pantallas
@@ -169,12 +176,21 @@ final class AppStore: ObservableObject {
     /// al cerrar sesion a mano se borra lo que la cuenta dejo en el celular:
     /// reportes sin mandar, copias del feed, copias de detalles, borrador y eventos sin mandar
     /// los menus guardados se quedan, son marcadores que el usuario eligio y no estan en el server
-    private func forget(_ userID: UUID) {
-        try? database?.deleteAll(userId: userID)
-        files.removeAll(userId: userID)
+    private func forget(_ userID: UUID, generation: UUID) async throws {
+        files.invalidate(userID: userID)
+        var failed = false
+        do {
+            guard let content else { throw APIFailure(code: "LOCAL_STORAGE_ERROR", message: "No se pudo abrir la base local.") }
+            try await content.forget(userID: userID, generation: generation)
+        } catch { failed = true }
+        // Se intenta limpiar también los archivos si falló la base, y viceversa.
+        do { try await files.removeAll(userId: userID, invalidating: generation) }
+        catch { failed = true }
         LocalValues.remove(key: FeedViewModel.cacheKey)
         LocalValues.remove(key: EventService.pendingKey(userID))
+        LocalValues.remove(key: EventService.rejectedKey(userID))
         LocalValues.remove(key: "unieat.report-failures.\(userID.uuidString)")   // motivos de la version anterior de la fachada
+        if failed { throw APIFailure(code: "LOCAL_STORAGE_ERROR", message: "La limpieza local no se pudo completar.") }
     }
 
     /// manda la cola de eventos, luego la de reportes y luego refresca el feed, en ese orden

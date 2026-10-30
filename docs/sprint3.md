@@ -13,10 +13,11 @@ Se conservan sus modelos de reportes, archivos de detalle/borrador y estrategias
 | Juan | #29, #31, #35, #37, #43 | Claridad BQ-04; concurrencia propia; detalle/reportar/publicar offline; caché de detalle/panel; nueva BQ-07 |
 | Ambos | #39, #44 | Wiki, evidencias reales, prueba en iPhone, video ético y entrega |
 
-Los cambios de Kevin se revisan en [iOS #45](https://github.com/k-alvarezr/UniEat---iOS/pull/45)
-y [backend #16](https://github.com/EstebanRojas01/UniEat---iOS-Back/pull/16).
-El backend #16 depende de [preparación #13](https://github.com/EstebanRojas01/UniEat---iOS-Back/pull/13).
-Aplicar migraciones en orden, desplegar `api-v1` y luego distribuir el cliente. Abrir un PR no despliega producción.
+La implementación de Kevin [iOS #45](https://github.com/k-alvarezr/UniEat---iOS/pull/45) está integrada,
+junto con los comentarios y ajustes de Juan #49/#51. El backend integra reportes y BQ-08 mediante
+commits y push directos a `main`; sus PR históricos #13/#16 están cerrados. Ese es el flujo vigente del
+backend, con CI en cada push. Aplicar migraciones en orden, desplegar `api-v1` y luego distribuir el cliente:
+un push al repositorio no despliega Supabase.
 
 ## BQ-08 · indicador de fila y cambio de decisión
 
@@ -62,8 +63,8 @@ confirmar. Sus métricas y su endpoint siguen pendientes en las issues iOS #43 y
 - `FeedCacheRecord`: snapshots por usuario/filtros y catálogo sin filtros; hasta 24 combinaciones por cuenta
   más un catálogo. El calentamiento automático no cuenta como búsqueda BQ-03 una vez desplegado el backend
   de la BQ-08 (antes de eso, el `refresh=auto` del feed sí se cuenta). Cerrar sesión desde Perfil borra estas
-  filas de la cuenta; los `SavedMenu` se conservan. La copia ya no guarda referencia de hora: `ServerClock`
-  usa la diferencia con el servidor de la última respuesta.
+  filas de la cuenta; los `SavedMenu` se conservan. La copia incluye referencia de hora del servidor;
+  el reloj avanza con uptime durante el proceso y restaura una estimación tras relanzar sin red.
 - Miniaturas públicas en `Caches/unieat-feed-images/<SHA256(URL)>.jpg`: escritura atómica, siete días,
   limpieza de archivos más antiguos por encima de 50 MiB. Es caché recuperable, no persistencia garantizada.
 
@@ -101,6 +102,11 @@ cubren migración idempotente y relacional, actualización de esquema con report
 por usuario, TTL, catálogo offline, diferencia entre queja/observación, control del piloto y cuatro descargas
 máximas con downsampling. Se mantienen las pruebas previas de sesión, vigencia, orden de respuestas y reportes.
 El backend prueba asignación/autorización/metadata, agregación con ventanas completas e insuficientes y RLS.
+
+Las correcciones posteriores conservan la fachada y comentarios de Juan. Añaden regresiones de reloj
+modificado, cierre de una sesión mientras entra otra, limpieza con escrituras pendientes, autoguardado
+de borradores y confirmación parcial de eventos. La política y sus límites están en
+[Arquitectura · sesión, vigencia y sincronización](architecture.md#sesión-vigencia-y-sincronización).
 
 | Evidencia real a adjuntar en #44 / wiki | Responsable | Estado |
 |---|---|---|

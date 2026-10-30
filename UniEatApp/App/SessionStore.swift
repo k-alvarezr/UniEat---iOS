@@ -12,12 +12,13 @@ final class SessionStore: ObservableObject {
     @Published private(set) var establishments: [RemoteEstablishment] = [] // datos de esos locales
     @Published private(set) var accountError: String?                      // error al cargar la cuenta
     @Published var authMessage: String?                                    // aviso en el login, ej confirmar correo
+    @Published private(set) var isForgetting = false
     /// id de esta sesion, cambia al entrar o salir
     /// las tareas guardan la generacion con la que arrancaron y si al terminar es otra botan el resultado
     /// asi una respuesta vieja nunca le llega al usuario siguiente
     private(set) var generation = UUID()
     var onChange: (() -> Void)?            // lo pone AppStore, se llama cuando entra o sale alguien
-    var onForget: ((UUID) -> Void)?        // lo pone AppStore, borra del celular lo que dejo esa cuenta
+    var onForget: ((UUID, UUID) async throws -> Void)? // usuario y generación que se van a limpiar
     private let auth: SessionAuthenticating
     private let api: APIRequesting
     init(auth: SessionAuthenticating, api: APIRequesting) {
@@ -34,12 +35,14 @@ final class SessionStore: ObservableObject {
     }
     /// si habia sesion en el keychain se entra directo
     func restore() async {
+        guard !isForgetting else { return }
         let expected = generation
         guard let restored = await auth.restore(), generation == expected else { return }
         await start(restored)
     }
     /// login con correo y contraseña, si alguien mas entro o salio mientras tanto se cancela
     func signIn(email: String, password: String) async throws {
+        try requireCleanupFinished()
         let expected = generation
         let profile = try await auth.signIn(email: email, password: password)
         guard expected == generation else { throw CancellationError() }
@@ -47,6 +50,7 @@ final class SessionStore: ObservableObject {
     }
     /// crea la cuenta, si supabase pide confirmar el correo no hay sesion todavia y se avisa
     func signUp(email: String, password: String, name: String) async throws {
+        try requireCleanupFinished()
         let expected = generation
         let signedIn = try await auth.signUp(email: email, password: password, name: name)
         guard expected == generation else { throw CancellationError() }
@@ -90,10 +94,8 @@ final class SessionStore: ObservableObject {
         accountError = nil
     }
     /// cierra sesion: generacion nueva para cortar lo que estaba en camino, borra el keychain y limpia todo
-    /// forgetData en true (el usuario cerro sesion a mano) borra tambien lo que la cuenta dejo en el celular
-    /// si la sesion se vencio sola no se borra, asi al volver a entrar sigue lo que no se alcanzo a mandar
-    func signOut(message: String? = nil, forgetData: Bool = false) {
-        let leaving = profile?.id
+    /// El vencimiento automático conserva pendientes. El cierre manual usa signOutAndForget.
+    func signOut(message: String? = nil) {
         generation = UUID()
         auth.signOut()
         profile = nil
@@ -102,7 +104,25 @@ final class SessionStore: ObservableObject {
         accountError = nil
         authMessage = message
         onChange?()
-        if forgetData, let leaving { onForget?(leaving) }
+    }
+    /// Invalida primero las tareas de la cuenta y espera su limpieza antes de permitir otro login.
+    /// Así una escritura vieja no puede reaparecer después de borrar, ni se limpia otra sesión.
+    func signOutAndForget() async {
+        guard !isForgetting, let leaving = profile?.id else { return }
+        let departingGeneration = generation
+        isForgetting = true
+        signOut()
+        defer { isForgetting = false }
+        do {
+            try await onForget?(leaving, departingGeneration)
+        } catch {
+            authMessage = "Cerraste sesión, pero no se pudieron limpiar todos los datos locales. Se conservaron los que no pudieron borrarse; vuelve a entrar para intentarlo de nuevo."
+        }
+    }
+    private func requireCleanupFinished() throws {
+        guard !isForgetting else {
+            throw APIFailure(code: "LOCAL_STORAGE_BUSY", message: "Estamos terminando de cerrar la sesión. Espera un momento.")
+        }
     }
     /// corta antes de llamar si no es admin, igual el server lo vuelve a revisar
     func requireAdmin() throws {

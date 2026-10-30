@@ -51,6 +51,10 @@ private struct MenuDetailScreen: View {
                     titleRow
                     statusRow(at: store.clock.now)
                     validityCard
+                    if let warning = store.cacheWarning {
+                        Label(warning, systemImage: "externaldrive.badge.exclamationmark")
+                            .font(.footnote).foregroundStyle(Palette.coral)
+                    }
                     waitCard(at: store.clock.now)
                     dishesSection
                     locationCard

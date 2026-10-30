@@ -5,6 +5,7 @@ import UniEatCore
 /// estado de perfil, lee la sesion, los guardados y la cola de reportes
 @MainActor
 final class ProfileViewModel: FeatureViewModel {
+    @Published private(set) var isSigningOut = false
     private let session: SessionStore
     private let saved: SavedMenusViewModel
     let reports: ReportingFacade
@@ -33,8 +34,13 @@ final class ProfileViewModel: FeatureViewModel {
     /// cierra sesion a mano: primero intenta mandar los reportes pendientes (si no hay red no hace nada)
     /// y despues borra del celular todo lo de la cuenta
     func signOut() async {
+        guard !isSigningOut, let userID = session.profile?.id else { return }
+        let generation = session.generation
+        isSigningOut = true
+        defer { isSigningOut = false }
         await reports.flushReports()
-        session.signOut(forgetData: true)
+        guard session.matches(userID, generation: generation), !Task.isCancelled else { return }
+        await session.signOutAndForget()
     }
     func refreshAccount() async { try? await session.refreshAccount() }
     /// reintenta tambien los reportes que el server rechazo

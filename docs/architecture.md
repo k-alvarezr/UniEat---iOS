@@ -112,11 +112,12 @@ o la respuesta, su resultado se cancela. Al cerrar sesión se cancela la renovac
 impedir que escriba otra vez en Keychain. Las respuestas de feed comprueban también identificador
 de solicitud, usuario y filtros: una solicitud vieja con filtros idénticos tampoco pisa la última.
 
-`ServerClock` guarda la diferencia entre la hora del servidor y la del teléfono en cada respuesta,
-y la hora de la app es la del teléfono más esa diferencia. Un teléfono con la hora mal puesta no altera
-la vigencia ni la hora de los reportes. Sin respuesta del servidor en esta apertura se usa la hora del
-teléfono; la UI identifica los datos como copia y se corrige con la siguiente respuesta. El reloj no
-publica cambios: las pantallas se redibujan con los datos que llegan en esa misma respuesta.
+`ServerClock` conserva una referencia del servidor y avanza con `systemUptime` durante el proceso:
+cambiar manualmente la hora del teléfono no cambia vigencia, evidencia de fila ni hora de observación.
+Las copias de feed/detalle guardan una referencia para el relanzamiento offline. En esa apertura la
+estimación del tiempo transcurrido depende del reloj local; se identifica la copia y se resincroniza
+al recibir red. Una referencia guardada nunca reemplaza una hora en vivo. Se mantiene la mejora de Juan:
+el reloj no publica cambios ni provoca redibujos de toda la aplicación.
 
 Los reportes se guardan antes de enviarse. Su UUID es estable y se envía como `clientReportId`;
 `observedAt` conserva la observación original. Solo una respuesta aceptada permite borrar la fila.
@@ -129,6 +130,22 @@ en el teléfono: reportes, copias del feed y catálogo en SwiftData (`FeedCacheR
 borrador y eventos sin enviar. Si quedan
 reportes sin enviar, Perfil lo avisa antes. Los menús guardados se conservan. Si la sesión vence sola,
 no se borra nada, para que su dueño retome los pendientes al volver a entrar.
+
+El cierre captura usuario/generación antes de esperar el envío y vuelve a comprobarlos después.
+La sesión se invalida antes de limpiar y el siguiente login espera a que termine esa limpieza.
+`LocalContentStore` ordena en una transacción la purga de reportes/copias; un permiso revocado impide
+que una escritura antigua vuelva a crear el feed. `FileStore` es un actor de I/O con invalidación de
+sesiones y orden de revisiones de borradores. Los fallos de limpieza se informan; no se borra la base
+completa ni se eliminan los guardados para ocultar un error.
+
+El borrador nuevo se autoguarda con debounce de 400 ms y al salir/pasar a segundo plano. Los cambios
+del formulario permanecen en memoria ante un fallo de disco y la UI permite reintentar. Una lectura
+tardía no reemplaza un formulario ya editado. Publicar/editar/cerrar conservan los permisos y
+`expectedVersion` del servidor; se comprueba la sesión antes de borrar borradores o refrescar pantallas.
+
+La cola de analítica interpreta aceptados, duplicados y rechazos individuales. Conserva fallos
+temporales y registra hasta 100 rechazos permanentes por cuenta para diagnosticar la calidad de datos;
+no reintenta infinitamente un evento inválido ni muestra detalles técnicos al estudiante.
 
 Una base que no abre se conserva: no se elimina el archivo ni se informa falsamente que un reporte
 quedó guardado. Este caso se muestra en Perfil y el formulario informa el fallo de persistencia.

@@ -106,11 +106,11 @@ final class FeedViewModel: FeatureViewModel {
             guard session.matches(userID, generation: generation), requestID == id, requested == filters else { return }
             clock.synchronize(feed.serverNow ?? feed.fetchedAt)
             // se guarda en memoria y en swiftdata, si no se pudo guardar se avisa pero el feed se muestra igual
-            let snapshot = CachedFeedSnapshot(userId: userID, filters: requested, response: feed)
+            let snapshot = CachedFeedSnapshot(userId: userID, filters: requested, response: feed, timeReference: clock.snapshot())
             memory.insert(snapshot)
             if let content {
                 do {
-                    try await content.saveFeed(snapshot)
+                    try await content.saveFeed(snapshot, generation: generation)
                 } catch {
                     if session.matches(userID, generation: generation), requestID == id {
                         cacheWarning = "El feed se cargó, pero no se pudo guardar su copia."
@@ -133,6 +133,7 @@ final class FeedViewModel: FeatureViewModel {
     }
     /// pone en pantalla una copia, stored en true es que viene guardada y no del server
     private func apply(_ snapshot: CachedFeedSnapshot, stored: Bool) {
+        if let reference = snapshot.timeReference { clock.restore(reference) }
         menus = snapshot.response.menus
         fetchedAt = snapshot.response.fetchedAt
         isShowingCachedFeed = stored
@@ -161,11 +162,12 @@ final class FeedViewModel: FeatureViewModel {
         }
         guard session.matches(userID, generation: generation), requestID == request, requested == filters else { return }
         if let catalog {
+            if let reference = catalog.timeReference { clock.restore(reference) }
             locationMenus = catalog.response.menus
             if snapshot == nil {
                 let filtered = OfflineMenuFiltering.filter(catalog.response.menus, filters: requested, at: clock.now)
                 snapshot = CachedFeedSnapshot(userId: userID, filters: requested,
-                    response: FeedResponse(fetchedAt: catalog.response.fetchedAt, menus: filtered))
+                    response: FeedResponse(fetchedAt: catalog.response.fetchedAt, menus: filtered), timeReference: catalog.timeReference)
             }
         }
         if let snapshot {
@@ -187,7 +189,8 @@ final class FeedViewModel: FeatureViewModel {
                 let response: FeedResponse = try await api.get("feed", query: [.init(name: "refresh", value: "auto")])
                 guard session.matches(userID, generation: generation), !Task.isCancelled else { return }
                 let all = FeedFilters(budgetCop: nil, availableMinutes: nil, diet: nil, area: nil, paymentMethod: nil)
-                try await content.saveFeed(CachedFeedSnapshot(userId: userID, filters: all, response: response), isCatalog: true)
+                try await content.saveFeed(CachedFeedSnapshot(userId: userID, filters: all, response: response, timeReference: clock.snapshot()),
+                    isCatalog: true, generation: generation)
                 guard session.matches(userID, generation: generation), !Task.isCancelled else { return }
                 locationMenus = response.menus
                 catalogAt = clock.now

@@ -66,11 +66,14 @@ actor LocalContentStore {
 
     /// guarda o reemplaza la copia del feed de esos filtros, o el catalogo
     /// se quedan maximo 24 copias por usuario (sin contar el catalogo), las mas viejas se borran
-    func saveFeed(_ snapshot: CachedFeedSnapshot, isCatalog: Bool = false) throws {
+    func saveFeed(_ snapshot: CachedFeedSnapshot, isCatalog: Bool = false, permit: ContentWritePermit) throws {
+        try permit.check()
         let key = isCatalog ? "\(snapshot.userId):catalog" : FeedCacheKey.make(userID: snapshot.userId, filters: snapshot.filters)
         let data = try UniEatDates.encoder().encode(snapshot)
         do {
             if let row = try modelContext.fetch(FetchDescriptor<FeedCacheRecord>(predicate: #Predicate { $0.key == key })).first {
+                // Una persistencia tardía del mismo contexto no pisa una respuesta más reciente.
+                guard row.fetchedAt <= snapshot.response.fetchedAt else { return }
                 row.payload = data
                 row.fetchedAt = snapshot.response.fetchedAt
             } else {
@@ -84,6 +87,21 @@ actor LocalContentStore {
             for old in rows.dropFirst(24) {
                 modelContext.delete(old)
             }
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            throw error
+        }
+    }
+
+    /// Reportes y copias se borran en una sola transacción. Los guardados se conservan,
+    /// como decidió Juan; el cierre automático nunca llama esta operación.
+    func forget(userID: UUID) throws {
+        do {
+            let reports = try modelContext.fetch(FetchDescriptor<MenuSnapshot>(predicate: #Predicate { $0.userId == userID }))
+            let feeds = try modelContext.fetch(FetchDescriptor<FeedCacheRecord>(predicate: #Predicate { $0.userID == userID }))
+            for row in reports { modelContext.delete(row) }
+            for row in feeds { modelContext.delete(row) }
             try modelContext.save()
         } catch {
             modelContext.rollback()

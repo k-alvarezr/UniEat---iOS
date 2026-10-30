@@ -63,11 +63,11 @@ struct AuthView: View {
                                 .font(.footnote)
                                 .foregroundStyle(Palette.coral)
                         }
-                        SolidButton(title: model.isSubmitting ? "Un momento…" : (model.isRegistering ? "Crear cuenta" : "Iniciar sesión"),
+                        SolidButton(title: model.isClosingSession ? "Cerrando sesión…" : (model.isSubmitting ? "Un momento…" : (model.isRegistering ? "Crear cuenta" : "Iniciar sesión")),
                                     icon: "arrow.right", color: Palette.yellow) {
                             Task { await model.submit() }
                         }
-                        .disabled(model.isSubmitting || model.email.isEmpty || model.password.isEmpty ||
+                        .disabled(model.isSubmitting || model.isClosingSession || model.email.isEmpty || model.password.isEmpty ||
                                   (model.isRegistering && RegistrationRules.nameError(model.displayName) != nil))
                     }
                 }
