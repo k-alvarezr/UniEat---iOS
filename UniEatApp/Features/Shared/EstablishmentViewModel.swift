@@ -45,9 +45,13 @@ final class EstablishmentViewModel: FeatureViewModel {
         return url.scheme?.lowercased() == "https" && url.host != nil && url.user == nil && url.password == nil
     }
     func showAddressOnMap() async {
+        guard let userID = session.profile?.id else { return }
+        let generation = session.generation, requested = address
         isGeocoding = true
-        defer { isGeocoding = false }
-        if let found = await geocode(address) {
+        defer { if session.matches(userID, generation: generation) { isGeocoding = false } }
+        let found = await geocode(requested)
+        guard session.matches(userID, generation: generation), address == requested else { return }
+        if let found {
             setPin(found, fromAddress: true)
             pinMessage = "Ubicación aproximada según la dirección. Revísala en el mapa."
         } else {
@@ -77,12 +81,14 @@ final class EstablishmentViewModel: FeatureViewModel {
         }
     }
     func submit() async {
-        guard canSubmit else { return }
+        guard canSubmit, let userID = session.profile?.id else { return }
+        let generation = session.generation
         isWorking = true
-        defer { isWorking = false }
+        defer { if session.matches(userID, generation: generation) { isWorking = false } }
         // si no hay pin se intenta con la direccion, si tampoco sale se manda sin coordenadas
         var coordinate = pin
         if coordinate == nil { coordinate = await geocode(address) }
+        guard session.matches(userID, generation: generation) else { return }
         let photo = photoURL.trimmed
         let request = EstablishmentRequestBody(
             name: name.trimmed, area: area, address: address.trimmed,
@@ -92,6 +98,7 @@ final class EstablishmentViewModel: FeatureViewModel {
             latitude: coordinate?.latitude, longitude: coordinate?.longitude)
         do {
             try await service.requestEstablishment(request)
+            guard session.matches(userID, generation: generation) else { return }
             message = "Solicitud enviada. Podrás publicar cuando un administrador la apruebe."
             name = ""
             address = ""
@@ -100,7 +107,9 @@ final class EstablishmentViewModel: FeatureViewModel {
             pin = nil
             pinMessage = nil
             showingForm = false
-        } catch {
+        } catch is CancellationError { }
+        catch {
+            guard session.matches(userID, generation: generation) else { return }
             message = error.localizedDescription
         }
     }

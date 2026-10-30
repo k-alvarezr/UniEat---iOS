@@ -16,7 +16,7 @@ la migración y API del backend antes de distribuir el cliente actualizado. Los 
 6. Reloj basado en servidor y tiempo transcurrido para vigencia/fila durante el proceso.
 7. Estados distinguibles de carga, vacío real, fallo y copia guardada con fecha y reintento.
 8. Conservación de los flujos de publicación, permisos y estrategias concurrentes de Juan.
-9. Documentación vigente y eliminación de la guía de sustentación de Sprint 2 solicitada por Kevin.
+9. Documentación vigente en `architecture.md` y este archivo; se retira la guía desactualizada de Sprint 2.
 
 ## Relación con las issues
 

@@ -52,8 +52,8 @@ final class MenuDetailViewModel: FeatureViewModel {
         requestID = id; isLoading = true
         defer { if requestID == id { isLoading = false } }
         // Juan's PR #41: show the local result while the concurrent request is in flight.
-        async let cached = service.cached(initialMenu)
-        async let fresh = service.load(initialMenu, automatic: automatic)
+        async let cached = service.cached(initialMenu, generation: expected)
+        async let fresh = service.load(initialMenu, automatic: automatic, generation: expected)
         if let copy = await cached, session.matches(userID, generation: expected), requestID == id, detail == nil {
             detail = copy
         }

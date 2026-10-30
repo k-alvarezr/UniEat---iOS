@@ -88,11 +88,12 @@ final class ReportingFacade: FeatureViewModel {
             var waiting = try outbox.pending(userID: userID)
                 .filter { failures[$0.id.uuidString] == nil }.makeIterator()
             let api = api
+            let owner = session
             // Preserve Juan's TaskGroup design, with four in-flight requests to bound resource use.
             await withTaskGroup(of: (UUID, DeliveryOutcome).self) { group in
                 for _ in 0..<4 {
                     if let report = waiting.next() {
-                        group.addTask(priority: .utility) { (report.id, await Self.send(report, api: api)) }
+                        group.addTask(priority: .utility) { (report.id, await Self.send(report, api: api, session: owner, userID: userID, generation: expected)) }
                     }
                 }
                 var canSchedule = true
@@ -105,7 +106,7 @@ final class ReportingFacade: FeatureViewModel {
                     if case .retry = outcome { canSchedule = false }
                     if case .cancelled = outcome { group.cancelAll(); return }
                     if canSchedule, let report = waiting.next() {
-                        group.addTask(priority: .utility) { (report.id, await Self.send(report, api: api)) }
+                        group.addTask(priority: .utility) { (report.id, await Self.send(report, api: api, session: owner, userID: userID, generation: expected)) }
                     }
                 }
             }
@@ -115,8 +116,11 @@ final class ReportingFacade: FeatureViewModel {
     private enum DeliveryOutcome: Sendable {
         case sent(String), retry, rejected(String), cancelled
     }
-    nonisolated private static func send(_ report: QueuedReport, api: APIRequesting) async -> DeliveryOutcome {
+    private static func send(_ report: QueuedReport, api: APIRequesting, session: SessionStore,
+                             userID: UUID, generation: UUID) async -> DeliveryOutcome {
         do {
+            // Child tasks may start after sign-out. Check on MainActor before entering transport.
+            guard session.matches(userID, generation: generation) else { return .cancelled }
             try Task.checkCancellation()
             let response: ReportResponse = try await api.send("POST", "reports", body: report.body)
             return .sent(response.status)
@@ -145,7 +149,7 @@ final class ReportingFacade: FeatureViewModel {
     }
     private func deliver(_ report: QueuedReport, userID: UUID) async throws -> String? {
         let expected = session.generation
-        let outcome = await Self.send(report, api: api)
+        let outcome = await Self.send(report, api: api, session: session, userID: userID, generation: expected)
         guard session.matches(userID, generation: expected) else { throw CancellationError() }
         try apply(outcome, id: report.id, userID: userID)
         updateCount()

@@ -24,6 +24,8 @@ final class PublishingService {
         guard let id = session.profile?.id else { return }
         files.save(draft, name: "publish-draft", folder: .support, userId: id)
     }
+    /// Lectura utility del PR #41; las escrituras siguen ordenadas en MainActor para evitar
+    /// que un borrador antiguo termine sobrescribiendo al que acaba de editarse.
     func loadDraft() async -> PublishDraft? {
         guard let id = session.profile?.id else { return nil }
         let expected = session.generation, files = files

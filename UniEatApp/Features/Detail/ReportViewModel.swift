@@ -26,6 +26,7 @@ final class ReportViewModel: ObservableObject {
             confirmationMessage = switch status {
             case "pending": "Gracias. Tu reporte quedó pendiente de revisión."
             case "confirmed": "Gracias. Otros estudiantes reportaron lo mismo: el cambio quedó confirmado."
+            case "dismissed": "Tu reporte ya fue revisado y descartado."
             case "queued": "Tu reporte quedó guardado y se enviará cuando el servicio esté disponible."
             case "needs_review": "El servidor rechazó el envío. Tu reporte sigue guardado para revisión desde Perfil."
             default: "Gracias. Tu observación quedó registrada."

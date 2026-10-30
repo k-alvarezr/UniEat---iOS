@@ -101,7 +101,11 @@ final class PublishViewModel: FeatureViewModel {
             let value = try await service.mine()
             guard session.matches(userID, generation: generation) else { return }
             ownMenus = value
-        } catch is CancellationError { } catch { message = error.localizedDescription }
+        } catch is CancellationError { return } catch {
+            guard session.matches(userID, generation: generation) else { return }
+            message = error.localizedDescription
+        }
+        guard session.matches(userID, generation: generation) else { return }
         await feed.refresh()
     }
     var isValid: Bool {
@@ -182,19 +186,25 @@ final class PublishViewModel: FeatureViewModel {
         message = "Editando versión \(menu.version). Guardar creará una versión nueva."
     }
     func close(_ menu: DailyMenu) async {
+        guard let userID = session.profile?.id, !isOffline else { return }
+        let generation = session.generation
         do {
             try await service.close(menu)
             await refresh()
+            guard session.matches(userID, generation: generation) else { return }
             if editingMenu?.id == menu.id { editingMenu = nil }
             message = "Publicación cerrada. El historial se conserva."
-        } catch {
+        } catch is CancellationError { }
+        catch {
+            guard session.matches(userID, generation: generation) else { return }
             message = (error as? APIFailure)?.message ?? "No se pudo cerrar la publicación. Inténtalo de nuevo."
         }
     }
     func publish() async {
-        guard isValid, !isOffline else { return }
+        guard isValid, !isOffline, let userID = session.profile?.id else { return }
+        let generation = session.generation
         isSaving = true
-        defer { isSaving = false }
+        defer { if session.matches(userID, generation: generation) { isSaving = false } }
         let trimmedAddress = address.trimmingCharacters(in: .whitespaces)
         let body = MenuBody(establishmentId: editingMenu?.establishmentId ?? selectedEstablishmentID,
                             title: title, validUntil: validUntil,
@@ -208,15 +218,20 @@ final class PublishViewModel: FeatureViewModel {
             try await service.publish(body, replacing: editingMenu)
             service.clearDraft()
             await refresh()
+            guard session.matches(userID, generation: generation) else { return }
             dishes = [DishDraft()]
             editingMenu = nil
             message = "Menú publicado. Ya es visible para los estudiantes."
         } catch let failure as APIFailure where failure.code == "VERSION_CONFLICT" {
+            guard session.matches(userID, generation: generation) else { return }
             // alguien mas edito primero, se recarga para editar la version actual
             editingMenu = nil
             await refresh()
+            guard session.matches(userID, generation: generation) else { return }
             message = "Otra persona editó este menú. Recargamos la versión actual; vuelve a aplicar tus cambios."
-        } catch {
+        } catch is CancellationError { }
+        catch {
+            guard session.matches(userID, generation: generation) else { return }
             message = (error as? APIFailure)?.message ?? "No se pudo guardar el menú. Revisa los datos e inténtalo de nuevo."
         }
     }

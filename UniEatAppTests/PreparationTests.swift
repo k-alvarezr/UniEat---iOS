@@ -83,6 +83,20 @@ final class PreparationTests: XCTestCase {
         XCTAssertTrue(h.api.reportBodies.isEmpty)
     }
 
+    func testReportChildrenCannotSendAnotherUsersPendingRowsAfterSignOut() async throws {
+        let h = try await Harness.make()
+        h.connectivity.update(isConnected: false)
+        for _ in 0..<3 {
+            _ = try await h.reports.submitReport(for: h.menu, kind: .price, note: "", waitMinutes: nil)
+        }
+        h.connectivity.update(isConnected: true)
+        h.api.onReport = { h.session.signOut() }
+        await h.reports.flushReports()
+        XCTAssertEqual(h.api.reportBodies.count, 1, "The remaining child tasks must fail their session preflight")
+        XCTAssertEqual(try h.database.pending(userID: h.auth.profile.id).count, 3,
+                       "Even the in-flight row is retained for an idempotent retry by its owner")
+    }
+
     func testLateFeedResponseAfterSignOutCannotRestorePreviousAccountData() async throws {
         let h = try await Harness.make()
         let started = expectation(description: "feed started")
@@ -148,6 +162,7 @@ private final class FakeAPI: APIRequesting {
     let userID: UUID
     var failure: APIFailure?
     var reportBodies: [Data] = []
+    var onReport: (() -> Void)?
     var feed: (() async throws -> Data)?
     init(userID: UUID) { self.userID = userID }
     func get<Response: Decodable>(_ path: String, query: [URLQueryItem]) async throws -> Response {
@@ -163,6 +178,7 @@ private final class FakeAPI: APIRequesting {
     func send<Response: Decodable, Body: Encodable>(_ method: String, _ path: String,
         query: [URLQueryItem], body: Body?) async throws -> Response {
         if let body { reportBodies.append(try UniEatDates.encoder().encode(body)) }
+        onReport?()
         if let failure { throw failure }
         return try JSONDecoder().decode(Response.self, from: Data("{\"status\":\"observation\"}".utf8))
     }
