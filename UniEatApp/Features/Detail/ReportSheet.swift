@@ -8,6 +8,7 @@ struct ReportSheet: View {
     @EnvironmentObject private var app: AppStore
     let menu: DailyMenu
     var initialKind: ReportKind = .unavailable
+    // se crea el viewmodel de la hoja con AppStore y lo usa la pantalla de adentro
     var body: some View { ReportScreen(menu: menu, model: app.makeReport(menu, kind: initialKind)) }
 }
 

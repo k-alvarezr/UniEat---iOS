@@ -4,6 +4,7 @@ import UniEatCore
 /// filtros de BQ-03, se edita un borrador y solo aplicar cambia el feed
 /// sugerir zona usa el gps una vez y lo compara con los pines de los locales
 struct FiltersView: View {
+    // el borrador de filtros vive en FiltersViewModel, se aplica al feed compartido
     @EnvironmentObject private var model: FiltersViewModel
     @Environment(\.dismiss) private var dismiss
     @StateObject private var location = LocationContextService()

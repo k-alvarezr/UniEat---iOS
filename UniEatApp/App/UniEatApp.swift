@@ -6,6 +6,8 @@ struct UniEatApp: App {
 
     var body: some Scene {
         WindowGroup {
+            // se inyecta el store y cada viewmodel por separado
+            // asi cada pantalla pide con @EnvironmentObject solo el que usa
             RootView()
                 .environmentObject(store)
                 .environmentObject(store.session)
@@ -38,6 +40,8 @@ struct RootView: View {
                 MainTabsView()
             }
         }
+        // cada sesion tiene una generacion distinta, al cambiarla se rehacen todas las pantallas
+        // asi no queda nada en pantalla del usuario anterior
         .id(session.generation)
         .tint(Palette.ink)
         .font(BrandFont.body)

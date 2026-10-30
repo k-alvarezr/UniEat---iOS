@@ -4,8 +4,11 @@ import Foundation
 import UniEatCore
 
 @MainActor
+/// estado de la pantalla de filtros, se edita un borrador y solo al aplicar cambia el feed
 final class FiltersViewModel: FeatureViewModel {
+    // filtros que la persona esta editando, todavia sin aplicar
     @Published var draft = FeedFilters()
+    // texto de la zona sugerida por gps o de que no hay locales cerca
     @Published var locationMessage: String?
     private let feed: FeedViewModel
     init(feed: FeedViewModel) { self.feed = feed; super.init(); observe(feed) }
@@ -14,7 +17,10 @@ final class FiltersViewModel: FeatureViewModel {
     var hasSnapshot: Bool { feed.hasSnapshot }
     var fetchedAt: Date { feed.fetchedAt }
     func reset() { draft = feed.filters; locationMessage = nil }
+    /// aplica el borrador, el feed los guarda y vuelve a pedir
     func apply() { feed.updateFilters(draft) }
+    /// sugiere zona por cercania a los locales publicados, la persona puede cambiarla
+    /// la ubicacion no se guarda ni se manda al server
     func suggest(_ position: CLLocation?) {
         guard let position else { return }
         if let suggestion = LocationAreaResolver.suggest(latitude: position.coordinate.latitude,

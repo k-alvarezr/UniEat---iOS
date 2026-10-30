@@ -2,6 +2,8 @@ import Foundation
 import UniEatCore
 
 @MainActor
+/// publicar, cerrar y el borrador salen del AppStore viejo a este servicio
+/// el borrador sigue siendo el archivo en Application Support de #33
 final class PublishingService {
     private let api: APIRequesting
     let session: SessionStore
@@ -9,7 +11,10 @@ final class PublishingService {
     init(api: APIRequesting, session: SessionStore, files: FileStore) {
         self.api = api; self.session = session; self.files = files
     }
+    /// menus del restaurante, para editarlos o cerrarlos
     func mine() async throws -> [DailyMenu] { let response: MenusResponse = try await api.get("menus/mine"); return response.menus }
+    /// crea un menu o una version nueva de old, al editar va la version que vio el dueño
+    /// si alguien mas lo edito el server responde VERSION_CONFLICT y no se pisan los cambios
     func publish(_ body: MenuBody, replacing old: DailyMenu?) async throws {
         guard let id = body.establishmentId, session.approvedEstablishments.contains(where: { $0.id == id }) else {
             throw APIFailure(code: "VALIDATION_ERROR", message: "Selecciona un establecimiento aprobado.")
@@ -17,15 +22,18 @@ final class PublishingService {
         if let old { let _: MenuResponse = try await api.send("PUT", "menus/\(old.id.uuidString)", body: body) }
         else { let _: MenuResponse = try await api.send("POST", "menus", body: body) }
     }
+    /// cierra el menu antes de que venza, el historial se queda
     func close(_ menu: DailyMenu) async throws {
         let _: CloseResponse = try await api.send("POST", "menus/\(menu.id.uuidString)/close", body: NoBody?.none)
     }
+    /// guarda el borrador directo en el hilo principal (#33)
     func saveDraft(_ draft: PublishDraft) {
         guard let id = session.profile?.id else { return }
         files.save(draft, name: "publish-draft", folder: .support, userId: id)
     }
-    /// Lectura utility del PR #41; las escrituras siguen ordenadas en MainActor para evitar
-    /// que un borrador antiguo termine sobrescribiendo al que acaba de editarse.
+    /// lee el borrador en segundo plano con Task.detached utility (#31), guardar va directo
+    /// para que nunca un borrador viejo pise uno nuevo
+    /// si cambio la sesion mientras se leia se bota el resultado
     func loadDraft() async -> PublishDraft? {
         guard let id = session.profile?.id else { return nil }
         let expected = session.generation, files = files
@@ -35,6 +43,7 @@ final class PublishingService {
         guard session.matches(id, generation: expected), !Task.isCancelled else { return nil }
         return draft
     }
+    /// borra el borrador despues de publicar
     func clearDraft() {
         guard let id = session.profile?.id else { return }
         files.remove(name: "publish-draft", folder: .support, userId: id)

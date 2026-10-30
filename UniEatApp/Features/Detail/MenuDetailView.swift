@@ -12,6 +12,7 @@ struct MenuDetailView: View {
 }
 
 private struct MenuDetailScreen: View {
+    // el estado del detalle ahora vive en MenuDetailViewModel, no en @State
     @StateObject private var store: MenuDetailViewModel
     @State private var showingReport = false
     // gps para decir que tan lejos queda el local, se lee una vez y no se guarda ni se manda

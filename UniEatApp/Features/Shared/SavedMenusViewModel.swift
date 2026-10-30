@@ -18,7 +18,9 @@ final class SavedMenusViewModel: ObservableObject {
         self.session = session; self.events = events; self.clock = clock
         self.content = content
     }
+    // llave por usuario
     private func key(_ id: UUID) -> String { "unieat.saved-menus.\(id.uuidString)" }
+    /// al cambiar de cuenta se cargan los guardados de ese usuario
     func accountChanged() {
         loading?.cancel(); savedMenus = []; savingIDs = []; errorMessage = nil; isLoading = false
         guard let userID = session.profile?.id else { return }
@@ -47,6 +49,7 @@ final class SavedMenusViewModel: ObservableObject {
         }
     }
     func isSaved(_ menu: DailyMenu) -> Bool { savedMenus.contains { $0.id == menu.id } }
+    /// guarda o quita el menu, al guardar cuenta el evento menu_save
     func toggleSaved(_ menu: DailyMenu) {
         guard let userID = session.profile?.id, !savingIDs.contains(menu.id), let content else { return }
         let generation = session.generation, savedAt = clock.now, wasSaved = isSaved(menu)

@@ -2,20 +2,27 @@ import Combine
 import Foundation
 import Network
 
+/// el estado de la red sale del AppStore viejo a su propio servicio
+/// isConnected lo da NWPathMonitor (el celular tiene red), serverUnreachable lo pone el feed
+/// cuando hay red pero el server no responde
 @MainActor
 final class ConnectivityService: ObservableObject {
-    @Published private(set) var isConnected = true
-    @Published var serverUnreachable = false
+    @Published private(set) var isConnected = true   // el celular tiene internet
+    @Published var serverUnreachable = false         // hay internet pero el server no responde
+    /// sin internet o con el server caido
     var isOffline: Bool { !isConnected || serverUnreachable }
-    var onReconnect: (() -> Void)?
-    private let monitor = NWPathMonitor()
+    var onReconnect: (() -> Void)?                    // lo pone AppStore para mandar las colas al volver la red
+    private let monitor = NWPathMonitor()             // avisa cuando cambia la conexion
+    /// monitorNetwork en false es para las pruebas, asi no depende de la red real
     init(monitorNetwork: Bool = true) {
         guard monitorNetwork else { return }
+        // cada cambio de red llega en un hilo aparte y se pasa al hilo de la pantalla
         monitor.pathUpdateHandler = { [weak self] path in
             Task { @MainActor in self?.update(isConnected: path.status == .satisfied) }
         }
         monitor.start(queue: DispatchQueue(label: "unieat.connectivity"))
     }
+    /// si estaba sin red y vuelve, se limpia lo del server caido y se avisa para mandar las colas
     func update(isConnected connected: Bool) {
         let reconnecting = !isConnected && connected
         isConnected = connected

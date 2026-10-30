@@ -3,6 +3,8 @@ import Foundation
 import UniEatCore
 
 @MainActor
+/// estado del detalle BQ-04 que antes estaba en MenuDetailView con @State
+/// uno por pantalla de detalle, lo crea AppStore.makeDetail
 final class MenuDetailViewModel: FeatureViewModel {
     @Published private(set) var detail: MenuDetail?
     @Published private(set) var loadError: APIFailure?
@@ -27,7 +29,9 @@ final class MenuDetailViewModel: FeatureViewModel {
         super.init(); observe(saved); observe(session); observe(connectivity); observe(clock); observe(events)
         if let pilot { observe(pilot) }
     }
+    /// la version del server si ya llego, si no la de la tarjeta
     var menu: DailyMenu { detail?.menu ?? initialMenu }
+    /// el server dijo 410 vencido o cerrado o 404
     var isGone: Bool { ["GONE", "NOT_FOUND"].contains(loadError?.code ?? "") }
     var isAdmin: Bool { session.isAdmin }
     var isRestaurant: Bool { session.isRestaurant }
@@ -41,24 +45,29 @@ final class MenuDetailViewModel: FeatureViewModel {
         if isGone { return "No disponible" }
         return detail?.status(at: clock.now).label ?? (menu.isActive(at: clock.now) ? "Vigente" : "Vencido")
     }
+    /// recarga antes de abrir la hoja para que el reporte quede con la version actual
     func canReport() async -> Bool {
         await load(automatic: true)
         return isOpen()
     }
+    /// elegir este menu, cuenta una vez por version en la sesion
     func choose() {
         guard isOpen() else { return }
         events.track("selection", menu: menu)
     }
+    /// marcar que llego, solo si antes lo eligio
     func arrive() {
         guard isOpen(), wasChosen(menu) else { return }
         events.track("arrival", menu: menu)
     }
+    /// carga el detalle, si automatic es true el server no lo cuenta en metricas
+    /// si cambio la sesion o arranco otra carga se bota el resultado y una cancelacion no se muestra como error
     func load(automatic: Bool = false) async {
         guard let userID = session.profile?.id else { return }
         let expected = session.generation, id = UUID()
         requestID = id; isLoading = true
         defer { if requestID == id { isLoading = false } }
-        // Juan's PR #41: show the local result while the concurrent request is in flight.
+        // copia del disco y server en paralelo con async let (#31), la copia se muestra mientras llega el server
         async let cached = service.cached(initialMenu, generation: expected)
         async let fresh = service.load(initialMenu, automatic: automatic, generation: expected)
         if let copy = await cached, session.matches(userID, generation: expected), requestID == id, detail == nil {

@@ -25,6 +25,8 @@ struct APIFailure: LocalizedError, Decodable {
 // cuerpo vacio para los get, que no mandan nada
 struct NoBody: Codable {}
 
+/// lo que los servicios necesitan de la api, como protocolo
+/// asi en las pruebas se cambia APIClient por una api falsa sin red
 @MainActor
 protocol APIRequesting: AnyObject, Sendable {
     func get<Response: Decodable>(_ path: String, query: [URLQueryItem]) async throws -> Response
@@ -32,6 +34,7 @@ protocol APIRequesting: AnyObject, Sendable {
         query: [URLQueryItem], body: Body?) async throws -> Response
 }
 
+// atajos para llamar sin query
 extension APIRequesting {
     func get<Response: Decodable>(_ path: String) async throws -> Response {
         try await get(path, query: [])
@@ -50,9 +53,10 @@ final class APIClient: APIRequesting {
     private let configuration: AppConfiguration
     // funcion que entrega un token valido, la pone AppStore con auth.validAccessToken()
     private let accessToken: () async throws -> String
+    // generacion de la sesion de auth, si cambia en medio de una peticion su respuesta se bota
     private let sessionIdentity: () -> UUID
-    private let transport: URLSession
-    var onUnauthorized: (() -> Void)?
+    private let transport: URLSession            // URLSession inyectable para las pruebas
+    var onUnauthorized: (() -> Void)?            // lo pone AppStore, cierra sesion si el server dice 401
 
     /// Authenticated JSON must never be replayed from a URL-only shared HTTP cache.
     private static let uncachedSession: URLSession = {
@@ -80,6 +84,7 @@ final class APIClient: APIRequesting {
     /// mandar una peticion con metodo, ruta, parametros y cuerpo opcional
     /// devuelve la respuesta ya convertida al tipo que se pidio
     func send<Response: Decodable, Body: Encodable>(_ method: String, _ path: String, query: [URLQueryItem] = [], body: Body?) async throws -> Response {
+        // se anota la sesion con la que arranca, si al volver es otra se cancela
         let identity = sessionIdentity()
         try Task.checkCancellation()
         
@@ -101,7 +106,7 @@ final class APIClient: APIRequesting {
         // cabeceras que pide el server en todas las llamadas
         let token: String
         do { token = try await accessToken() }
-        catch AuthFailure.expired { onUnauthorized?(); throw AuthFailure.expired }
+        catch AuthFailure.expired { onUnauthorized?(); throw AuthFailure.expired }   // token muerto -> cerrar sesion
         guard identity == sessionIdentity() else { throw CancellationError() }
         request.setValue(configuration.publishableKey, forHTTPHeaderField: "apikey")  // clave publica del proyecto supabase
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")      // quien es el usuario
@@ -119,6 +124,7 @@ final class APIClient: APIRequesting {
         do {
             (data, response) = try await transport.data(for: request)
         } catch {
+            // si se cancelo (ej salir de la pantalla) no es falta de red, no se muestra sin conexion
             if Task.isCancelled || (error as? URLError)?.code == .cancelled { throw CancellationError() }
             throw APIFailure.offline
         }
@@ -128,7 +134,7 @@ final class APIClient: APIRequesting {
         // 4. revisar la respuesta: si no es 2xx se lee el error del server, si esta bien se convierte
         guard let status = (response as? HTTPURLResponse)?.statusCode else { throw APIFailure.unexpected }
         guard (200..<300).contains(status) else {
-            if status == 401 { onUnauthorized?() }
+            if status == 401 { onUnauthorized?() }   // sesion vencida en el server
             throw APIFailure.from(data)
         }
         do {
@@ -149,7 +155,7 @@ final class APIClient: APIRequesting {
 struct FeedResponse: Codable, Sendable {
     let fetchedAt: Date
     let menus: [DailyMenu]
-    var serverNow: Date? = nil
+    var serverNow: Date? = nil   // hora del server para el ServerClock, opcional por si el back no la manda
 }
 
 /// Convierte los filtros en parametros de la URL y omite los vacios
@@ -203,13 +209,16 @@ struct ReportBody: Encodable, Sendable {
     let kind: String
     let note: String
     let observedWaitMinutes: Int?
+    // id del reporte creado en el celular, si se reintenta el server no lo cuenta dos veces (back #13)
     var clientReportId: UUID? = nil
+    // cuando lo vio el estudiante, no cuando se pudo mandar, sirve si se mando horas despues
     var observedAt: Date? = nil
 }
 
 /// respuesta al reportar, el estado en que quedo pending confirmed u observation
 struct ReportResponse: Decodable, Sendable { let status: String }
 
+// uuid de ceros, la sesion por defecto cuando no se pasa sessionIdentity (pruebas)
 private extension UUID {
     static let zero = UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
 }

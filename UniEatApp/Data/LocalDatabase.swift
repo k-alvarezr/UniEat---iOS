@@ -59,6 +59,7 @@ final class PendingReport{
                           version: snapshot.version,
                           kind: kind,
                           note: note, observedWaitMinutes: waitMinutes,
+                          // el id y la hora del reporte van al server para no duplicar al reintentar
                           clientReportId: id, observedAt: createdAt)
     }
 }
@@ -80,6 +81,8 @@ final class LocalDatabase {
     }
     
     /// guarda el reporte colgado del snapshot de esa version, si el snapshot no existe se crea
+    /// recibe el id y la hora desde afuera para que el mismo reporte conserve su id al reintentar
+    /// y lanza el error si no se pudo guardar, para no decirle al usuario que quedo guardado cuando no
     func enqueueReport(userId: UUID, menu: DailyMenu, kind: String, note: String, waitMinutes: Int?,
                        id: UUID = UUID(), observedAt: Date = .now) throws {
         let key = MenuSnapshot.key(userId, menu.id, menu.version)
@@ -91,6 +94,7 @@ final class LocalDatabase {
         report.createdAt = observedAt
         context.insert(report)
         report.snapshot = snapshot
+        // si no se pudo guardar se deshace lo que se metio al contexto
         do { try context.save() } catch { context.rollback(); throw error }
     }
     
@@ -119,8 +123,8 @@ final class LocalDatabase {
         if let report = found.first { try remove(report) }
     }
     
-    /// Borrado explícito de datos del usuario: la relación elimina los reportes en cascada.
-    /// El cierre de sesión conserva ahora los pendientes aislados por su dueño para no perder trabajo.
+    /// borra todo lo del usuario, el cascade se lleva los reportes
+    /// ya no se usa al cerrar sesion, los reportes se quedan guardados para cuando el dueño vuelva
     func deleteAll(userId: UUID) {
         let snapshots = (try? context.fetch(FetchDescriptor<MenuSnapshot>(predicate: #Predicate { $0.userId == userId }))) ?? []
         for snapshot in snapshots { context.delete(snapshot) }

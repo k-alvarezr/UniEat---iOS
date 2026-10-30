@@ -4,6 +4,7 @@ import SwiftUI
 /// igual la api revisa el rol en cada llamada
 struct MainTabsView: View {
     @EnvironmentObject private var store: AppStore
+    // el rol para decidir las pestañas sale de SessionStore
     @EnvironmentObject private var session: SessionStore
 
     var body: some View {
@@ -40,6 +41,7 @@ struct MainTabsView: View {
 
 /// perfil, datos de la cuenta, lo de cada rol, guardados y cerrar sesion
 struct ProfileView: View {
+    // perfil lee sesion, guardados y cola de reportes por ProfileViewModel
     @EnvironmentObject private var store: ProfileViewModel
 
     private var roleName: String {

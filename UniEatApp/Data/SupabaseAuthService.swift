@@ -3,7 +3,7 @@ import Security
 import UniEatCore
 
 enum AuthFailure: LocalizedError {
-    case expired
+    case expired   // la sesion ya no sirve y hay que volver a entrar, distinto de no tener red
     case unconfigured
     case invalidResponse
     case service(String)
@@ -26,6 +26,7 @@ private struct StoredSession: Codable {
     let expiresAt: Date?
 }
 
+/// lo que SessionStore necesita del login, como protocolo para poder probarlo sin supabase
 @MainActor
 protocol SessionAuthenticating {
     func signIn(email: String, password: String) async throws -> Profile
@@ -36,11 +37,14 @@ protocol SessionAuthenticating {
 
 @MainActor
 final class SupabaseAuthService: SessionAuthenticating {
+    /// cambia al entrar o salir, si una renovacion de token termina con otra generacion
+    /// no se guarda, asi un token viejo no vuelve al keychain despues de cerrar sesion
     private(set) var generation = UUID()
     private let config = AppConfiguration.current
     private let keychainService = "co.edu.uniandes.unieat.auth"
 
     func signIn(email: String, password: String) async throws -> Profile {
+        // generacion nueva y se cancela cualquier renovacion de la sesion anterior
         generation = UUID(); renewing?.cancel(); renewing = nil; renewalID = nil
         let expected = generation
         let data = try await request(path: "auth/v1/token", query: "grant_type=password",
@@ -79,10 +83,11 @@ final class SupabaseAuthService: SessionAuthenticating {
         } catch is CancellationError {
             return nil
         } catch AuthFailure.expired {
+            // solo se cierra la sesion si supabase dice que el token ya no sirve
             signOut()
             return nil
         } catch {
-            // A temporary Auth outage must not destroy the device's cached session.
+            // si supabase falla un rato no se borra la sesion del celular, se sigue con la guardada
             return cached.profile
         }
     }
@@ -101,7 +106,7 @@ final class SupabaseAuthService: SessionAuthenticating {
 
     // si ya se esta renovando, las demas llamadas esperan esa misma renovacion
     private var renewing: Task<StoredSession, Error>?
-    private var renewalID: UUID?
+    private var renewalID: UUID?   // id de la renovacion actual, para no limpiar una mas nueva
 
     private func refresh(_ cached: StoredSession) async throws -> StoredSession {
         if let renewing { return try await renewing.value }
@@ -111,6 +116,7 @@ final class SupabaseAuthService: SessionAuthenticating {
             let response = try await request(path: "auth/v1/token", query: "grant_type=refresh_token",
                                              body: ["refresh_token": cached.refreshToken])
             guard let renewed = try session(from: response) else { throw AuthFailure.invalidResponse }
+            // si cerraron sesion mientras se renovaba, el token nuevo no se guarda
             try Task.checkCancellation()
             guard generation == expected else { throw CancellationError() }
             store(renewed)
@@ -123,6 +129,7 @@ final class SupabaseAuthService: SessionAuthenticating {
     }
 
     func signOut() {
+        // generacion nueva y se corta la renovacion en camino antes de borrar el keychain
         generation = UUID()
         renewing?.cancel()
         renewing = nil
@@ -154,6 +161,7 @@ final class SupabaseAuthService: SessionAuthenticating {
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw AuthFailure.invalidResponse }
         guard (200..<300).contains(http.statusCode) else {
+            // estos codigos de supabase significan que la sesion murio, no que fallo la red
             let details = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
             let code = (details?["error_code"] as? String) ?? (details?["code"] as? String) ?? ""
             if ["refresh_token_not_found", "refresh_token_already_used", "session_not_found", "bad_jwt"].contains(code) {

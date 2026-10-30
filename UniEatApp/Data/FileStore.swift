@@ -4,6 +4,7 @@ import UniEatCore
 /// guarda json en archivos del celular, separado por usuario
 /// el detalle va en Caches porque se puede volver a bajar y el sistema lo puede borrar si falta espacio
 /// el borrador va en Application Support porque es trabajo del usuario y no se debe perder
+/// Sendable para poder llevarlo a los Task.detached sin advertencias
 struct FileStore: Sendable {
     enum Folder {case caches, support}
     //carpeta del usuario, se crea la primera vez

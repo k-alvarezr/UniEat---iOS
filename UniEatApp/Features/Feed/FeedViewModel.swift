@@ -9,7 +9,9 @@ final class FeedViewModel: FeatureViewModel {
     @Published private(set) var locationMenus: [DailyMenu] = []
     @Published private(set) var filters = FeedFilters()
     @Published private(set) var fetchedAt = Date.now
+    // hay una carga en camino
     @Published private(set) var isLoading = false
+    // true si lo que se ve es la copia guardada y no la respuesta del server
     @Published private(set) var isShowingCachedFeed = false
     @Published private(set) var hasSnapshot = false
     @Published private(set) var loadError: String?
@@ -23,6 +25,7 @@ final class FeedViewModel: FeatureViewModel {
     private let content: LocalContentService?
     private let memory: FeedMemoryCache
     private var requestID = UUID()
+    // carga en camino, se cancela si cambian los filtros o la cuenta
     private var refreshTask: Task<Void, Never>?
     private var catalogTask: Task<Void, Never>?
     private var catalogAt: Date?
@@ -37,9 +40,11 @@ final class FeedViewModel: FeatureViewModel {
         self.memory = memory ?? FeedMemoryCache()
         super.init(); observe(connectivity); observe(clock)
     }
+    /// menus en el orden del server quitando los vencidos, aunque vengan de la copia
     var visibleMenus: [DailyMenu] { menus.filter { $0.isActive(at: clock.now) } }
     var isOffline: Bool { connectivity.isOffline }
     var isAdmin: Bool { session.isAdmin }
+    /// al cambiar de cuenta se limpia, se cargan los filtros y la copia de ese usuario y se pide el feed
     func accountChanged() {
         refreshTask?.cancel(); catalogTask?.cancel(); catalogTask = nil; catalogAt = nil
         requestID = UUID(); memory.clear()
@@ -48,6 +53,7 @@ final class FeedViewModel: FeatureViewModel {
         filters = LocalValues.load(FeedFilters.self, key: "unieat.filters") ?? FeedFilters()
         refreshTask = Task { await refresh() }
     }
+    /// guarda los filtros nuevos y pide el feed con ellos, cancela la carga anterior
     func updateFilters(_ newFilters: FeedFilters) {
         filters = newFilters
         LocalValues.save(newFilters, key: "unieat.filters")

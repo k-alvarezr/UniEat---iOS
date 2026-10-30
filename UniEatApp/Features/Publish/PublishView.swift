@@ -5,6 +5,7 @@ import UniEatCore
 
 /// pestaña publicar para restaurantes, crear editar y cerrar el menu del dia
 struct PublishView: View {
+    // el formulario ahora vive en PublishViewModel, aca solo se dibuja
     @EnvironmentObject private var model: PublishViewModel
 
     private let areas = ["Centro", "Norte", "Sur", "Fuera del campus"]

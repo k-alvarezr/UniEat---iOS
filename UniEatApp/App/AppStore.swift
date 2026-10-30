@@ -2,9 +2,12 @@ import Combine
 import Foundation
 import UniEatCore
 
+/// pestañas de la app, para poder cambiar de pestaña desde cualquier pantalla
 enum AppTab { case today, second, metrics, profile }
 
-/// Composition root and navigation only. Each feature owns its presentation state.
+/// antes AppStore era el viewmodel de toda la app, ahora solo arma las piezas y maneja la pestaña
+/// crea los servicios y los viewmodels de cada pantalla, les pasa lo que necesitan y los conecta entre si
+/// cada pantalla tiene su propio viewmodel con su estado, aca no queda estado de pantallas
 @MainActor
 final class AppStore: ObservableObject {
     @Published var selectedTab: AppTab = .today
@@ -33,7 +36,10 @@ final class AppStore: ObservableObject {
     private var synchronization: Task<Void, Never>?
     private var imageTask: Task<Void, Never>?
 
+    /// arma toda la app en orden: auth -> api -> sesion -> servicios -> viewmodels -> conexiones entre ellos
     init() {
+        // 1. autenticacion y api, la api pide el token al auth en cada llamada
+        //    sessionIdentity sirve para botar respuestas que llegan despues de cerrar sesion
         let auth = SupabaseAuthService()
         let api = APIClient(configuration: .current, sessionIdentity: { auth.generation }) {
             try await auth.validAccessToken()
@@ -42,6 +48,8 @@ final class AppStore: ObservableObject {
         let connectivity = ConnectivityService()
         let clock = ServerClock()
         let files = FileStore()
+
+        // 2. base local, si no abre no se borra (puede tener reportes del usuario), se sigue sin ella y se avisa
         let database: LocalDatabase?
         do { database = try LocalDatabase(); storageError = nil }
         catch { database = nil; storageError = "No se pudieron cargar los datos guardados. Se conservaron para intentar recuperarlos; los reportes nuevos aún no se pueden guardar." }
@@ -70,6 +78,8 @@ final class AppStore: ObservableObject {
         establishments = EstablishmentViewModel(service: accounts, session: session)
         approvals = AdminApprovalsViewModel(service: accounts, session: session)
         roles = AdminRolesViewModel(service: accounts, session: session)
+
+        // 4. conexiones: que pasa cuando vence la sesion, cambia la cuenta o vuelve la red
         api.onUnauthorized = { [weak session] in session?.signOut(message: "Tu sesión terminó. Inicia sesión de nuevo.") }
         session.onChange = { [weak self] in self?.accountChanged() }
         connectivity.onReconnect = { [weak self] in self?.synchronize() }
@@ -91,9 +101,13 @@ final class AppStore: ObservableObject {
         feed.onServiceAvailable = { [weak events, weak reports] in
             Task { await events?.flush(); await reports?.flushReports() }
         }
+
+        // 5. si habia sesion en el keychain se entra directo
         Task { await session.restore() }
     }
 
+    /// al entrar, salir o cambiar de cuenta se limpia lo de cada pantalla
+    /// para que el siguiente usuario no vea nada del anterior, y se vuelven a cargar sus cosas
     private func accountChanged() {
         imageTask?.cancel()
         synchronization?.cancel(); selectedTab = .today
@@ -105,7 +119,7 @@ final class AppStore: ObservableObject {
         approvals.requests = []; approvals.message = nil; approvals.workingId = nil
         establishments.reset()
         feed.accountChanged()
-        synchronize(refreshFeed: false)
+        synchronize(refreshFeed: false)   // el feed ya lo pide feed.accountChanged, aca solo las colas
     }
 
     private func prefetchImages(_ menus: [DailyMenu]) {
