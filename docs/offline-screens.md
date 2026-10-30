@@ -20,7 +20,7 @@ comprobación entre pantallas. No se presenta un error 500 como una búsqueda va
 | Guardados | Lee relaciones SwiftData por cuenta; abre el menú guardado y permite quitarlo localmente | Conserva fecha y señala vencidos; cambios remotos se verifican en detalle |
 | Detalle | Lee archivo o snapshot inicial; permite guardar, elegir, registrar llegada y preparar reporte | Sin ruta no intenta HTTP; pull-to-refresh y reconexión recargan sin inflar BQ-04 |
 | Reportar y tiempo de fila | Mantiene formulario; el envío guarda en la cola SwiftData antes de confirmar que está pendiente | Reintentos idempotentes por cuenta y hora observada; error visible si el almacenamiento falla |
-| Publicar / editar / cerrar | Formulario y borrador de publicación local; mantiene datos ya cargados | Publicar/cerrar requieren conexión y cuenta verificada; el servidor controla `expectedVersion` |
+| Publicar / editar / cerrar | Formulario y borrador de publicación local; mantiene datos ya cargados y distingue lista ausente de lista vacía | Publicar/cerrar requieren conexión y cuenta verificada; revalida cuenta y lista al reconectar; el servidor controla `expectedVersion` |
 | Perfil | Datos de cuenta y reportes locales; acceso a guardados y cierre de sesión | Cuenta guardada identificada por fecha; actualización verifica rol/membresías con el servidor |
 | Solicitar establecimiento | Mantiene el formulario y pin seleccionado; GPS puede operar sin internet | Geocodificar y enviar requieren red; conserva campos ante fallo; no concede permisos locales |
 | Roles / aprobaciones | Listas ya recibidas permanecen consultables dentro de Perfil | Acciones bloqueadas sin red/cuenta verificada; una lista no descargada no significa cero solicitudes |

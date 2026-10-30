@@ -60,6 +60,9 @@ struct PublishView: View {
         }
         .onAppear(perform: model.selectFirstEstablishment)
         .onChange(of: model.approvedEstablishments.map(\.id)) { _, _ in model.selectFirstEstablishment() }
+        .onChange(of: model.canPublishOnline) { _, available in
+            if available { Task { await model.refresh() } }
+        }
         .onChange(of: model.currentDraft) { _, _ in model.scheduleDraftSave() }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { Task { await model.flushDraft() } }
@@ -151,12 +154,20 @@ struct PublishView: View {
     }
 
     @ViewBuilder private var myMenus: some View {
-        if model.ownMenus.isEmpty {
+        HStack {
+            Text("Mis publicaciones").font(.rounded(21))
+            Spacer()
+            Button(model.isRefreshingOwnMenus ? "Actualizando…" : "Actualizar") { Task { await model.refresh() } }
+                .disabled(!model.canPublishOnline || model.isRefreshingOwnMenus)
+        }
+        if !model.hasLoadedOwnMenus {
+            Text("Aún no hay una lista descargada de tus publicaciones. Puedes trabajar en el borrador y actualizar la lista al recuperar el servicio.")
+                .font(.footnote).foregroundStyle(.secondary)
+        } else if model.ownMenus.isEmpty {
             SurfaceCard {
                 Label("Aún no has publicado un menú del día.", systemImage: "storefront").font(.subheadline)
             }
         } else {
-            Text("Mis publicaciones").font(.rounded(21))
             ForEach(model.ownMenus) { menu in
                 SurfaceCard {
                     VStack(alignment: .leading, spacing: 8) {

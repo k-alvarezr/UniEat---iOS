@@ -130,6 +130,26 @@ final class OfflineScreenTests: XCTestCase {
         XCTAssertTrue(h.api.paths.isEmpty)
     }
 
+    func testOfflinePublicationsDoNotClaimThatAnUnloadedListIsEmpty() async throws {
+        let h = try await roleHarness(role: "restaurant"), clock = ServerClock()
+        let files = FileStore()
+        let events = EventService(api: h.api, session: h.session, connectivity: h.network, clock: clock)
+        let feed = FeedViewModel(api: h.api, session: h.session, connectivity: h.network, clock: clock, events: events)
+        let model = PublishViewModel(service: PublishingService(api: h.api, session: h.session, files: files),
+            feed: feed, session: h.session, connectivity: h.network, clock: clock)
+        h.network.update(isConnected: false)
+        h.api.paths = []
+        await model.refresh()
+        XCTAssertFalse(model.hasLoadedOwnMenus)
+        XCTAssertFalse(model.isRefreshingOwnMenus)
+        XCTAssertTrue(h.api.paths.isEmpty)
+        h.network.update(isConnected: true)
+        await model.refresh()
+        XCTAssertTrue(model.hasLoadedOwnMenus)
+        XCTAssertTrue(model.ownMenus.isEmpty)
+        XCTAssertEqual(h.api.paths, ["menus/mine"])
+    }
+
     func testColdAccountCopyPreservesNavigationButCannotAuthorizeAdminActions() async throws {
         let h = try await roleHarness()
         defer { LocalValues.remove(key: SessionStore.accountCacheKey(h.api.userID)) }
@@ -279,10 +299,11 @@ final class OfflineScreenTests: XCTestCase {
         XCTAssertFalse(model.isLoading)
     }
 
-    private func roleHarness() async throws -> (api: ScreenAPI, session: SessionStore,
+    private func roleHarness(role: String = "admin") async throws -> (api: ScreenAPI, session: SessionStore,
                                                network: ConnectivityService, performance: PerformanceViewModel) {
         let api = ScreenAPI(), auth = FakeAuth()
-        auth.profile = Profile(id: api.userID, displayName: "Fixture", role: "admin")
+        api.role = role
+        auth.profile = Profile(id: api.userID, displayName: "Fixture", role: role)
         let session = SessionStore(auth: auth, api: api)
         try await session.signIn(email: "fixture@example.invalid", password: "fixture")
         let network = ConnectivityService(monitorNetwork: false)
@@ -343,6 +364,7 @@ private final class ScreenAPI: APIRequesting {
         case "admin/dashboard": data = try await dashboard?() ?? dashboardData()
         case "admin/users": data = try await users?() ?? Data("{\"users\":[]}".utf8)
         case "admin/memberships": data = Data("{\"memberships\":[]}".utf8)
+        case "menus/mine": data = Data("{\"menus\":[]}".utf8)
         default: throw APIFailure.unexpected
         }
         return try UniEatDates.decoder().decode(Response.self, from: data)

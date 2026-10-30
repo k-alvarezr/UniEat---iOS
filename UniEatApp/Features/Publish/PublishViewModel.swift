@@ -77,6 +77,8 @@ final class PublishViewModel: FeatureViewModel {
     @Published private(set) var draftSavedAt: Date?
     // menus del restaurante, antes estaban en el AppStore viejo
     @Published private(set) var ownMenus: [DailyMenu] = []
+    @Published private(set) var hasLoadedOwnMenus = false
+    @Published private(set) var isRefreshingOwnMenus = false
     let paymentChoices = ["Nequi", "Daviplata", "Efectivo", "Tarjeta"]
     private let service: PublishingService
     private let feed: FeedViewModel
@@ -164,6 +166,8 @@ final class PublishViewModel: FeatureViewModel {
         draftError = nil
         draftSavedAt = nil
         ownMenus = []
+        hasLoadedOwnMenus = false
+        isRefreshingOwnMenus = false
         selectedEstablishmentID = nil
         restaurantName = ""
         area = "Centro"
@@ -180,12 +184,15 @@ final class PublishViewModel: FeatureViewModel {
     /// pide los menus propios del restaurante
     /// si cambio la sesion mientras tanto se bota la respuesta
     func refresh() async {
-        guard let userID = session.profile?.id else { return }
+        guard canPublishOnline, !isRefreshingOwnMenus, let userID = session.profile?.id else { return }
         let generation = session.generation
+        isRefreshingOwnMenus = true
+        defer { if session.matches(userID, generation: generation) { isRefreshingOwnMenus = false } }
         do {
             let value = try await service.mine()
             guard session.matches(userID, generation: generation) else { return }
             ownMenus = value
+            hasLoadedOwnMenus = true
         } catch is CancellationError { return } catch {
             guard session.matches(userID, generation: generation) else { return }
             message = error.localizedDescription
