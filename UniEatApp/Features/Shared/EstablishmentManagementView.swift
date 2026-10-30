@@ -177,4 +177,3 @@ struct AdminApprovalsView: View {
     }
 
 }
-
