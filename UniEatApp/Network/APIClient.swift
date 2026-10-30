@@ -453,4 +453,17 @@ struct BQ04Metrics: Decodable {
     let closedShown: Int
     let pendingNoticesShown: Int
     let confirmedNoticesShown: Int
+    // campos nuevos del back, opcionales para que un back sin la migracion no rompa el panel
+    var unavailableShown: Int? = nil
+    var distinctMenus: Int? = nil
+    var rates: BQ04Rates? = nil
+}
+
+/// porcentajes de BQ-04 de 0 a 1, el server los manda solo si hay 20 consultas o mas
+struct BQ04Rates: Decodable {
+    let active: Double
+    let expiring: Double
+    let unavailable: Double
+    let pendingNotice: Double
+    let confirmedNotice: Double
 }
