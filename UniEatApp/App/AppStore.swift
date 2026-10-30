@@ -153,7 +153,9 @@ final class AppStore: ObservableObject {
     /// para que el siguiente usuario no vea nada del anterior, y se vuelven a cargar sus cosas
     private func accountChanged() {
         imageTask?.cancel()
-        imageTask = nil; imageRequestID = UUID(); imageURLs = []
+        imageTask = nil
+        imageRequestID = UUID()
+        imageURLs = []
         synchronization?.cancel()
         content?.setSession(userID: session.profile?.id, generation: session.generation)
         files.setSession(userID: session.profile?.id, generation: session.generation)
@@ -179,15 +181,17 @@ final class AppStore: ObservableObject {
     private func prefetchImages(_ menus: [DailyMenu]) {
         guard !connectivity.isOffline else { return }
         let urls = Set(menus.compactMap(\.photoUrl))
-        // Un refresco de los mismos menús no cancela y vuelve a iniciar su lote pendiente.
+        // Un refresco de los mismos menus no cancela y vuelve a iniciar su lote pendiente.
         guard imageTask == nil || urls != imageURLs else { return }
         imageTask?.cancel()
         let id = UUID()
-        imageRequestID = id; imageURLs = urls
+        imageRequestID = id
+        imageURLs = urls
         imageTask = Task(priority: .utility) { [weak self, images] in
             _ = await images.prefetch(menus)
             guard let self, imageRequestID == id else { return }
-            imageTask = nil; imageURLs = []
+            imageTask = nil
+            imageURLs = []
         }
     }
 
@@ -201,7 +205,7 @@ final class AppStore: ObservableObject {
             guard let content else { throw APIFailure(code: "LOCAL_STORAGE_ERROR", message: "No se pudo abrir la base local.") }
             try await content.forget(userID: userID, generation: generation)
         } catch { failed = true }
-        // Se intenta limpiar también los archivos si falló la base, y viceversa.
+        // Se intenta limpiar tambien los archivos si fallo la base, y viceversa.
         do { try await files.removeAll(userId: userID, invalidating: generation) }
         catch { failed = true }
         LocalValues.remove(key: FeedViewModel.cacheKey)

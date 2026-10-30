@@ -20,6 +20,7 @@ final class PerformanceViewModel: FeatureViewModel {
     private let connectivity: ConnectivityService
     // id de la ultima carga, una respuesta vieja no pisa una nueva
     private var requestID = UUID()
+    private var accountCheckedAt: Date?   // cuando se reviso la cuenta por ultima vez
     init(api: APIRequesting, session: SessionStore, events: EventService, connectivity: ConnectivityService) {
         self.api = api
         self.session = session
@@ -35,6 +36,7 @@ final class PerformanceViewModel: FeatureViewModel {
     var isConnected: Bool { connectivity.isConnected }
     /// al cambiar de cuenta se borra todo para que nadie vea metricas de otro
     func reset() {
+        accountCheckedAt = nil
         requestID = UUID()
         adminDashboard = [:]
         restaurantPerformance = [:]
@@ -48,13 +50,21 @@ final class PerformanceViewModel: FeatureViewModel {
         guard let userID = session.profile?.id else { return }
         let expected = session.generation, id = UUID()
         requestID = id
-        // Sin internet se conservan las cifras disponibles y no se inicia un spinner ni una petición.
-        guard connectivity.isConnected else { isLoading = false; return }
+        // Sin internet se conservan las cifras disponibles y no se inicia un spinner ni una peticion.
+        guard connectivity.isConnected else {
+            isLoading = false
+            return
+        }
         isLoading = true
         defer { if requestID == id { isLoading = false } }
         performanceError = nil
         do {
-            try await session.refreshAccount()
+            // el rol se revisa con el server maximo cada 2 minutos, no en cada refresco de 10 s
+            // igual el server rechaza el panel si el rol ya no alcanza
+            if accountCheckedAt.map({ Date.now.timeIntervalSince($0) > 120 }) ?? true {
+                try await session.refreshAccount()
+                accountCheckedAt = .now
+            }
             await events.flush()
             guard session.matches(userID, generation: expected), requestID == id,
                   connectivity.isConnected, !Task.isCancelled else { return }

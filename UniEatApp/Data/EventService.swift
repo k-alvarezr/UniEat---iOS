@@ -2,7 +2,7 @@ import Combine
 import Foundation
 import UniEatCore
 
-/// Diagnóstico local acotado; no son eventos pendientes ni se vuelve a enviar un rechazo permanente.
+/// Diagnostico local acotado; no son eventos pendientes ni se vuelve a enviar un rechazo permanente.
 struct RejectedAnalyticsEvent: Codable {
     let event: RemoteEvent
     let reason: String

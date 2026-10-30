@@ -62,10 +62,10 @@ confirmar. Sus métricas y su endpoint siguen pendientes en las issues iOS #43 y
 - Migración desde `unieat.saved-menus.<usuario>`: deduplica, conserva filas existentes y confirma la transacción
   antes de eliminar la clave anterior. Un fallo conserva el origen e informa el error.
 - `FeedCacheRecord`: snapshots por usuario/filtros y catálogo sin filtros; hasta 24 combinaciones por cuenta
-  más un catálogo. El calentamiento automático no cuenta como búsqueda BQ-03 una vez desplegado el backend
-  de la BQ-08 (antes de eso, el `refresh=auto` del feed sí se cuenta). Cerrar sesión desde Perfil borra estas
-  filas de la cuenta; los `SavedMenu` se conservan. La copia incluye referencia de hora del servidor;
-  el reloj avanza con uptime durante el proceso y restaura una estimación tras relanzar sin red.
+  más un catálogo. El calentamiento automático (`refresh=auto`) no cuenta como búsqueda BQ-03; el backend
+  desplegado lo excluye. Cerrar sesión desde Perfil borra estas
+  filas de la cuenta; los `SavedMenu` se conservan. La copia no guarda referencia de hora: `ServerClock`
+  usa la diferencia con el servidor de la última respuesta.
 - Imágenes públicas: una caché activa de Kingfisher con archivos SHA-256 de URL/procesador, límite de
   disco 50 MiB y vencimiento configurado de siete días. Las versiones anteriores tenían JPEG propios y
   caché Kingfisher por separado: se importan al usarlos, incluso offline, y se retira la copia antigua

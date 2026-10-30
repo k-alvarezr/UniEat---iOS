@@ -120,7 +120,7 @@ final class PublishViewModel: FeatureViewModel {
         }
     }
 
-    /// Al salir de la pantalla o pasar a segundo plano se guarda la última foto sin esperar el debounce.
+    /// Al salir de la pantalla o pasar a segundo plano se guarda la ultima foto sin esperar el debounce.
     func flushDraft() async {
         draftTask?.cancel()
         guard editingMenu == nil, hasDraftContent, !isSaving, let userID = session.profile?.id else { return }

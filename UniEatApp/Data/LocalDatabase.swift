@@ -132,25 +132,6 @@ final class LocalDatabase {
         }
     }
 
-    /// borra lo del usuario al cerrar sesion: reportes (el cascade se los lleva con su snapshot) y copias del feed
-    func deleteAll(userId: UUID) throws {
-        let snapshots = try context.fetch(FetchDescriptor<MenuSnapshot>(predicate: #Predicate { $0.userId == userId }))
-        for snapshot in snapshots {
-            context.delete(snapshot)
-        }
-        // tambien las copias del feed y el catalogo de esa cuenta (#34), los menus guardados se quedan
-        let feeds = try context.fetch(FetchDescriptor<FeedCacheRecord>(predicate: #Predicate { $0.userID == userId }))
-        for feed in feeds {
-            context.delete(feed)
-        }
-        do {
-            try context.save()
-        } catch {
-            context.rollback()
-            throw error
-        }
-    }
-
     /// busca un reporte por id sin cargar toda la cola, solo si es de ese usuario
     /// el dueño se revisa por la relacion con el snapshot, otra cuenta no puede tocarlo
     func report(id: UUID, userId: UUID) throws -> PendingReport? {

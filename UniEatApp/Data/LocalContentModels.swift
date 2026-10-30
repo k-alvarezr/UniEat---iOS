@@ -64,7 +64,6 @@ struct CachedFeedSnapshot: Codable, Sendable {
     let userId: UUID
     let filters: FeedFilters
     let response: FeedResponse
-    var timeReference: ServerTimeReference? = nil
 }
 
 /// copia del feed guardada en swiftdata (#34), una fila por usuario y filtros, o el catalogo completo

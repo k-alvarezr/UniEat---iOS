@@ -87,6 +87,23 @@ Juan conserva la autoría de la base de almacenamiento y de las estrategias de c
 La preparación de Kevin reorganiza esas implementaciones y añade límites, políticas de reintento,
 pruebas y documentación. La funcionalidad pendiente de cada integrante sigue en sus issues originales.
 
+## Cableado de AppStore
+
+`AppStore` conecta las piezas con closures en su `init`. Esta es la lista completa:
+
+| Quién avisa | Closure | Qué hace AppStore |
+|---|---|---|
+| `APIClient` | `onUnauthorized` | Cierra la sesión sin borrar datos (vencida) |
+| `APIClient` | `onServiceAvailability` | Marca el servicio disponible o caído en `ConnectivityService` |
+| `SessionStore` | `onChange` | `accountChanged()`: cada pieza limpia lo suyo y se abre la `SessionGate` nueva |
+| `SessionStore` | `onForget` | `forget()`: borra reportes, copias, archivos y eventos de la cuenta |
+| `ConnectivityService` | `onReconnect` | `synchronize()`: eventos, reportes y feed, en ese orden |
+| `FeedViewModel` | `onMenusLoaded` | Precarga las fotos del feed |
+| `FeedViewModel` | `onServiceAvailable` | Envía las colas cuando el servidor vuelve |
+| `FeedViewModel` | `prepareContext` | Pide la variante del piloto BQ-08 antes del feed |
+| `EventService` | `metadataProvider` | Agrega la variante del piloto a cada evento |
+| `WaitIndicatorPilot` | `onParticipationChanged` | Sesión de eventos nueva y feed forzado |
+
 ## Concurrencia preservada y límites
 
 - `SessionStore.refreshAccount` usa `async let` para pedir cuenta y establecimientos en paralelo.
@@ -118,12 +135,11 @@ o la respuesta, su resultado se cancela. Al cerrar sesión se cancela la renovac
 impedir que escriba otra vez en Keychain. Las respuestas de feed comprueban también identificador
 de solicitud, usuario y filtros: una solicitud vieja con filtros idénticos tampoco pisa la última.
 
-`ServerClock` conserva una referencia del servidor y avanza con `systemUptime` durante el proceso:
-cambiar manualmente la hora del teléfono no cambia vigencia, evidencia de fila ni hora de observación.
-Las copias de feed/detalle guardan una referencia para el relanzamiento offline. En esa apertura la
-estimación del tiempo transcurrido depende del reloj local; se identifica la copia y se resincroniza
-al recibir red. Una referencia guardada nunca reemplaza una hora en vivo. Se mantiene la mejora de Juan:
-el reloj no publica cambios ni provoca redibujos de toda la aplicación.
+`ServerClock` guarda la diferencia entre la hora del servidor y la del teléfono en cada respuesta, y la
+hora de la app es la del teléfono más esa diferencia. Un teléfono con la hora mal puesta no altera la
+vigencia, la evidencia de fila ni la hora de observación. Sin respuesta del servidor en esta apertura se
+usa la hora del teléfono; la UI identifica los datos como copia y se corrige con la siguiente respuesta.
+Las copias no guardan referencia de hora. El reloj no publica cambios ni provoca redibujos.
 
 Los reportes se guardan antes de enviarse. Su UUID es estable y se envía como `clientReportId`;
 `observedAt` conserva la observación original. Solo una respuesta aceptada permite borrar la fila.
@@ -139,9 +155,10 @@ no se borra nada, para que su dueño retome los pendientes al volver a entrar.
 
 El cierre captura usuario/generación antes de esperar el envío y vuelve a comprobarlos después.
 La sesión se invalida antes de limpiar y el siguiente login espera a que termine esa limpieza.
-`LocalContentStore` ordena en una transacción la purga de reportes/copias; un permiso revocado impide
-que una escritura antigua vuelva a crear el feed. `FileStore` es un actor de I/O con invalidación de
-sesiones y orden de revisiones de borradores. Los fallos de limpieza se informan; no se borra la base
+`LocalContentStore` ordena en una transacción la purga de reportes/copias. `FileStore` es un actor de I/O
+con orden de revisiones de borradores. Los dos usan la misma `SessionGate`: guarda la generación vigente de
+cada usuario con un lock y rechaza escrituras de una generación cerrada, así una tarea tardía no vuelve a
+crear copias o archivos borrados. Los fallos de limpieza se informan; no se borra la base
 completa ni se eliminan los guardados para ocultar un error.
 
 El borrador nuevo se autoguarda con debounce de 400 ms y al salir/pasar a segundo plano. Los cambios

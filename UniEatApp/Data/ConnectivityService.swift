@@ -45,8 +45,8 @@ final class ConnectivityService: ObservableObject {
         guard serverUnreachable == available else { return }
         serverUnreachable = !available
     }
-    /// Una comprobación pública y sin credenciales permite recuperarse incluso desde login.
-    /// Se comparte una sola comprobación entre todas las pantallas.
+    /// Una comprobacion publica y sin credenciales permite recuperarse incluso desde login.
+    /// Se comparte una sola comprobacion entre todas las pantallas.
     func retry() async {
         guard isConnected, !isChecking, let checkService else { return }
         isChecking = true

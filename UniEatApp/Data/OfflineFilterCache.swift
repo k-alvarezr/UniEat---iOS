@@ -13,7 +13,10 @@ final class OfflineFilterCache {
         weak var previous: Node?
         var next: Node?
         init(key: String, menus: [DailyMenu], insertedAt: Date, expiresAt: Date) {
-            self.key = key; self.menus = menus; self.insertedAt = insertedAt; self.expiresAt = expiresAt
+            self.key = key
+            self.menus = menus
+            self.insertedAt = insertedAt
+            self.expiresAt = expiresAt
         }
     }
     private var entries: [String: Node] = [:]
@@ -24,7 +27,7 @@ final class OfflineFilterCache {
     let maximumEntryBytes = 1024 * 1024
     init(capacity: Int = 4) { self.capacity = max(1, capacity) }
 
-    /// Diccionario + lista doble: búsqueda, promoción y retirada de una entrada en O(1).
+    /// Diccionario + lista doble: busqueda, promocion y retirada de una entrada en O(1).
     func value(userID: UUID, filters: FeedFilters, at now: Date) -> [DailyMenu]? {
         let key = FeedCacheKey.make(userID: userID, filters: filters)
         guard let node = entries[key] else { return nil }
@@ -38,7 +41,7 @@ final class OfflineFilterCache {
     }
 
     /// El coste de codificar el valor es O(n); la estructura LRU no recorre las entradas.
-    /// Caduca antes de cualquier cambio temporal de elegibilidad, además del TTL.
+    /// Caduca antes de cualquier cambio temporal de elegibilidad, ademas del TTL.
     func insert(_ menus: [DailyMenu], source: [DailyMenu], userID: UUID, filters: FeedFilters, at now: Date) {
         let key = FeedCacheKey.make(userID: userID, filters: filters)
         if let previous = entries[key] { remove(previous) }
@@ -52,7 +55,7 @@ final class OfflineFilterCache {
             }
             for change in changes where change >= now { expiry = min(expiry, change) }
         }
-        // Un límite inclusivo (p. ej. evidencia de fila exactamente a los 30 min) se recalcula.
+        // Un limite inclusivo (p. ej. evidencia de fila exactamente a los 30 min) se recalcula.
         guard expiry > now else { return }
         let node = Node(key: key, menus: menus, insertedAt: now, expiresAt: expiry)
         entries[key] = node
@@ -60,7 +63,7 @@ final class OfflineFilterCache {
         if entries.count > capacity, let oldest { remove(oldest) }
     }
 
-    /// El propietario invalida al cambiar de usuario, catálogo o publicación.
+    /// El propietario invalida al cambiar de usuario, catalogo o publicacion.
     func clear() {
         entries.removeAll()
         newest = nil

@@ -4,19 +4,6 @@ import UniEatCore
 
 @MainActor
 final class SessionBoundaryTests: XCTestCase {
-    func testColdCopyRestoresAnEstimateButCannotReplaceALiveClock() {
-        var wall = Date(timeIntervalSince1970: 2000)
-        var uptime: TimeInterval = 10
-        let clock = ServerClock(uptime: { uptime }, wallTime: { wall })
-        clock.restore(ServerTimeReference(serverNow: Date(timeIntervalSince1970: 1000), receivedAt: wall.addingTimeInterval(-120)))
-        XCTAssertEqual(clock.now.timeIntervalSince1970, 1120, accuracy: 0.001)
-        uptime += 30; wall = wall.addingTimeInterval(86_400)
-        XCTAssertEqual(clock.now.timeIntervalSince1970, 1150, accuracy: 0.001)
-        clock.synchronize(Date(timeIntervalSince1970: 5000))
-        clock.restore(ServerTimeReference(serverNow: .distantPast, receivedAt: wall))
-        XCTAssertEqual(clock.now.timeIntervalSince1970, 5000, accuracy: 0.001)
-    }
-
     func testOldSignOutCannotForgetTheAccountThatSignedInDuringAFlush() async throws {
         let h = try await Harness.make(), oldUser = h.auth.profile.id
         h.connectivity.update(isConnected: false)
@@ -72,7 +59,7 @@ final class SessionBoundaryTests: XCTestCase {
         let content = LocalContentService(container: h.database.container)
         content.setSession(userID: owner, generation: generation)
         let snapshot = CachedFeedSnapshot(userId: owner, filters: FeedFilters(),
-            response: FeedResponse(fetchedAt: .now, menus: [h.menu]), timeReference: h.clock.snapshot())
+            response: FeedResponse(fetchedAt: .now, menus: [h.menu]))
         try await content.saveFeed(snapshot, generation: generation)
         _ = try await content.toggle(h.menu, userID: owner, savedAt: .now)
         try h.database.enqueueReport(userId: owner, menu: h.menu, kind: "price", note: "", waitMinutes: nil)

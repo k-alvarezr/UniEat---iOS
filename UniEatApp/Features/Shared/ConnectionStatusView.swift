@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Un aviso compartido con instrucciones propias de la vista. No sustituye su estrategia offline:
-/// cada pantalla conserva su navegación, copias, formularios o cola de envíos.
+/// cada pantalla conserva su navegacion, copias, formularios o cola de envios.
 enum ConnectionContext {
     case authentication, today, filters, recommendation, saved, detail, reporting, waitTime
     case publishing, profile, administration, performance, gallery
