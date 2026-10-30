@@ -27,12 +27,21 @@ private struct StoredSession: Codable {
 }
 
 @MainActor
-final class SupabaseAuthService {
+protocol SessionAuthenticating {
+    func signIn(email: String, password: String) async throws -> Profile
+    func signUp(email: String, password: String, name: String) async throws -> Profile?
+    func restore() async -> Profile?
+    func signOut()
+}
+
+@MainActor
+final class SupabaseAuthService: SessionAuthenticating {
     private(set) var generation = UUID()
     private let config = AppConfiguration.current
     private let keychainService = "co.edu.uniandes.unieat.auth"
 
     func signIn(email: String, password: String) async throws -> Profile {
+        generation = UUID(); renewing?.cancel(); renewing = nil; renewalID = nil
         let expected = generation
         let data = try await request(path: "auth/v1/token", query: "grant_type=password",
                                      body: ["email": email, "password": password])
@@ -43,6 +52,7 @@ final class SupabaseAuthService {
     }
 
     func signUp(email: String, password: String, name: String) async throws -> Profile? {
+        generation = UUID(); renewing?.cancel(); renewing = nil; renewalID = nil
         let expected = generation
         if let error = RegistrationRules.nameError(name) ?? RegistrationRules.passwordError(password) {
             throw AuthFailure.service(error)
@@ -91,10 +101,12 @@ final class SupabaseAuthService {
 
     // si ya se esta renovando, las demas llamadas esperan esa misma renovacion
     private var renewing: Task<StoredSession, Error>?
+    private var renewalID: UUID?
 
     private func refresh(_ cached: StoredSession) async throws -> StoredSession {
         if let renewing { return try await renewing.value }
         let expected = generation
+        let id = UUID()
         let task = Task {
             let response = try await request(path: "auth/v1/token", query: "grant_type=refresh_token",
                                              body: ["refresh_token": cached.refreshToken])
@@ -105,7 +117,8 @@ final class SupabaseAuthService {
             return renewed
         }
         renewing = task
-        defer { renewing = nil }
+        renewalID = id
+        defer { if renewalID == id { renewing = nil; renewalID = nil } }
         return try await task.value
     }
 
@@ -113,6 +126,7 @@ final class SupabaseAuthService {
         generation = UUID()
         renewing?.cancel()
         renewing = nil
+        renewalID = nil
         let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
                                     kSecAttrService as String: keychainService]
         SecItemDelete(query as CFDictionary)

@@ -116,9 +116,9 @@ struct EstablishmentManagementView: View {
                     }
                     .onTapGesture { point in
                         guard let tapped = proxy.convert(point, from: .local) else { return }
-                        self.pin = tapped
-                        pinFromAddress = false
-                        pinMessage = "Pin movido manualmente."
+                        model.pin = tapped
+                        model.pinFromAddress = false
+                        model.pinMessage = "Pin movido manualmente."
                     }
                 }
                 .frame(height: 180)
@@ -129,7 +129,7 @@ struct EstablishmentManagementView: View {
             if let text = model.pinMessage ?? location.message {
                 Text(text).font(.footnote).foregroundStyle(.secondary)
             }
-            Text("Los estudiantes usan este model.pin para ver el mapa, abrir indicaciones y sugerir su zona.")
+            Text("Los estudiantes usan este pin para ver el mapa, abrir indicaciones y sugerir su zona.")
                 .font(.footnote).foregroundStyle(.secondary)
         }
         .onReceive(location.$location) { position in
@@ -150,6 +150,10 @@ struct EstablishmentManagementView: View {
 
 
 
+}
+
+private extension String {
+    var trimmed: String { trimmingCharacters(in: .whitespacesAndNewlines) }
 }
 
 /// admin aprueba los locales, al aprobar el usuario pasa a restaurante

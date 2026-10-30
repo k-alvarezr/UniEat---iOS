@@ -26,6 +26,11 @@ final class EstablishmentViewModel: FeatureViewModel {
     }
     var memberships: [RemoteMembership] { session.memberships }
     var isRestaurant: Bool { session.isRestaurant }
+    func reset() {
+        showingForm = false; name = ""; area = "Centro"; address = ""; entranceDescription = ""
+        photoURL = ""; paymentMethods = ["Efectivo"]; isWorking = false; message = nil
+        pin = nil; pinFromAddress = false; pinMessage = nil; isGeocoding = false; mapPosition = .automatic
+    }
     let methods = ["Nequi", "Daviplata", "Efectivo", "Tarjeta"]
     var canSubmit: Bool {
         !isWorking && !name.trimmed.isEmpty &&

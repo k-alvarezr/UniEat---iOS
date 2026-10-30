@@ -33,8 +33,8 @@ struct DishDraft: Identifiable {
     }
 }
 /// lo que se guarda del formulario en un archivo para no perderlo si se cierra la app o se va la red
-struct PublishDraft: Codable {
-    struct Dish: Codable {
+struct PublishDraft: Codable, Sendable, Equatable {
+    struct Dish: Codable, Sendable, Equatable {
         var name: String
         var detail: String
         var priceText: String
@@ -84,7 +84,11 @@ final class PublishViewModel: FeatureViewModel {
     var approvedEstablishments: [RemoteEstablishment] { session.approvedEstablishments }
     var isOffline: Bool { connectivity.isOffline }
     func saveDraft(_ draft: PublishDraft) { service.saveDraft(draft) }
-    func loadDraft() -> PublishDraft? { service.loadDraft() }
+    func restoreDraft() async {
+        guard editingMenu == nil else { return }
+        let expected = currentDraft
+        if let draft = await service.loadDraft(), editingMenu == nil, currentDraft == expected { restore(draft) }
+    }
     func reset() {
         ownMenus = []; selectedEstablishmentID = nil; restaurantName = ""; area = "Centro"
         address = ""; entranceDescription = ""; title = "Almuerzo completo"

@@ -2,6 +2,7 @@ import SwiftUI
 import UniEatCore
 
 /// borrador de un plato del formulario
+
 /// pestaña publicar para restaurantes, crear editar y cerrar el menu del dia
 struct PublishView: View {
     @EnvironmentObject private var model: PublishViewModel
@@ -44,11 +45,11 @@ struct PublishView: View {
             .padding(16)
         }
         .background(Palette.cream)
-        .task { await model.refresh() }
+        .task { await model.restoreDraft(); model.selectFirstEstablishment(); await model.refresh() }
         .onAppear(perform: model.selectFirstEstablishment)
         .onChange(of: model.approvedEstablishments.map(\.id)) { _, _ in model.selectFirstEstablishment() }
-        .onAppear { if model.editingMenu == nil, let draft = model.loadDraft() { model.restore(draft) } }
         .onDisappear { if model.editingMenu == nil && model.hasDraftContent { model.saveDraft(model.currentDraft) } }
+
     }
 
     // MARK: - partes del formulario
@@ -152,6 +153,7 @@ struct PublishView: View {
                             }
                             if menu.isActive() {
                                 Button("Cerrar publicación", role: .destructive) { Task { await model.close(menu) } }
+                                    .disabled(model.isOffline || model.isSaving)
                                     .buttonStyle(.bordered)
                             }
                         }

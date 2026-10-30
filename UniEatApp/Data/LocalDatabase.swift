@@ -112,6 +112,12 @@ final class LocalDatabase {
         do { try context.save() } catch { context.rollback(); throw error }
     }
 
+    /// borra por id, para cuando el reporte se mando desde otro hilo y solo se tiene su id
+    func remove(id:UUID) throws {
+        let found = try context.fetch(FetchDescriptor<PendingReport>(predicate: #Predicate { $0.id == id }))
+        if let report = found.first { try remove(report) }
+    }
+    
     /// al cerrar sesion se borra todo lo del usuario, el cascade se lleva los reportes
     func deleteAll(userId: UUID) {
         let snapshots = (try? context.fetch(FetchDescriptor<MenuSnapshot>(predicate: #Predicate { $0.userId == userId }))) ?? []

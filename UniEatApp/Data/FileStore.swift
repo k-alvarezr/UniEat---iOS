@@ -4,7 +4,7 @@ import UniEatCore
 /// guarda json en archivos del celular, separado por usuario
 /// el detalle va en Caches porque se puede volver a bajar y el sistema lo puede borrar si falta espacio
 /// el borrador va en Application Support porque es trabajo del usuario y no se debe perder
-struct FileStore {
+struct FileStore: Sendable {
     enum Folder {case caches, support}
     //carpeta del usuario, se crea la primera vez
     private func directory(_ folder: Folder, userId: UUID) -> URL {

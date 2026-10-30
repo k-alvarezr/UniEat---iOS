@@ -39,15 +39,20 @@ final class MenuDetailViewModel: FeatureViewModel {
         let expected = session.generation, id = UUID()
         requestID = id; isLoading = true
         defer { if requestID == id { isLoading = false } }
+        // Juan's PR #41: show the local result while the concurrent request is in flight.
+        async let cached = service.cached(initialMenu)
+        async let fresh = service.load(initialMenu, automatic: automatic)
+        if let copy = await cached, session.matches(userID, generation: expected), requestID == id, detail == nil {
+            detail = copy
+        }
         do {
-            let value = try await service.load(initialMenu, automatic: automatic)
+            let value = try await fresh
             guard session.matches(userID, generation: expected), requestID == id else { return }
             detail = value; loadError = nil
         } catch is CancellationError { }
         catch {
             guard session.matches(userID, generation: expected), requestID == id else { return }
             loadError = (error as? APIFailure) ?? .unexpected
-            if loadError?.code == "OFFLINE", detail == nil { detail = service.cached(initialMenu) }
         }
     }
     func track(_ kind: String, menu: DailyMenu) { events.track(kind, menu: menu) }

@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import UniEatCore
 
@@ -11,9 +12,9 @@ final class SessionStore: ObservableObject {
     @Published var authMessage: String?
     private(set) var generation = UUID()
     var onChange: (() -> Void)?
-    private let auth: SupabaseAuthService
+    private let auth: SessionAuthenticating
     private let api: APIRequesting
-    init(auth: SupabaseAuthService, api: APIRequesting) { self.auth = auth; self.api = api }
+    init(auth: SessionAuthenticating, api: APIRequesting) { self.auth = auth; self.api = api }
     var isRestaurant: Bool { profile?.role == "restaurant" }
     var isAdmin: Bool { profile?.role == "admin" }
     var approvedEstablishments: [RemoteEstablishment] { establishments.filter(\.approved) }
@@ -53,9 +54,12 @@ final class SessionStore: ObservableObject {
     func refreshAccount() async throws {
         guard let userID = profile?.id else { return }
         let expected = generation
-        let me: MeResponse = try await api.get("me", query: [])
-        let mine: EstablishmentsResponse = try await api.get("establishments/mine", query: [])
+        // Preserve Juan's PR #41: the two independent reads execute concurrently.
+        async let account: MeResponse = try api.get("me", query: [])
+        async let establishments: EstablishmentsResponse = try api.get("establishments/mine", query: [])
+        let (me, mine) = try await (account, establishments)
         guard matches(userID, generation: expected) else { throw CancellationError() }
+        guard me.id == userID else { signOut(); throw AuthFailure.expired }
         profile = me.profile; memberships = me.establishments; establishments = mine.establishments
         accountError = nil
     }

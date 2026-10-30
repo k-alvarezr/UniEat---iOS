@@ -330,10 +330,10 @@ private struct MenuDetailScreen: View {
         let minutes = max(1, Int((meters / 80).rounded(.up)))
         if meters < 1_000 {
             let rounded = Int((meters / 50).rounded()) * 50
-            return "A unos \(max(50, rounded)) m de ti, ~\(minutes) min caminando"
+            return "A unos \(max(50, rounded)) m en línea recta; caminata orientativa de ~\(minutes) min"
         }
         let km = (meters / 100).rounded() / 10
-        return "A unos \(km) km de ti, ~\(minutes) min caminando"
+        return "A unos \(km) km en línea recta; caminata orientativa de ~\(minutes) min"
     }
 
     // MARK: - cargar
@@ -350,6 +350,7 @@ private struct MenuDetailScreen: View {
     }
 
     private func load(automatic: Bool = false) async { await store.load(automatic: automatic) }
+
 
     /// recarga antes de abrir la hoja para que el reporte quede con la version actual
     /// y si cerraron el menu mientras tanto no se abre

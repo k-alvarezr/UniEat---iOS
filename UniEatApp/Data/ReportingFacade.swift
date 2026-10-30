@@ -3,7 +3,7 @@ import Foundation
 import UniEatCore
 
 /// A value snapshot keeps SwiftData objects out of in-flight network operations.
-struct QueuedReport: Identifiable {
+struct QueuedReport: Identifiable, Sendable {
     let id: UUID
     let body: ReportBody
 }
@@ -84,39 +84,75 @@ final class ReportingFacade: FeatureViewModel {
         isFlushing = true
         defer { isFlushing = false; updateCount() }
         do {
-            for report in try outbox.pending(userID: userID) {
-                guard session.matches(userID, generation: expected), !connectivity.isOffline else { return }
-                if failures[report.id.uuidString] != nil { continue }
-                if try await deliver(report, userID: userID) == nil { return }
+            var waiting = try outbox.pending(userID: userID)
+                .filter { failures[$0.id.uuidString] == nil }.makeIterator()
+            let api = api
+            // Preserve Juan's TaskGroup design, with four in-flight requests to bound resource use.
+            await withTaskGroup(of: (UUID, DeliveryOutcome).self) { group in
+                for _ in 0..<4 {
+                    if let report = waiting.next() {
+                        group.addTask(priority: .utility) { (report.id, await Self.send(report, api: api)) }
+                    }
+                }
+                var canSchedule = true
+                for await (id, outcome) in group {
+                    guard session.matches(userID, generation: expected), !Task.isCancelled else {
+                        group.cancelAll(); return
+                    }
+                    do { try apply(outcome, id: id, userID: userID) }
+                    catch { syncMessage = "El reporte sigue guardado: \(error.localizedDescription)"; canSchedule = false }
+                    if case .retry = outcome { canSchedule = false }
+                    if case .cancelled = outcome { group.cancelAll(); return }
+                    if canSchedule, let report = waiting.next() {
+                        group.addTask(priority: .utility) { (report.id, await Self.send(report, api: api)) }
+                    }
+                }
             }
         } catch is CancellationError { }
         catch { syncMessage = "El reporte sigue guardado: \(error.localizedDescription)" }
     }
+    private enum DeliveryOutcome: Sendable {
+        case sent(String), retry, rejected(String), cancelled
+    }
+    nonisolated private static func send(_ report: QueuedReport, api: APIRequesting) async -> DeliveryOutcome {
+        do {
+            try Task.checkCancellation()
+            let response: ReportResponse = try await api.send("POST", "reports", body: report.body)
+            return .sent(response.status)
+        } catch is CancellationError { return .cancelled }
+        catch {
+            if ["VALIDATION_ERROR", "FORBIDDEN", "NOT_FOUND", "VERSION_CONFLICT", "GONE"].contains((error as? APIFailure)?.code ?? "") {
+                return .rejected(error.localizedDescription)
+            }
+            return .retry
+        }
+    }
+    private func apply(_ outcome: DeliveryOutcome, id: UUID, userID: UUID) throws {
+        switch outcome {
+        case .sent:
+            try outbox?.acknowledge(id: id, userID: userID)
+            failures.removeValue(forKey: id.uuidString)
+            syncMessage = nil
+        case .rejected(let reason):
+            failures[id.uuidString] = reason
+            syncMessage = "Un reporte requiere revisión y sigue guardado: \(reason)"
+        case .retry:
+            syncMessage = "El reporte sigue guardado. Se reintentará al recuperar el servicio."
+        case .cancelled: return
+        }
+        LocalValues.save(failures, key: failureKey)
+    }
     private func deliver(_ report: QueuedReport, userID: UUID) async throws -> String? {
         let expected = session.generation
-        do {
-            let response: ReportResponse = try await api.send("POST", "reports", body: report.body)
-            guard session.matches(userID, generation: expected) else { throw CancellationError() }
-            // Only a successful acknowledgement permits deleting the durable pending row.
-            try outbox?.acknowledge(id: report.id, userID: userID)
-            failures.removeValue(forKey: report.id.uuidString)
-            LocalValues.save(failures, key: failureKey)
-            syncMessage = nil; updateCount()
-            return response.status
-        } catch is CancellationError { throw CancellationError() }
-        catch {
-            guard session.matches(userID, generation: expected) else { throw CancellationError() }
-            let failure = error as? APIFailure
-            let permanent = ["VALIDATION_ERROR", "FORBIDDEN", "NOT_FOUND", "VERSION_CONFLICT", "GONE"]
-            if permanent.contains(failure?.code ?? "") {
-                failures[report.id.uuidString] = error.localizedDescription
-                LocalValues.save(failures, key: failureKey)
-                syncMessage = "Un reporte requiere revisión y sigue guardado: \(error.localizedDescription)"
-            } else {
-                syncMessage = "El reporte sigue guardado. Se reintentará al recuperar el servicio."
-            }
-            updateCount()
-            return nil
+        let outcome = await Self.send(report, api: api)
+        guard session.matches(userID, generation: expected) else { throw CancellationError() }
+        try apply(outcome, id: report.id, userID: userID)
+        updateCount()
+        switch outcome {
+        case .sent(let status): return status
+        case .rejected: return "needs_review"
+        case .retry: return nil
+        case .cancelled: throw CancellationError()
         }
     }
 }

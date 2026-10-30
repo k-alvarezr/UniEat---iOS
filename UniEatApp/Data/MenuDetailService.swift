@@ -19,10 +19,18 @@ final class MenuDetailService {
         guard session.matches(userID, generation: expected) else { throw CancellationError() }
         clock.synchronize(detail.serverNow)
         files.save(detail, name: "detail-\(menu.id.uuidString)", folder: .caches, userId: userID)
+        files.save(clock.snapshot(), name: "detail-clock-\(menu.id.uuidString)", folder: .caches, userId: userID)
         return detail
     }
-    func cached(_ menu: DailyMenu) -> MenuDetail? {
+    func cached(_ menu: DailyMenu) async -> MenuDetail? {
         guard let userID = session.profile?.id else { return nil }
-        return files.load(MenuDetail.self, name: "detail-\(menu.id.uuidString)", folder: .caches, userId: userID)
+        let expected = session.generation, files = files, id = menu.id
+        let (detail, reference) = await Task.detached(priority: .utility) {
+            (files.load(MenuDetail.self, name: "detail-\(id.uuidString)", folder: .caches, userId: userID),
+             files.load(ServerTimeReference.self, name: "detail-clock-\(id.uuidString)", folder: .caches, userId: userID))
+        }.value
+        guard session.matches(userID, generation: expected), !Task.isCancelled else { return nil }
+        if let reference { clock.restore(reference) }
+        return detail
     }
 }

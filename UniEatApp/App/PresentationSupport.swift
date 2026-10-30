@@ -24,7 +24,7 @@ enum LocalValues {
 }
 
 /// Persisted with a cached response. Within one process elapsed time uses uptime.
-struct ServerTimeReference: Codable {
+struct ServerTimeReference: Codable, Sendable {
     let serverNow: Date
     let receivedAt: Date
 }

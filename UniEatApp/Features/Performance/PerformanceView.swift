@@ -88,7 +88,7 @@ private extension View {
 private struct PeriodPicker: View {
     @Binding var days: Int
     var body: some View {
-        Picker("Período", selection: $store.days) {
+        Picker("Período", selection: $days) {
             Text("Últimos 7 días").tag(7)
             Text("28 días").tag(28)
         }

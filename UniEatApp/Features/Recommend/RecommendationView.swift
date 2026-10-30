@@ -17,6 +17,7 @@ struct RecommendationView: View {
                 Text("Las opciones se ordenan según tus filtros y la información disponible.")
                     .font(.subheadline)
                 filtersSummary
+                if store.isShowingCachedFeed { OfflineNotice(fetchedAt: store.fetchedAt) }
                 if options.isEmpty {
                     EmptyFeedView()
                 } else {

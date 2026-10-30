@@ -16,10 +16,10 @@ struct TodayFeedContent: View {
         // se redibuja cada minuto para que por vencer y vencido cambien solos
         TimelineView(.periodic(from: .now, by: 60)) { timeline in
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                LazyVStack(alignment: .leading, spacing: 16) {
                     BrandHeader(title: "UniEat · Hoy")
                     header(date: timeline.date)
-                    if store.isOffline {
+                    if store.isOffline || store.isShowingCachedFeed {
                         NavigationLink(destination: OfflineFeedView()) {
                             OfflineNotice(fetchedAt: store.fetchedAt)
                         }
@@ -27,7 +27,20 @@ struct TodayFeedContent: View {
                     }
                     recommendationShortcut
                     sectionTitle
-                    if store.visibleMenus.isEmpty {
+                    if let error = store.loadError {
+                        SurfaceCard {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(error).font(.footnote)
+                                Button("Reintentar actualización") { Task { await store.refresh() } }
+                            }
+                        }
+                    }
+                    if store.isLoading && store.visibleMenus.isEmpty {
+                        ProgressView("Cargando menús…")
+                    } else if store.visibleMenus.isEmpty && store.loadError != nil {
+                        ContentUnavailableView("No se pudo actualizar el feed", systemImage: "arrow.clockwise",
+                            description: Text("Reintenta cuando el servicio esté disponible."))
+                    } else if store.visibleMenus.isEmpty {
                         EmptyFeedView()
                     } else {
                         ForEach(store.visibleMenus) { menu in
@@ -44,6 +57,7 @@ struct TodayFeedContent: View {
         }
         .background(Palette.cream)
         .navigationBarHidden(hidesNavigationBar)
+        .refreshable { await store.refresh() }
     }
 
     private func header(date: Date) -> some View {
@@ -186,7 +200,7 @@ struct OfflineNotice: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "wifi.slash").font(.title3)
             VStack(alignment: .leading, spacing: 3) {
-                Text("Sin conexión · vista guardada").fontWeight(.heavy)
+                Text("Vista guardada · puede haber cambios").fontWeight(.heavy)
                 Text("Última carga: \(SpanishPresentation.dateAndTime(fetchedAt)); los menús vencidos se ocultan.")
                     .font(.caption)
             }

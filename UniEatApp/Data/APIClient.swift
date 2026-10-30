@@ -26,7 +26,7 @@ struct APIFailure: LocalizedError, Decodable {
 struct NoBody: Codable {}
 
 @MainActor
-protocol APIRequesting {
+protocol APIRequesting: AnyObject, Sendable {
     func get<Response: Decodable>(_ path: String, query: [URLQueryItem]) async throws -> Response
     func send<Response: Decodable, Body: Encodable>(_ method: String, _ path: String,
         query: [URLQueryItem], body: Body?) async throws -> Response
@@ -140,6 +140,7 @@ final class APIClient: APIRequesting {
 struct FeedResponse: Codable {
     let fetchedAt: Date
     let menus: [DailyMenu]
+    var serverNow: Date? = nil
 }
 
 /// Convierte los filtros en parametros de la URL y omite los vacios
@@ -187,7 +188,7 @@ struct CloseResponse: Decodable { let closedAt: Date }
 // MARK: - reportes
 
 /// lo que se manda al reportar un cambio, va con la version que vio el estudiante
-struct ReportBody: Encodable {
+struct ReportBody: Encodable, Sendable {
     let publicationId: UUID
     let version: Int
     let kind: String
@@ -198,7 +199,7 @@ struct ReportBody: Encodable {
 }
 
 /// respuesta al reportar, el estado en que quedo pending confirmed u observation
-struct ReportResponse: Decodable { let status: String }
+struct ReportResponse: Decodable, Sendable { let status: String }
 
 private extension UUID {
     static let zero = UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))

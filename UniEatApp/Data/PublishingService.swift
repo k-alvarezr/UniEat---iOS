@@ -24,9 +24,14 @@ final class PublishingService {
         guard let id = session.profile?.id else { return }
         files.save(draft, name: "publish-draft", folder: .support, userId: id)
     }
-    func loadDraft() -> PublishDraft? {
+    func loadDraft() async -> PublishDraft? {
         guard let id = session.profile?.id else { return nil }
-        return files.load(PublishDraft.self, name: "publish-draft", folder: .support, userId: id)
+        let expected = session.generation, files = files
+        let draft = await Task.detached(priority: .utility) {
+            files.load(PublishDraft.self, name: "publish-draft", folder: .support, userId: id)
+        }.value
+        guard session.matches(id, generation: expected), !Task.isCancelled else { return nil }
+        return draft
     }
     func clearDraft() {
         guard let id = session.profile?.id else { return }
