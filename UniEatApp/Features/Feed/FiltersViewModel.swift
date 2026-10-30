@@ -13,7 +13,9 @@ final class FiltersViewModel: FeatureViewModel {
     private let feed: FeedViewModel
     init(feed: FeedViewModel) { self.feed = feed; super.init(); observe(feed) }
     var filters: FeedFilters { feed.filters }
-    /// al abrir la pantalla el borrador arranca con los filtros aplicados
+    var usesCachedCatalog: Bool { feed.isOffline || feed.isShowingCachedFeed }
+    var hasSnapshot: Bool { feed.hasSnapshot }
+    var fetchedAt: Date { feed.fetchedAt }
     func reset() { draft = feed.filters; locationMessage = nil }
     /// aplica el borrador, el feed los guarda y vuelve a pedir
     func apply() { feed.updateFilters(draft) }
@@ -22,7 +24,7 @@ final class FiltersViewModel: FeatureViewModel {
     func suggest(_ position: CLLocation?) {
         guard let position else { return }
         if let suggestion = LocationAreaResolver.suggest(latitude: position.coordinate.latitude,
-            longitude: position.coordinate.longitude, menus: feed.menus) {
+            longitude: position.coordinate.longitude, menus: feed.locationMenus.isEmpty ? feed.menus : feed.locationMenus) {
             draft.area = suggestion.area
             locationMessage = "Zona sugerida: \(suggestion.area), cerca de \(suggestion.establishmentName) (~\(suggestion.distanceMeters) m). Puedes cambiarla."
         } else {

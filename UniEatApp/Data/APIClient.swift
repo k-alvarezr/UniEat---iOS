@@ -58,7 +58,16 @@ final class APIClient: APIRequesting {
     private let transport: URLSession            // URLSession inyectable para las pruebas
     var onUnauthorized: (() -> Void)?            // lo pone AppStore, cierra sesion si el server dice 401
 
-    init(configuration: AppConfiguration, session: URLSession = .shared,
+    /// Authenticated JSON must never be replayed from a URL-only shared HTTP cache.
+    private static let uncachedSession: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.httpShouldSetCookies = false
+        return URLSession(configuration: configuration)
+    }()
+
+    init(configuration: AppConfiguration, session: URLSession = APIClient.uncachedSession,
          sessionIdentity: @escaping () -> UUID = { UUID.zero },
          accessToken: @escaping () async throws -> String) {
         self.configuration = configuration
@@ -143,7 +152,7 @@ final class APIClient: APIRequesting {
 // MARK: - feed
 
 /// respuesta del feed, los menus de hoy y la hora en que el server los mando, tambien se guarda como copia sin internet
-struct FeedResponse: Codable {
+struct FeedResponse: Codable, Sendable {
     let fetchedAt: Date
     let menus: [DailyMenu]
     var serverNow: Date? = nil   // hora del server para el ServerClock, opcional por si el back no la manda
@@ -224,6 +233,7 @@ struct RemoteEvent: Codable, Equatable {
     let version: Int
     let kind: String
     let occurredAt: Date
+    var metadata: ExperimentEventMetadata? = nil
 }
 
 /// un lote de eventos para mandarlos juntos, hasta 100
@@ -337,6 +347,27 @@ struct AdminDashboardSnapshot: Decodable {
     let bq03: BQ03Metrics
     let bq04: BQ04Metrics
     let engagement: PerformanceSummary
+    var bq08: BQ08Metrics? = nil
+}
+
+struct BQ08Metrics: Decodable {
+    struct Groups: Decodable { let control: Group; let treatment: Group }
+    struct Group: Decodable {
+        let assignedSessions: Int
+        let exposedSessions: Int
+        let initialSelections: Int
+        let completeSelections: Int
+        let incompleteSelections: Int
+        let longLineOutcomes: Int
+        let switchOutcomes: Int
+        let combinedOutcomes: Int
+        let outcomeRate: Double?
+    }
+    let groups: Groups
+    let insufficientData: Bool
+    let rateDifference: Double?
+    let followUpMinutes: Int
+    let minimumSampleSize: Int
 }
 
 /// cifras de BQ-03, cuantas veces se pidio el feed y como le fue

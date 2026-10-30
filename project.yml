@@ -5,6 +5,9 @@ options:
   deploymentTarget:
     iOS: "17.0"
 packages:
+  Kingfisher:
+    url: https://github.com/onevcat/Kingfisher.git
+    exactVersion: 8.14.0
   UniEatCore:
     path: Packages/UniEatCore
 targets:
@@ -39,6 +42,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
     dependencies:
       - package: UniEatCore
+      - package: Kingfisher
   UniEatTests:
     type: bundle.unit-test
     platform: iOS

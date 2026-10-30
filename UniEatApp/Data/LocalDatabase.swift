@@ -71,13 +71,12 @@ final class LocalDatabase {
     let container: ModelContainer // esta es perse la BD local, archivo con esquemas y modelos
     private var context: ModelContext {container.mainContext} // contexto asociado al hilo principal
     
-    /// ahora lanza el error en vez de borrar la base, inMemory es para las pruebas
-    init(inMemory: Bool = false) throws {
+    init(inMemory: Bool = false, storeURL: URL? = nil) throws {
         // todos los modelos de la app van en esta lista
-        let schema = Schema([MenuSnapshot.self, PendingReport.self])
-        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory)
-        // si no abre no se borra el archivo, puede tener reportes del usuario
-        // AppStore sigue sin base y Perfil avisa del problema
+        let schema = Schema([MenuSnapshot.self, PendingReport.self, SavedMenu.self, SavedDish.self, FeedCacheRecord.self])
+        let config = storeURL.map { ModelConfiguration(schema: schema, url: $0) }
+            ?? ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory)
+        // Never remove an existing store after a migration/open failure: it contains user work.
         container = try ModelContainer(for: schema, configurations: config)
     }
     

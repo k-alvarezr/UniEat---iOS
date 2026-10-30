@@ -18,6 +18,8 @@ flowchart TD
     VM --> Facade[ReportingFacade]
     Services --> API[APIRequesting / APIClient]
     Services --> Files[FileStore]
+    VM --> Content[LocalContentService / ModelActor]
+    Content --> SwiftData
     Facade --> API
     Facade --> DB[ReportOutbox / LocalDatabase]
     DB --> SwiftData[ModelContainer único]
@@ -41,7 +43,8 @@ el feed aplicado, la cola y el contenedor tienen un único propietario para impe
 | Perfil | `ProfileViewModel` | Sesión, guardados y estado de la cola |
 | Solicitud de establecimiento | `EstablishmentViewModel` | `AccountService`, sesión y geocodificación |
 | Aprobaciones / roles | `AdminApprovalsViewModel`, `AdminRolesViewModel` | `AccountService` y sesión |
-| Guardados | `SavedMenusViewModel` | Formato existente de UserDefaults y eventos |
+| Guardados | `SavedMenusViewModel` | `LocalContentService`, SwiftData y eventos; migración del formato anterior |
+| Piloto BQ-08 | `WaitIndicatorPilot` | Sesión, API de asignación y metadata de eventos |
 
 `AppStore` es el punto de composición e inyección y conserva la pestaña seleccionada.
 No es el ViewModel de todas las pantallas. `UniEatApp` inyecta los objetos compartidos;
@@ -60,6 +63,11 @@ Los DTO del transporte permanecen en `Data/APIClient.swift`. `PublishDraft` y `D
 están junto a su ViewModel, porque representan el formulario. `MenuSnapshot` y `PendingReport`
 permanecen en `Data/LocalDatabase.swift` como modelos de persistencia de Juan. La base local es
 relacional y usa el mismo `ModelContainer`; la separación de entidades del dominio no crea nuevas bases.
+
+Sprint 3 añade `SavedMenu`, `SavedDish` y `FeedCacheRecord` en `LocalContentModels.swift`.
+`LocalContentService` crea `LocalContentStore` fuera de MainActor, con contexto propio sobre ese contenedor.
+`SavedMenuEntry` es el valor Codable/Sendable de presentación y migración; los objetos SwiftData no cruzan
+actores. `FeedMemoryCache` y `FeedImageStore` tienen políticas explícitas descritas en [sprint3.md](sprint3.md).
 
 ## Patrones y responsabilidades
 

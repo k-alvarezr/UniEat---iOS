@@ -10,17 +10,15 @@ enum AppTab { case today, second, metrics, profile }
 /// cada pantalla tiene su propio viewmodel con su estado, aca no queda estado de pantallas
 @MainActor
 final class AppStore: ObservableObject {
-    @Published var selectedTab: AppTab = .today   // pestaña visible
-
-    // piezas compartidas, una sola instancia para toda la app
-    let session: SessionStore                     // quien entro y sus permisos
-    let connectivity: ConnectivityService         // si hay red o el server no responde
-    let clock: ServerClock                        // hora del server
-    /// la base swiftdata de reportes (#33), nil si no se pudo abrir, kevin agrega sus modelos aca (#34)
+    @Published var selectedTab: AppTab = .today
+    let session: SessionStore
+    let connectivity: ConnectivityService
+    let clock: ServerClock
+    /// One container for Juan's report models, saved dishes and feed snapshots.
     let database: LocalDatabase?
-    let storageError: String?                     // mensaje si la base no abrio, se muestra en perfil
-
-    // viewmodels de cada pantalla, se inyectan en UniEatApp
+    let storageError: String?
+    let images: FeedImageStore
+    let pilot: WaitIndicatorPilot
     let feed: FeedViewModel
     let saved: SavedMenusViewModel
     let authentication: AuthViewModel
@@ -32,10 +30,11 @@ final class AppStore: ObservableObject {
     let establishments: EstablishmentViewModel
     let approvals: AdminApprovalsViewModel
     let roles: AdminRolesViewModel
-    let reports: ReportingFacade                  // envio y cola de reportes
-    private let events: EventService              // cola de eventos de analitica
-    private let details: MenuDetailService        // pide y guarda detalles, se usa al crear cada detalle
-    private var synchronization: Task<Void, Never>?   // tarea que manda colas y refresca, una a la vez
+    let reports: ReportingFacade
+    private let events: EventService
+    private let details: MenuDetailService
+    private var synchronization: Task<Void, Never>?
+    private var imageTask: Task<Void, Never>?
 
     /// arma toda la app en orden: auth -> api -> sesion -> servicios -> viewmodels -> conexiones entre ellos
     init() {
@@ -54,11 +53,16 @@ final class AppStore: ObservableObject {
         let database: LocalDatabase?
         do { database = try LocalDatabase(); storageError = nil }
         catch { database = nil; storageError = "No se pudieron cargar los datos guardados. Se conservaron para intentar recuperarlos; los reportes nuevos aún no se pueden guardar." }
-
-        // 3. servicios y viewmodels, cada uno recibe solo lo que usa
+        let content = database.map { LocalContentService(container: $0.container) }
+        let images = FeedImageStore()
+        self.images = images
+        ImageLibraryConfiguration.configure()
+        Task { await images.clean() }
         let events = EventService(api: api, session: session, connectivity: connectivity, clock: clock)
-        let saved = SavedMenusViewModel(session: session, events: events, clock: clock)
-        let feed = FeedViewModel(api: api, session: session, connectivity: connectivity, clock: clock, events: events)
+        let pilot = WaitIndicatorPilot(api: api, session: session, clock: clock)
+        self.pilot = pilot
+        let saved = SavedMenusViewModel(session: session, events: events, clock: clock, content: content)
+        let feed = FeedViewModel(api: api, session: session, connectivity: connectivity, clock: clock, events: events, content: content)
         let reports = ReportingFacade(api: api, outbox: database, session: session, connectivity: connectivity, clock: clock)
         let accounts = AccountService(api: api, session: session)
         self.session = session; self.connectivity = connectivity; self.clock = clock; self.database = database
@@ -70,7 +74,7 @@ final class AppStore: ObservableObject {
         publication = PublishViewModel(service: PublishingService(api: api, session: session, files: files),
                                        feed: feed, session: session, connectivity: connectivity, clock: clock)
         performance = PerformanceViewModel(api: api, session: session, events: events, connectivity: connectivity)
-        profile = ProfileViewModel(session: session, saved: saved, reports: reports, storageError: storageError)
+        profile = ProfileViewModel(session: session, saved: saved, reports: reports, storageError: storageError, pilot: pilot)
         establishments = EstablishmentViewModel(service: accounts, session: session)
         approvals = AdminApprovalsViewModel(service: accounts, session: session)
         roles = AdminRolesViewModel(service: accounts, session: session)
@@ -79,8 +83,21 @@ final class AppStore: ObservableObject {
         api.onUnauthorized = { [weak session] in session?.signOut(message: "Tu sesión terminó. Inicia sesión de nuevo.") }
         session.onChange = { [weak self] in self?.accountChanged() }
         connectivity.onReconnect = { [weak self] in self?.synchronize() }
-        // el server puede volver sin que cambie la red del celular, por eso tambien se mandan las colas
-        // cuando el feed vuelve a cargar bien
+        feed.onMenusLoaded = { [weak self] menus in self?.prefetchImages(menus) }
+        feed.prepareContext = { [weak pilot, weak events] in
+            guard let events else { return }
+            await pilot?.prepare(sessionID: events.sessionID)
+        }
+        events.metadataProvider = { [weak pilot, weak events, weak feed, weak connectivity] menu in
+            guard let events else { return nil }
+            return pilot?.metadata(menu: menu, sessionID: events.sessionID,
+                live: feed?.isShowingCachedFeed == false && connectivity?.isOffline == false)
+        }
+        pilot.onParticipationChanged = { [weak events, weak feed] in
+            events?.restartSession()
+            Task { await feed?.refresh(force: true) }
+        }
+        // A service outage can recover without NWPathMonitor changing its network path.
         feed.onServiceAvailable = { [weak events, weak reports] in
             Task { await events?.flush(); await reports?.flushReports() }
         }
@@ -92,9 +109,10 @@ final class AppStore: ObservableObject {
     /// al entrar, salir o cambiar de cuenta se limpia lo de cada pantalla
     /// para que el siguiente usuario no vea nada del anterior, y se vuelven a cargar sus cosas
     private func accountChanged() {
+        imageTask?.cancel()
         synchronization?.cancel(); selectedTab = .today
         connectivity.serverUnreachable = false
-        events.accountChanged(); saved.accountChanged(); reports.accountChanged()
+        events.accountChanged(); pilot.accountChanged(); saved.accountChanged(); reports.accountChanged()
         publication.reset(); performance.reset(); recommendation.reset()
         authentication.password = ""; authentication.errorText = nil; authentication.isSubmitting = false
         roles.users = []; roles.selected = nil; roles.message = nil; roles.workingID = nil; roles.confirming = false
@@ -104,8 +122,12 @@ final class AppStore: ObservableObject {
         synchronize(refreshFeed: false)   // el feed ya lo pide feed.accountChanged, aca solo las colas
     }
 
-    /// manda la cola de eventos, luego la de reportes y luego refresca el feed, en ese orden
-    /// si llega otra sincronizacion se cancela la anterior para no mandar dos veces lo mismo
+    private func prefetchImages(_ menus: [DailyMenu]) {
+        guard !connectivity.isOffline else { return }
+        imageTask?.cancel()
+        imageTask = Task(priority: .utility) { [images] in _ = await images.prefetch(menus) }
+    }
+
     private func synchronize(refreshFeed: Bool = true) {
         synchronization?.cancel()
         synchronization = Task { [weak self] in
@@ -118,13 +140,12 @@ final class AppStore: ObservableObject {
         }
     }
 
-    /// cada detalle tiene su propio viewmodel, se crea aca porque necesita varias piezas compartidas
-    func makeDetail(_ menu: DailyMenu) -> MenuDetailViewModel {
+    func makeDetail(_ menu: DailyMenu, cachedAt: Date? = nil) -> MenuDetailViewModel {
         MenuDetailViewModel(menu: menu, service: details, session: session, events: events,
-                             saved: saved, connectivity: connectivity, clock: clock)
+                             saved: saved, connectivity: connectivity, clock: clock, pilot: pilot,
+                             initialFetchedAt: cachedAt ?? feed.fetchedAt)
     }
-    /// viewmodel de la hoja de reportar, uno por cada vez que se abre
-    func makeReport(_ menu: DailyMenu, kind: ReportKind) -> ReportViewModel {
-        ReportViewModel(menu: menu, kind: kind, reports: reports)
+    func makeReport(_ menu: DailyMenu, kind: ReportKind, waitObservation: Bool = false) -> ReportViewModel {
+        ReportViewModel(menu: menu, kind: kind, reports: reports, waitObservation: waitObservation)
     }
 }

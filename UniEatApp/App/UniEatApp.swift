@@ -22,6 +22,7 @@ struct UniEatApp: App {
                 .environmentObject(store.establishments)
                 .environmentObject(store.approvals)
                 .environmentObject(store.roles)
+                .environmentObject(store.pilot)
                 .environment(\.locale, SpanishPresentation.locale)
                 .preferredColorScheme(.light)
         }

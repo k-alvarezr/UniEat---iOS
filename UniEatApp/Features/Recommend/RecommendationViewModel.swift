@@ -12,9 +12,13 @@ final class RecommendationViewModel: FeatureViewModel {
     init(feed: FeedViewModel) { self.feed = feed; super.init(); observe(feed) }
     var visibleMenus: [DailyMenu] { feed.visibleMenus }
     var filters: FeedFilters { feed.filters }
-    var isShowingCachedFeed: Bool { feed.isShowingCachedFeed }
+    var isShowingCachedFeed: Bool { feed.isShowingCachedFeed || feed.isOffline }
+    var hasSnapshot: Bool { feed.hasSnapshot }
     var fetchedAt: Date { feed.fetchedAt }
-    /// pasa a la siguiente opcion y vuelve al inicio al llegar al final
+    var now: Date { feed.clock.now }
+    var loadError: String? { feed.loadError }
+    var isLoading: Bool { feed.isLoading }
+    func refresh() async { await feed.refresh(force: true) }
     func next() { index = (index + 1) % max(visibleMenus.count, 1) }
     func reset() { index = 0 }
 }

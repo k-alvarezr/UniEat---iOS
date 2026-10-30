@@ -69,6 +69,17 @@ struct ProfileView: View {
                     } else {
                         EstablishmentManagementView()
                     }
+                    if store.canJoinPilot {
+                        SurfaceCard {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Toggle("Participar en la evaluación del indicador de fila", isOn: Binding(
+                                    get: { store.pilotEnabled }, set: store.setPilotEnabled))
+                                Text("En algunas sesiones verás el indicador y en otras no. Tus elecciones y reportes ayudarán a evaluar su utilidad. Puedes dejar de participar aquí.")
+                                    .font(.footnote).foregroundStyle(.secondary)
+                                if let message = store.pilotMessage { Text(message).font(.footnote) }
+                            }
+                        }
+                    }
                     if let error = store.accountError {
                         Text(error).font(.footnote)
                         Button("Actualizar cuenta") { Task { await store.refreshAccount() } }

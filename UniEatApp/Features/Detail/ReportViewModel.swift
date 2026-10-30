@@ -17,8 +17,10 @@ final class ReportViewModel: ObservableObject {
     private let reports: ReportingFacade
     // id fijo de este reporte, si se toca enviar otra vez no se duplica
     private var requestID = UUID()
-    init(menu: DailyMenu, kind: ReportKind, reports: ReportingFacade) {
+    private let waitObservation: Bool
+    init(menu: DailyMenu, kind: ReportKind, reports: ReportingFacade, waitObservation: Bool = false) {
         self.menu = menu; self.kind = kind; self.reports = reports
+        self.waitObservation = waitObservation
     }
     /// manda el reporte y traduce el estado del server a un mensaje para el estudiante
     /// queued es que quedo guardado sin red, needs_review que el server lo rechazo y sigue guardado
@@ -28,7 +30,7 @@ final class ReportViewModel: ObservableObject {
         defer { isSending = false }
         do {
             let status = try await reports.submitReport(for: menu, kind: kind, note: note,
-                waitMinutes: kind == .longLine ? minutes : nil, requestID: requestID)
+                waitMinutes: waitObservation ? minutes : nil, requestID: requestID)
             confirmationMessage = switch status {
             case "pending": "Gracias. Tu reporte quedó pendiente de revisión."
             case "confirmed": "Gracias. Otros estudiantes reportaron lo mismo: el cambio quedó confirmado."

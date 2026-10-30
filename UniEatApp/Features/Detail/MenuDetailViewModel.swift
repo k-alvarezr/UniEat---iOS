@@ -16,13 +16,18 @@ final class MenuDetailViewModel: FeatureViewModel {
     private let events: EventService
     private let saved: SavedMenusViewModel
     private let connectivity: ConnectivityService
-    // id de la ultima carga, una respuesta vieja no pisa una nueva
+    private let pilot: WaitIndicatorPilot?
+    private let initialFetchedAt: Date?
     private var requestID = UUID()
     init(menu: DailyMenu, service: MenuDetailService, session: SessionStore, events: EventService,
-         saved: SavedMenusViewModel, connectivity: ConnectivityService, clock: ServerClock) {
+         saved: SavedMenusViewModel, connectivity: ConnectivityService, clock: ServerClock, pilot: WaitIndicatorPilot? = nil,
+         initialFetchedAt: Date? = nil) {
         initialMenu = menu; self.service = service; self.session = session; self.events = events
         self.saved = saved; self.connectivity = connectivity; self.clock = clock
+        self.pilot = pilot
+        self.initialFetchedAt = initialFetchedAt
         super.init(); observe(saved); observe(session); observe(connectivity); observe(clock); observe(events)
+        if let pilot { observe(pilot) }
     }
     /// la version del server si ya llego, si no la de la tarjeta
     var menu: DailyMenu { detail?.menu ?? initialMenu }
@@ -31,9 +36,8 @@ final class MenuDetailViewModel: FeatureViewModel {
     var isAdmin: Bool { session.isAdmin }
     var isRestaurant: Bool { session.isRestaurant }
     var isOffline: Bool { connectivity.isOffline }
-    /// hora de la copia que se esta mostrando
-    var fetchedAt: Date { detail?.serverNow ?? menu.publishedAt }
-    /// se puede elegir o reportar ahora, usa el estado del server avanzado con el reloj del server
+    var showsWaitIndicator: Bool { pilot?.showsWaitIndicator ?? true }
+    var fetchedAt: Date { detail?.serverNow ?? initialFetchedAt ?? menu.publishedAt }
     func isOpen() -> Bool {
         !isGone && (detail?.status(at: clock.now).acceptsActions ?? menu.isActive(at: clock.now))
     }

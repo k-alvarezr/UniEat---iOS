@@ -11,12 +11,14 @@ struct SavedMenusView: View {
                 BrandHeader(title: "Menús guardados")
                 Text("Se guardan en este dispositivo para tu cuenta. La vigencia y los reportes se actualizan al abrir el detalle con conexión.")
                     .font(.subheadline).foregroundStyle(.secondary)
-                if store.savedMenus.isEmpty {
+                if let error = store.errorMessage { Text(error).font(.footnote).foregroundStyle(Palette.coral) }
+                if store.isLoading { ProgressView("Leyendo tus guardados…") }
+                if store.savedMenus.isEmpty && !store.isLoading {
                     ContentUnavailableView("Sin menús guardados", systemImage: "bookmark",
                                            description: Text("Abre un menú y toca Guardar menú."))
                 } else {
                     ForEach(store.savedMenus) { entry in
-                        NavigationLink(destination: MenuDetailView(menu: entry.menu)) {
+                        NavigationLink(destination: MenuDetailView(menu: entry.menu, cachedAt: entry.savedAt)) {
                             SurfaceCard {
                                 VStack(alignment: .leading, spacing: 5) {
                                     Text(entry.menu.establishmentName).font(.headline)

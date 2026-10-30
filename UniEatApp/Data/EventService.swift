@@ -11,10 +11,11 @@ final class EventService: ObservableObject {
     private let session: SessionStore
     private let connectivity: ConnectivityService
     private let clock: ServerClock
-    private(set) var sessionID = UUID()          // id de esta apertura de la app, va en cada evento
-    private var counted: Set<String> = []        // acciones que ya se contaron en esta sesion
-    private var pending: [RemoteEvent] = []      // cola de eventos sin mandar
-    private var flushingGeneration: UUID?        // sesion que esta mandando la cola, para no mandarla dos veces
+    private(set) var sessionID = UUID()
+    private var counted: Set<String> = []
+    private var pending: [RemoteEvent] = []
+    private var flushingGeneration: UUID?
+    var metadataProvider: ((DailyMenu) -> ExperimentEventMetadata?)?
     init(api: APIRequesting, session: SessionStore, connectivity: ConnectivityService, clock: ServerClock) {
         self.api = api; self.session = session; self.connectivity = connectivity; self.clock = clock
     }
@@ -28,17 +29,23 @@ final class EventService: ObservableObject {
     }
     // llave de una accion sobre un menu, con la version para que un menu editado cuente aparte
     private func eventKey(_ kind: String, _ menu: DailyMenu) -> String { "\(kind):\(menu.id):\(menu.version)" }
-    /// true si en esta sesion ya se conto esa accion sobre esa version del menu
+    func restartSession() { objectWillChange.send(); sessionID = UUID(); counted = [] }
     func hasCounted(_ kind: String, menu: DailyMenu) -> Bool { counted.contains(eventKey(kind, menu)) }
     /// mete el evento en la cola, ver una tarjeta, elegir o llegar cuentan una sola vez por menu y version
     /// la hora es la del server (clock) y no la del celular
     func track(_ kind: String, menu: DailyMenu) {
         guard session.profile != nil else { return }
         objectWillChange.send()
-        if ["feed_impression", "selection", "arrival"].contains(kind), !counted.insert(eventKey(kind, menu)).inserted { return }
+        let metadata = metadataProvider?(menu)
+        var dedupKey = eventKey(kind, menu)
+        if kind == "feed_impression" {
+            // A cached impression must not consume the later eligible live exposure. Existing
+            // engagement SQL still counts distinct session/publication/version, not these rows.
+            dedupKey += ":\(metadata?.assignmentId.uuidString ?? "ordinary"):\(metadata?.indicatorAvailable ?? false)"
+        }
+        if ["feed_impression", "selection", "arrival"].contains(kind), !counted.insert(dedupKey).inserted { return }
         pending.append(RemoteEvent(eventId: UUID(), sessionId: sessionID, publicationId: menu.id,
-                                    version: menu.version, kind: kind, occurredAt: clock.now))
-        // si la cola se pasa del tope se botan los mas viejos
+                                    version: menu.version, kind: kind, occurredAt: clock.now, metadata: metadata))
         if pending.count > 500 { pending.removeFirst(pending.count - 500) }
         LocalValues.save(pending, key: key)
         if !connectivity.isOffline { Task { await flush() } }

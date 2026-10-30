@@ -1,4 +1,5 @@
 import SwiftUI
+import Kingfisher
 import UniEatCore
 
 struct TodayFeedView: View {
@@ -21,11 +22,14 @@ struct TodayFeedContent: View {
                     header(date: timeline.date)
                     // al abrir se muestra la copia mientras llega el server, eso no es estar sin conexion
                     // el aviso sale solo si no hay red o si la carga ya termino y no se pudo actualizar
-                    if store.isOffline || (store.isShowingCachedFeed && !store.isLoading) {
+                    if (store.isOffline || (store.isShowingCachedFeed && !store.isLoading)) && store.hasSnapshot {
                         NavigationLink(destination: OfflineFeedView()) {
                             OfflineNotice(fetchedAt: store.fetchedAt)
                         }
                         .buttonStyle(.plain)
+                    } else if store.isOffline && !store.hasSnapshot {
+                        Text("Sin conexión. Descarga los menús cuando vuelva la red para tener una copia disponible.")
+                            .font(.footnote)
                     } else if store.isShowingCachedFeed {
                         HStack(spacing: 8) {
                             ProgressView()
@@ -38,9 +42,13 @@ struct TodayFeedContent: View {
                         SurfaceCard {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text(error).font(.footnote)
-                                Button("Reintentar actualización") { Task { await store.refresh() } }
+                                Button("Reintentar actualización") { Task { await store.refresh(force: true) } }
                             }
                         }
+                    }
+                    if let warning = store.cacheWarning {
+                        Label(warning, systemImage: "externaldrive.badge.exclamationmark")
+                            .font(.footnote).foregroundStyle(Palette.coral)
                     }
                     if store.isLoading && store.visibleMenus.isEmpty {
                         ProgressView("Cargando menús…")
@@ -57,6 +65,7 @@ struct TodayFeedContent: View {
                             .buttonStyle(.plain)
                             .onAppear { store.track("feed_impression", menu: menu) }
                         }
+                        .id(store.contentRevision)
                     }
                 }
                 .padding(16)
@@ -64,7 +73,7 @@ struct TodayFeedContent: View {
         }
         .background(Palette.cream)
         .navigationBarHidden(hidesNavigationBar)
-        .refreshable { await store.refresh() }
+        .refreshable { await store.refresh(force: true) }
     }
 
     private func header(date: Date) -> some View {
@@ -108,6 +117,7 @@ struct TodayFeedContent: View {
 
 /// tarjeta del menu, lo que se ve de BQ-03
 struct MenuCard: View {
+    @EnvironmentObject private var pilot: WaitIndicatorPilot
     let menu: DailyMenu
     let date: Date
 
@@ -129,7 +139,9 @@ struct MenuCard: View {
                 Text(menu.title).font(.rounded(14, .bold))
                 HStack(spacing: 7) {
                     Sticker(text: menu.area, color: Palette.cyan, icon: "mappin")
-                    if let wait = menu.waitMinutes, menu.hasWaitEvidence(at: date) {
+                    if !pilot.showsWaitIndicator {
+                        Sticker(text: "Evaluación en curso", color: Palette.cream, icon: "clock")
+                    } else if let wait = menu.waitMinutes, menu.hasWaitEvidence(at: date) {
                         Sticker(text: "~\(wait) min de fila", color: Palette.green, icon: "clock")
                     } else {
                         Sticker(text: "Fila sin datos", color: Palette.cream, icon: "clock")
@@ -143,7 +155,7 @@ struct MenuCard: View {
                     Label("Menú por vencer", systemImage: "hourglass")
                         .font(.caption).foregroundStyle(Palette.coral)
                 }
-                Text(menu.explanation)
+                Text(pilot.explanation(menu.explanation))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -154,6 +166,8 @@ struct MenuCard: View {
 
 /// foto del local si tiene url https, si no un dibujo con el nombre
 struct FoodArtwork: View {
+    @EnvironmentObject private var app: AppStore
+    @State private var localPhoto: URL?
     let name: String
     var photoUrl: String?
 
@@ -173,11 +187,15 @@ struct FoodArtwork: View {
         // con scaledToFill adentro del zstack la foto crecia y tapaba la tarjeta de abajo
         .overlay {
             if let photo {
-                AsyncImage(url: photo) { image in
-                    image.resizable().scaledToFill()
-                } placeholder: {
-                    placeholderIcon
-                }
+                KFImage(source: localPhoto.map {
+                    .provider(LocalFileImageDataProvider(fileURL: $0, cacheKey: photo.absoluteString))
+                } ?? .network(ImageResource(downloadURL: photo)))
+                .placeholder { placeholderIcon }
+                .setProcessor(DownsamplingImageProcessor(size: CGSize(width: 720, height: 480)))
+                .cacheOriginalImage()
+                .onlyFromCache(app.connectivity.isOffline && localPhoto == nil)
+                .cancelOnDisappear(true)
+                .resizable().scaledToFill()
             }
         }
         // el nombre va encima de la foto para que se siga viendo
@@ -191,6 +209,10 @@ struct FoodArtwork: View {
         .frame(maxWidth: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: 11))
         .accessibilityLabel(photo == nil ? "Ilustración de \(name)" : "Foto de \(name)")
+        .task(id: photo?.absoluteString) {
+            localPhoto = nil
+            if let photo { localPhoto = await app.images.localFile(photo) }
+        }
     }
 
     private var placeholderIcon: some View {
