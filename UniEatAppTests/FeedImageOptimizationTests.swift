@@ -54,6 +54,8 @@ final class FeedImageOptimizationTests: XCTestCase {
             UIColor.red.setFill(); context.fill(CGRect(x: 0, y: 0, width: 1200, height: 800))
         }.jpegData(compressionQuality: 0.8)!
         try data.write(to: legacyFile)
+        // Un ajuste hacia atrás del reloj no hace desaparecer una foto ya descargada.
+        try FileManager.default.setAttributes([.modificationDate: Date.now.addingTimeInterval(60)], ofItemAtPath: legacyFile.path)
         let images = FeedImageStore(cache: cache, legacyDirectory: directory)
         let first = await images.load(url, allowNetwork: false)
         XCTAssertTrue(first)
@@ -69,6 +71,25 @@ final class FeedImageOptimizationTests: XCTestCase {
         let second = await images.load(url, allowNetwork: false)
         XCTAssertTrue(second)
         await cache.clearDiskCache()
+    }
+
+    func testUpgradeKeepsPhotosThatOnlyExistedInTheOldKingfisherCache() async throws {
+        let oldCache = ImageCache(name: UUID().uuidString), newCache = ImageCache(name: UUID().uuidString)
+        let url = URL(string: "https://example.invalid/old-kingfisher-\(UUID())")!
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 900, height: 600)).image { context in
+            UIColor.blue.setFill(); context.fill(CGRect(x: 0, y: 0, width: 900, height: 600))
+        }
+        try await oldCache.store(image, forKey: url.absoluteString,
+            processorIdentifier: ImageLibraryConfiguration.processor.identifier)
+        oldCache.clearMemoryCache()
+        let images = FeedImageStore(cache: newCache, legacyDirectory: nil, legacyCache: oldCache)
+        let ready = await images.load(url, allowNetwork: false)
+        XCTAssertTrue(ready)
+        let copiedFile = await images.localFile(url)
+        XCTAssertNotNil(copiedFile)
+        XCTAssertNil(oldCache.cacheFileURLIfOnDisk(forKey: url.absoluteString,
+            processorIdentifier: ImageLibraryConfiguration.processor.identifier))
+        await oldCache.clearDiskCache(); await newCache.clearDiskCache()
     }
 }
 

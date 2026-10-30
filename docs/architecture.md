@@ -105,6 +105,12 @@ La concurrencia no equivale a hacer trabajo pesado en la UI: las esperas de red 
 el trabajo de lectura/decodificación de archivos se ejecuta fuera del actor principal.
 El tamaño máximo del grupo limita presión de red y cuotas sin perder las filas que faltan por enviar.
 
+El feed mantiene identidad de filas y fuente/filtros del snapshot aplicado. La exposición BQ-08 tiene
+su propia clave contextual (sesión, asignación, versión, fuente y evidencia) para registrar copia → vivo
+sin destruir las tarjetas. `FeedImageStore` comparte solicitudes por URL entre el grupo de cuatro hijos y
+las vistas, con un solo caché/procesador Kingfisher. Cancelar una precarga no cancela un consumidor que
+todavía necesita la foto. La migración conserva las imágenes antiguas hasta confirmar el nuevo archivo.
+
 ## Sesión, vigencia y sincronización
 
 Cada petición captura una generación de autenticación; si cambia durante la obtención del token

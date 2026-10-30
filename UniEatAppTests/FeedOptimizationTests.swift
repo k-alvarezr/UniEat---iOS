@@ -13,7 +13,7 @@ final class FeedOptimizationTests: XCTestCase {
         let feed = makeFeed(h, api: api, content: content)
         await feed.refresh(force: true)
         try await content.saveFeed(CachedFeedSnapshot(userId: h.auth.profile.id, filters: FeedFilters(),
-            response: FeedResponse(fetchedAt: .now.addingTimeInterval(-60), menus: [old])))
+            response: FeedResponse(fetchedAt: feed.fetchedAt, menus: [old])))
         let started = expectation(description: "Petición en curso")
         var pending: CheckedContinuation<FeedResponse, Error>?
         api.respond = { _ in try await withCheckedThrowingContinuation { pending = $0; started.fulfill() } }
@@ -94,6 +94,24 @@ final class FeedOptimizationTests: XCTestCase {
         XCTAssertEqual(feed.exposureKey(for: menu), eligible)
         events.restartSession()
         XCTAssertNotEqual(feed.exposureKey(for: menu), eligible)
+    }
+
+    func testUpgradeCanStillOpenTheOldUnfilteredSnapshotWithoutACatalog() async throws {
+        let h = try await Harness.make(), content = LocalContentService(container: h.database.container)
+        content.setSession(userID: h.auth.profile.id, generation: h.session.generation)
+        let all = FeedFilters(budgetCop: nil, availableMinutes: nil, diet: nil, area: nil, paymentMethod: nil)
+        let menu = h.menu
+        try await content.saveFeed(CachedFeedSnapshot(userId: h.auth.profile.id, filters: all,
+            response: FeedResponse(fetchedAt: .now, menus: [menu])))
+        h.connectivity.update(isConnected: false)
+        let api = FeedOptimizationAPI { _ in XCTFail("La migración offline no pide red"); return FeedResponse(fetchedAt: .now, menus: []) }
+        let feed = makeFeed(h, api: api, content: content)
+        feed.updateFilters(all)
+        let limit = Date.now.addingTimeInterval(3)
+        while (!feed.hasSnapshot || feed.isLoading) && Date.now < limit { await Task.yield() }
+        XCTAssertEqual(feed.visibleMenus.map(\.id), [menu.id])
+        XCTAssertTrue(feed.isShowingCachedFeed)
+        XCTAssertTrue(api.queries.isEmpty)
     }
 
     private func makeFeed(_ h: Harness, api: FeedOptimizationAPI, content: LocalContentService) -> FeedViewModel {

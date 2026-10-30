@@ -12,13 +12,16 @@ struct FeedImageStore: Sendable {
     static let diskLimit: UInt = 50 * 1024 * 1024
     let cache: ImageCache
     private let legacyDirectory: URL?
+    private let legacyCache: ImageCache?
     private let requests: FeedImageRequests
 
     init(cache: ImageCache = ImageLibraryConfiguration.cache,
          legacyDirectory: URL? = URL.cachesDirectory.appending(path: "unieat-feed-images", directoryHint: .isDirectory),
+         legacyCache: ImageCache? = .default,
          retrieve: Retrieval? = nil) {
         self.cache = cache
         self.legacyDirectory = legacyDirectory
+        self.legacyCache = legacyCache
         let manager = KingfisherManager(downloader: .default, cache: cache)
         requests = FeedImageRequests { url, allowNetwork in
             if let retrieve { try await retrieve(url); return }
@@ -27,7 +30,7 @@ struct FeedImageStore: Sendable {
             if cached.cached { return }
             try Task.checkCancellation()
             // El mismo procesador y llave que KFImage. No se guarda además el original.
-            let old = await Self.legacyFile(url, directory: legacyDirectory)
+            let old = await Self.legacyFile(url, directory: legacyDirectory, cache: legacyCache)
             let source: Source = old.map { .provider(LocalFileImageDataProvider(fileURL: $0, cacheKey: url.absoluteString)) }
                 ?? .network(ImageResource(downloadURL: url))
             var options: KingfisherOptionsInfo = [
@@ -39,7 +42,13 @@ struct FeedImageStore: Sendable {
             // Una actualización sin red conserva las fotos anteriores. Solo después de importarlas
             // al caché único se retira su archivo viejo, que ya dejó de ser la fuente de la imagen.
             if let old {
-                _ = await Task.detached(priority: .utility) { try? FileManager.default.removeItem(at: old) }.value
+                _ = await Task.detached(priority: .utility) {
+                    // Poder mostrar la imagen en memoria no garantiza que el disco se guardara.
+                    // Si falló esa escritura, la copia anterior sigue siendo necesaria al relanzar offline.
+                    guard cache.cacheFileURLIfOnDisk(forKey: url.absoluteString,
+                        processorIdentifier: ImageLibraryConfiguration.processor.identifier) != nil else { return }
+                    try? FileManager.default.removeItem(at: old)
+                }.value
             }
         }
     }
@@ -48,7 +57,7 @@ struct FeedImageStore: Sendable {
     func load(_ url: URL, allowNetwork: Bool) async -> Bool {
         guard url.scheme == "https", !Task.isCancelled else { return false }
         if await isCached(url) { return true }
-        if !allowNetwork, await Self.legacyFile(url, directory: legacyDirectory) == nil { return false }
+        if !allowNetwork, await Self.legacyFile(url, directory: legacyDirectory, cache: legacyCache) == nil { return false }
         return await requests.load(url, visible: true, allowNetwork: allowNetwork)
     }
 
@@ -67,17 +76,21 @@ struct FeedImageStore: Sendable {
         return type.cached
     }
 
-    private static func legacyFile(_ url: URL, directory: URL?) async -> URL? {
-        guard let directory else { return nil }
+    private static func legacyFile(_ url: URL, directory: URL?, cache: ImageCache?) async -> URL? {
         return await Task.detached(priority: .utility) { () -> URL? in
-            let filename = SHA256.hash(data: Data(url.absoluteString.utf8))
-                .map { String(format: "%02x", $0) }.joined() + ".jpg"
-            let file = directory.appending(path: filename)
-            guard let values = try? file.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
-                  let date = values.contentModificationDate,
-                  Date.now.timeIntervalSince(date) >= 0, Date.now.timeIntervalSince(date) < Self.lifetime,
-                  (values.fileSize ?? 0) > 0 else { return nil }
-            return file
+            if let directory {
+                let filename = SHA256.hash(data: Data(url.absoluteString.utf8))
+                    .map { String(format: "%02x", $0) }.joined() + ".jpg"
+                let file = directory.appending(path: filename)
+                if let values = try? file.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
+                   let date = values.contentModificationDate,
+                   max(0, Date.now.timeIntervalSince(date)) < Self.lifetime,
+                   (values.fileSize ?? 0) > 0 { return file }
+            }
+            // Algunas fotos pudieron existir solo en el Kingfisher anterior; también se migran offline.
+            return cache?.cacheFileURLIfOnDisk(forKey: url.absoluteString,
+                processorIdentifier: ImageLibraryConfiguration.processor.identifier)
+                ?? cache?.cacheFileURLIfOnDisk(forKey: url.absoluteString)
         }.value
     }
 
@@ -108,6 +121,7 @@ struct FeedImageStore: Sendable {
     /// Durante la migración solo se retiran JPEG viejos vencidos: los vigentes aún sirven offline.
     func clean() async {
         await cache.cleanExpiredDiskCache()
+        await legacyCache?.cleanExpiredDiskCache()
         guard let legacyDirectory else { return }
         await Task.detached(priority: .background) {
             let files = (try? FileManager.default.contentsOfDirectory(at: legacyDirectory,

@@ -186,6 +186,8 @@ final class FeedViewModel: FeatureViewModel {
                 if requested.queryItems.isEmpty {
                     if let catalog { snapshot = catalog }
                     else { snapshot = try await content.feed(userID: userID, filters: requested, catalog: true) }
+                    // La versión anterior guardaba también el feed sin filtros bajo su llave exacta.
+                    if snapshot == nil { snapshot = try await content.feed(userID: userID, filters: requested) }
                 } else {
                     snapshot = try await content.feed(userID: userID, filters: requested)
                 }
