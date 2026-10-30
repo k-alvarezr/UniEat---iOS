@@ -2,7 +2,7 @@ import Foundation
 import UniEatCore
 
 /// publicar, cerrar y el borrador salen del AppStore viejo a este servicio
-/// el borrador sigue siendo el archivo en Application Support de #33
+/// el borrador sigue siendo el archivo en Application Support
 @MainActor
 final class PublishService {
     private let api: APIRequesting
@@ -35,7 +35,7 @@ final class PublishService {
         try session.requireVerifiedAccount()
         let _: CloseResponse = try await api.send("POST", "menus/\(menu.id.uuidString)/close", body: NoBody?.none)
     }
-    /// La foto del formulario queda ligada a la cuenta y generacion que la origino.
+    /// lo guardado del formulario queda atado a la cuenta y sesion que lo hizo
     func saveDraft(_ draft: PublishDraft, userID: UUID, generation: UUID) async throws {
         guard session.matches(userID, generation: generation) else { throw CancellationError() }
         draftRevision += 1
@@ -43,7 +43,7 @@ final class PublishService {
         try await files.save(draft, name: "publish-draft", folder: .support, userId: userID, generation: generation, revision: revision)
         guard session.matches(userID, generation: generation) else { throw CancellationError() }
     }
-    /// El actor ordena lectura/escritura; una sesion distinta descarta la lectura.
+    /// el actor pone en fila lecturas y escrituras
     /// si cambio la sesion mientras se leia se bota el resultado
     func loadDraft() async throws -> PublishDraft? {
         guard let id = session.profile?.id else { return nil }

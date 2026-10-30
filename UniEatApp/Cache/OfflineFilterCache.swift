@@ -1,8 +1,8 @@
 import Foundation
 import UniEatCore
 
-/// Kevin: resultados de filtros locales recientes. NSCache mantiene respuestas online;
-/// esta LRU evita recalcular al alternar filtros offline sin duplicar datos en disco.
+/// resultados recientes de filtrar sin red, la NSCache guarda las respuestas con red
+/// y esta LRU evita recalcular al cambiar filtros sin red, sin duplicar nada en disco
 @MainActor
 final class OfflineFilterCache {
     private final class Node {
@@ -27,7 +27,7 @@ final class OfflineFilterCache {
     let maximumEntryBytes = 1024 * 1024
     init(capacity: Int = 4) { self.capacity = max(1, capacity) }
 
-    /// Diccionario + lista doble: busqueda, promocion y retirada de una entrada en O(1).
+    /// diccionario + lista doble: buscar, mover al frente y botar una entrada son O(1)
     func value(userID: UUID, filters: FeedFilters, at now: Date) -> [DailyMenu]? {
         let key = FeedCacheKey.make(userID: userID, filters: filters)
         guard let node = entries[key] else { return nil }
@@ -40,8 +40,8 @@ final class OfflineFilterCache {
         return node.menus
     }
 
-    /// El coste de codificar el valor es O(n); la estructura LRU no recorre las entradas.
-    /// Caduca antes de cualquier cambio temporal de elegibilidad, ademas del TTL.
+    /// codificar el valor cuesta O(n), la LRU en si no recorre las entradas
+    /// vence antes de que cambie algo por la hora, ademas del TTL
     func insert(_ menus: [DailyMenu], source: [DailyMenu], userID: UUID, filters: FeedFilters, at now: Date) {
         let key = FeedCacheKey.make(userID: userID, filters: filters)
         if let previous = entries[key] { remove(previous) }
@@ -55,7 +55,7 @@ final class OfflineFilterCache {
             }
             for change in changes where change >= now { expiry = min(expiry, change) }
         }
-        // Un limite inclusivo (p. ej. evidencia de fila exactamente a los 30 min) se recalcula.
+        // si cae justo en el limite (ej evidencia de fila de exactamente 30 min) se recalcula
         guard expiry > now else { return }
         let node = Node(key: key, menus: menus, insertedAt: now, expiresAt: expiry)
         entries[key] = node
@@ -63,7 +63,7 @@ final class OfflineFilterCache {
         if entries.count > capacity, let oldest { remove(oldest) }
     }
 
-    /// El propietario invalida al cambiar de usuario, catalogo o publicacion.
+    /// el que la usa la vacia al cambiar de usuario, catalogo o publicacion
     func clear() {
         entries.removeAll()
         newest = nil

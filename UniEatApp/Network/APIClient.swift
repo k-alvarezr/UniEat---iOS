@@ -179,7 +179,7 @@ final class APIClient: APIRequesting {
         let response: URLResponse
         do { (data, response) = try await transport.data(for: request) }
         catch {
-            // Una peticion cancelada o de otra cuenta no cambia el aviso de conexion actual.
+            // una peticion cancelada o de otra cuenta no cambia el aviso de conexion
             guard identity == sessionIdentity(), !Task.isCancelled,
                   (error as? URLError)?.code != .cancelled else { throw CancellationError() }
             onServiceAvailability?(false)
@@ -204,7 +204,7 @@ struct FeedResponse: Codable, Sendable {
     var serverNow: Date? = nil   // hora del server para el ServerClock, opcional por si el back no la manda
 }
 
-/// Convierte los filtros en parametros de la URL y omite los vacios
+/// pasa los filtros a parametros de la URL y salta los vacios
 extension FeedFilters {
     var queryItems: [URLQueryItem] {
         [("budgetCop", budgetCop.map(String.init)), ("availableMinutes", availableMinutes.map(String.init)),
@@ -255,7 +255,7 @@ struct ReportBody: Encodable, Sendable {
     let kind: String
     let note: String
     let observedWaitMinutes: Int?
-    // id del reporte creado en el celular, si se reintenta el server no lo cuenta dos veces (back #13)
+    // id del reporte creado en el celular, si se reintenta el server no lo cuenta dos veces
     var clientReportId: UUID? = nil
     // cuando lo vio el estudiante, no cuando se pudo mandar, sirve si se mando horas despues
     var observedAt: Date? = nil
@@ -298,7 +298,7 @@ struct BatchResponse: Decodable {
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         accepted = try values.decode(Int.self, forKey: .accepted)
-        // El contrato anterior solo entregaba accepted; se mantiene su lectura.
+        // la version vieja del back solo mandaba accepted, se sigue leyendo
         duplicates = try values.decodeIfPresent(Int.self, forKey: .duplicates) ?? 0
         rejected = try values.decodeIfPresent([BatchEventRejection].self, forKey: .rejected) ?? []
     }

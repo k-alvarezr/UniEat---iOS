@@ -11,7 +11,7 @@ final class ConnectivityService: ObservableObject {
     @Published var serverUnreachable = false         // hay internet pero el server no responde
     /// sin internet o con el server caido
     var isOffline: Bool { !isConnected || serverUnreachable }
-    /// NWPathMonitor solo confirma una ruta de red; no garantiza que UniEat responda.
+    /// NWPathMonitor solo dice que hay red, no que el server de UniEat responda
     var issue: ConnectionIssue? {
         if !isConnected { return .noInternet }
         return serverUnreachable ? .serviceUnavailable : nil
@@ -40,13 +40,13 @@ final class ConnectivityService: ObservableObject {
             onReconnect?()
         }
     }
-    /// Todas las rutas de la API informan el resultado, no solo el feed.
+    /// todas las rutas de la api avisan como les fue, no solo el feed
     func serviceResponded(_ available: Bool) {
         guard serverUnreachable == available else { return }
         serverUnreachable = !available
     }
-    /// Una comprobacion publica y sin credenciales permite recuperarse incluso desde login.
-    /// Se comparte una sola comprobacion entre todas las pantallas.
+    /// se revisa una ruta publica sin credenciales, asi se recupera hasta desde el login
+    /// todas las pantallas comparten la misma revision
     func retry() async {
         guard isConnected, !isChecking, let checkService else { return }
         isChecking = true

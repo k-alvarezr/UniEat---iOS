@@ -10,7 +10,7 @@ struct SavedMenuEntry: Codable, Identifiable, Sendable {
     var id: UUID { menu.id }
 }
 
-/// menu guardado en swiftdata (#34), una fila por usuario y menu, es la tabla padre de sus platos
+/// menu guardado en swiftdata, una fila por usuario y menu, es la tabla padre de sus platos
 @Model
 final class SavedMenu {
     @Attribute(.unique) var key: String   // usuario:menu, para no repetir filas
@@ -66,7 +66,7 @@ struct CachedFeedSnapshot: Codable, Sendable {
     let response: FeedResponse
 }
 
-/// copia del feed guardada en swiftdata (#34), una fila por usuario y filtros, o el catalogo completo
+/// copia del feed guardada en swiftdata, una fila por usuario y filtros, o el catalogo completo
 /// la copia va como json en payload porque se lee entera, no se consulta por campos
 @Model
 final class FeedCacheRecord {

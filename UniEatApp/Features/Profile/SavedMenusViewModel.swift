@@ -2,7 +2,7 @@ import Combine
 import Foundation
 import UniEatCore
 
-/// menus guardados del usuario (#34): la pantalla vive en el hilo principal
+/// menus guardados del usuario: la pantalla vive en el hilo principal
 /// y guardar o leer en swiftdata lo hace el actor compartido en segundo plano (LocalContentService)
 @MainActor
 final class SavedMenusViewModel: ObservableObject {

@@ -22,7 +22,7 @@ struct ExperimentEventMetadata: Codable, Equatable, Sendable {
     let source: String
 }
 
-/// piloto de la BQ-08 (Kevin, #30): el estudiante que se anota desde perfil queda en control o treatment
+/// piloto de la BQ-08 (Kevin): el estudiante que se anota desde perfil queda en control o treatment
 /// en control no ve el indicador de fila, asi se compara si el indicador cambia lo que eligen
 @MainActor
 final class WaitIndicatorPilot: FeatureViewModel {

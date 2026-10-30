@@ -80,7 +80,7 @@ final class MenuDetailViewModel: FeatureViewModel {
         requestID = id
         isLoading = true
         defer { if requestID == id { isLoading = false } }
-        // Sin ruta de red se consulta solo el archivo. No se espera un timeout para navegar o reportar.
+        // sin red solo se lee el archivo, no se espera un timeout para navegar o reportar
         if !connectivity.isConnected {
             let copy = await service.savedCopy(initialMenu, generation: expected)
             guard session.matches(userID, generation: expected), requestID == id else { return }
@@ -88,7 +88,7 @@ final class MenuDetailViewModel: FeatureViewModel {
             loadError = .offline
             return
         }
-        // copia del disco y server en paralelo con async let (#31), la copia se muestra mientras llega el server
+        // copia del disco y server en paralelo con async let, la copia se muestra mientras llega el server
         async let cached = service.savedCopy(initialMenu, generation: expected)
         async let fresh = service.fetch(initialMenu, automatic: automatic, generation: expected)
         if let copy = await cached, session.matches(userID, generation: expected), requestID == id, detail == nil {
