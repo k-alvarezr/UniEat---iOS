@@ -2,9 +2,9 @@ import Foundation
 import SwiftData
 import UniEatCore
 
-/// puerta a LocalContentStore (guardados y copias del feed) desde las pantallas (#32, #34)
+/// puerta a LocalContentStore (guardados y copias del feed) desde las pantallas
 /// el actor se crea con Task.detached utility para que su contexto de swiftdata trabaje fuera del hilo principal
-/// todas las pantallas usan el mismo actor y el mismo ModelContainer que los reportes de #33
+/// todas las pantallas usan el mismo actor y el mismo ModelContainer que los reportes
 struct LocalContentService: Sendable {
     private let worker: Task<LocalContentStore, Never>   // el actor, se espera con .value la primera vez
     private let sessions = SessionGate()   // misma puerta que FileStore: copias del feed solo de la sesion vigente

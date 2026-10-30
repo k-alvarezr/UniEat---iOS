@@ -3,9 +3,9 @@ import CryptoKit
 import Kingfisher
 import UniEatCore
 
-/// Una sola copia procesada por URL: la precarga y las tarjetas comparten Kingfisher.
-/// El grupo mantiene cuatro hijos de I/O; el coordinador limita tambien las descargas
-/// entre grupos y vistas, comparte pedidos por URL y respeta su cancelacion.
+/// una sola copia procesada por URL, la precarga y las tarjetas usan el mismo Kingfisher
+/// el grupo tiene maximo cuatro tareas de disco y red, el coordinador tambien limita las descargas
+/// entre grupos y vistas, si dos piden la misma URL se baja una vez y se respeta la cancelacion
 struct FeedImageStore: Sendable {
     typealias Retrieval = @Sendable (URL) async throws -> Void
     static let lifetime: TimeInterval = 7 * 86_400
@@ -32,7 +32,7 @@ struct FeedImageStore: Sendable {
                 processorIdentifier: KingfisherSetup.processor.identifier)
             if cached.cached { return }
             try Task.checkCancellation()
-            // El mismo procesador y llave que KFImage. No se guarda ademas el original.
+            // mismo procesador y llave que KFImage, no se guarda tambien la original
             let old = await Self.legacyFile(url, directory: legacyDirectory, cache: legacyCache)
             let source: Source = old.map { .provider(LocalFileImageDataProvider(fileURL: $0, cacheKey: url.absoluteString)) }
                 ?? .network(KF.ImageResource(downloadURL: url))
@@ -42,12 +42,12 @@ struct FeedImageStore: Sendable {
             ]
             if !allowNetwork && old == nil { options.append(.onlyFromCache) }
             _ = try await manager.retrieveImage(with: source, options: options)
-            // Una actualizacion sin red conserva las fotos anteriores. Solo despues de importarlas
-            // al cache unico se retira su archivo viejo, que ya dejo de ser la fuente de la imagen.
+            // sin red se conservan las fotos anteriores, el archivo viejo solo se borra
+            // despues de pasarlo al cache unico, cuando ya no hace falta
             if let old {
                 _ = await Task.detached(priority: .utility) {
-                    // Poder mostrar la imagen en memoria no garantiza que el disco se guardara.
-                    // Si fallo esa escritura, la copia anterior sigue siendo necesaria al relanzar offline.
+                    // que la imagen este en memoria no quiere decir que se guardo en disco
+                    // si fallo el guardado la copia vieja sigue sirviendo al abrir sin red
                     guard cache.cacheFileURLIfOnDisk(forKey: url.absoluteString,
                         processorIdentifier: KingfisherSetup.processor.identifier) != nil else { return }
                     try? FileManager.default.removeItem(at: old)
@@ -56,7 +56,7 @@ struct FeedImageStore: Sendable {
         }
     }
 
-    /// Las tarjetas visibles piden prioridad; sin red solo se busca lo ya descargado.
+    /// las tarjetas en pantalla van primero, sin red solo se busca lo que ya se bajo
     func load(_ url: URL, allowNetwork: Bool) async -> Bool {
         guard url.scheme == "https", !Task.isCancelled else { return false }
         if await isCached(url) { return true }
@@ -64,7 +64,7 @@ struct FeedImageStore: Sendable {
         return await requests.load(url, visible: true, allowNetwork: allowNetwork)
     }
 
-    /// Kingfisher administra el archivo por SHA-256 de URL + procesador en un solo directorio.
+    /// Kingfisher nombra el archivo con SHA-256 de la URL + procesador, todo en una carpeta
     func localFile(_ url: URL) async -> URL? {
         let cache = cache
         return await Task.detached(priority: .utility) { () -> URL? in
@@ -90,14 +90,14 @@ struct FeedImageStore: Sendable {
                    max(0, Date.now.timeIntervalSince(date)) < Self.lifetime,
                    (values.fileSize ?? 0) > 0 { return file }
             }
-            // Algunas fotos pudieron existir solo en el Kingfisher anterior; tambien se migran offline.
+            // algunas fotos solo estaban en el Kingfisher viejo, esas tambien se pasan sin red
             return cache?.cacheFileURLIfOnDisk(forKey: url.absoluteString,
                 processorIdentifier: KingfisherSetup.processor.identifier)
                 ?? cache?.cacheFileURLIfOnDisk(forKey: url.absoluteString)
         }.value
     }
 
-    /// Conserva el orden del feed y un grupo de hasta cuatro hijos; no precarga todo el catalogo.
+    /// respeta el orden del feed con maximo cuatro tareas a la vez, no precarga todo el catalogo
     func prefetch(_ menus: [DailyMenu]) async -> Int {
         var seen = Set<URL>()
         let urls = menus.compactMap { $0.photoUrl.flatMap(URL.init(string:)) }
@@ -123,8 +123,8 @@ struct FeedImageStore: Sendable {
         }
     }
 
-    /// La libreria limpia su disco una vez al arrancar, no despues de cada lote.
-    /// Durante la migracion solo se retiran JPEG viejos vencidos: los vigentes aun sirven offline.
+    /// la libreria limpia su disco una vez al arrancar, no despues de cada lote
+    /// en la migracion solo se borran los JPEG viejos vencidos, los vigentes sirven sin red
     func clean() async {
         await cache.cleanExpiredDiskCache()
         await legacyCache?.cleanExpiredDiskCache()
@@ -142,7 +142,7 @@ struct FeedImageStore: Sendable {
     }
 }
 
-/// Cada consumidor tiene su espera: cancelar la precarga no cancela una foto todavia visible.
+/// cada quien espera por su lado, cancelar la precarga no cancela una foto que sigue en pantalla
 private actor FeedImageRequests {
     private struct Request {
         let url: URL
@@ -221,7 +221,7 @@ private actor FeedImageRequests {
         guard requests[id]?.waiters.isEmpty == true else { return }
         current.removeValue(forKey: url)
         if let task = requests[id]?.task {
-            // El cupo no se libera hasta que el trabajo cancelado haya terminado de verdad.
+            // el cupo se libera cuando la tarea cancelada de verdad termino
             task.cancel()
         } else {
             requests.removeValue(forKey: id)
@@ -230,7 +230,7 @@ private actor FeedImageRequests {
     }
 }
 
-/// Un unico cache y un unico formato procesado, compartidos por tareas y vistas.
+/// un solo cache y un solo formato procesado para tareas y vistas
 enum KingfisherSetup {
     static let cache = ImageCache(name: "unieat-feed-images")
     static let processor = DownsamplingImageProcessor(size: CGSize(width: 720, height: 480))

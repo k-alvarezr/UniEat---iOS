@@ -150,7 +150,7 @@ final class SupabaseAuthService: SessionAuthenticating {
         SecItemDelete(query as CFDictionary)
     }
 
-    /// POST a supabase auth, devuelve la respuesta o lanza el error ya traducido al español
+    /// POST a supabase auth, devuelve la respuesta o lanza el error ya traducido
     private func request(path: String, query: String? = nil, body: [String: Any]) async throws -> Data {
         // 1. armar la url: url de supabase + ruta + parametros
         guard config.isConfigured,

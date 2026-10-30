@@ -67,7 +67,7 @@ relacional y usa el mismo `ModelContainer`; la separación de entidades del domi
 Sprint 3 añade `SavedMenu`, `SavedDish` y `FeedCacheRecord` en `LocalContentModels.swift`.
 `LocalContentService` crea `LocalContentStore` fuera de MainActor, con contexto propio sobre ese contenedor.
 `SavedMenuEntry` es el valor Codable/Sendable de presentación y migración; los objetos SwiftData no cruzan
-actores. `FeedMemoryCache` y `FeedImageStore` tienen políticas explícitas descritas en [sprint3.md](sprint3.md).
+actores. Las cachés en memoria están en la sección [Cachés](#cachés); `FeedImageStore` se describe en [sprint3.md](sprint3.md).
 
 ## Patrones y responsabilidades
 
@@ -94,7 +94,7 @@ pruebas y documentación. La funcionalidad pendiente de cada integrante sigue en
 | `App/` | Arranque, `AppContainer` (composition root), `SessionStore`, `FeatureViewModel` (papa de los viewmodels), `ServerClock`, tema y textos |
 | `Network/` | `APIClient` y sus modelos, autenticación, configuración y conectividad |
 | `Storage/` | Base SwiftData (`LocalDatabase`, `LocalContent*`), archivos (`FileStore`), `UserDefaultsStore` y `SessionGate` |
-| `Cache/` | Caché del feed en memoria, LRU de filtros sin red y fotos |
+| `Cache/` | Cachés en memoria (feed, filtros sin red, detalles y panel) y fotos |
 | `Services/` | Lógica de datos que usan los ViewModels: detalle, publicar, cuenta, eventos, reportes (fachada), piloto y ubicación |
 | `Features/<pantalla>/` | Vista y ViewModel de cada pantalla (MVVM): Feed, Detail, Publish, Recommend, Performance, Auth, Profile, Admin, Establishment |
 | `Features/Shared/` | Lo que comparten varias pantallas: pestañas y aviso de conexión |
@@ -116,11 +116,29 @@ pruebas y documentación. La funcionalidad pendiente de cada integrante sigue en
 | `EventService` | `metadataProvider` | Agrega la variante del piloto a cada evento |
 | `WaitIndicatorPilot` | `onParticipationChanged` | Sesión de eventos nueva y feed forzado |
 
+## Cachés
+
+Cada caché vive en memoria y se vacía al cambiar de cuenta. El disco (`FileStore`, SwiftData) sigue siendo
+la copia que sirve sin red y sobrevive al cerrar la app; la caché solo evita volver a leerlo o pedirlo.
+
+| Caché | Estructura | Parámetros | Para qué |
+|---|---|---|---|
+| `FeedMemoryCache` (Kevin) | NSCache | 12 entradas, 4 MB (costo = bytes del JSON), 30 s | Volver a un filtro reciente sin pedir el feed otra vez |
+| `OfflineFilterCache` (Kevin) | LRU, diccionario + lista doble | 4 entradas, 30 s | Cambiar filtros sin red sin recalcular |
+| `DetailMemoryCache` (Juan) | LRU propia, diccionario + arreglo con el orden de uso | 20 detalles, 60 s, llave usuario:menú | Reabrir un detalle sin leer ni decodificar el archivo |
+| `PanelMemoryCache` (Juan) | NSCache | 2 períodos (7 y 28 días) | Cambiar de período en Rendimiento sin esperar; iOS lo libera si falta memoria |
+| `FeedImageStore` (Kevin) | Kingfisher (memoria + disco) | 100 imágenes, 50 MB en memoria | Una sola copia procesada por foto |
+
+El detalle se lee en orden memoria → disco → servidor. `fetch` guarda en memoria y en disco;
+`savedCopy` mira primero la memoria y, si lee del disco, sube el resultado a memoria. La LRU de detalles
+usa un arreglo y no una lista enlazada: con 20 entradas recorrerlo es instantáneo y el código es más simple.
+El panel usa NSCache porque con dos llaves no importa el orden de expulsión sino que la memoria se pueda liberar.
+
 ## Concurrencia preservada y límites
 
 - `SessionStore.refreshAccount` usa `async let` para pedir cuenta y establecimientos en paralelo.
   Comprueba usuario y generación de sesión antes de aplicar los dos resultados.
-- `MenuDetailService.cached` lee y decodifica archivos con `Task.detached(priority: .utility)`.
+- `MenuDetailService.savedCopy` lee y decodifica archivos con `Task.detached(priority: .utility)`.
   Devuelve valores `Sendable`; el reloj y la presentación se actualizan en `MainActor`.
 - `MenuDetailViewModel.load` inicia copia y red con `async let`. La copia puede mostrarse mientras
   llega la respuesta. Las tareas pertenecen al `task` de la vista; la cancelación no se presenta como desconexión.

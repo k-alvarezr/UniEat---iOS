@@ -1,6 +1,6 @@
 import Foundation
 
-/// filtra sin red el catalogo guardado con los mismos criterios que rank-v1 (#36)
+/// filtra sin red el catalogo guardado con los mismos criterios que rank-v1
 /// puede decir si un menu es compatible, pero no que siga disponible ni en que orden va
 public enum OfflineMenuFiltering {
     public static func filter(_ menus: [DailyMenu], filters: FeedFilters, at date: Date) -> [DailyMenu] {

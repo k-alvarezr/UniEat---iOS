@@ -13,7 +13,7 @@ final class SessionStore: ObservableObject {
     @Published private(set) var accountError: String?                      // error al cargar la cuenta
     @Published var authMessage: String?                                    // aviso en el login, ej confirmar correo
     @Published private(set) var isForgetting = false
-    /// Una cuenta guardada permite navegar y editar borradores, nunca conceder permisos sin verificar.
+    /// con la cuenta guardada se puede navegar y editar borradores, pero los permisos siempre los confirma el server
     @Published private(set) var isAccountVerified = false
     @Published private(set) var cachedAccountDate: Date?
     /// id de esta sesion, cambia al entrar o salir
@@ -21,7 +21,7 @@ final class SessionStore: ObservableObject {
     /// asi una respuesta vieja nunca le llega al usuario siguiente
     private(set) var generation = UUID()
     var onChange: (() -> Void)?            // lo pone AppContainer, se llama cuando entra o sale alguien
-    var onForget: ((UUID, UUID) async throws -> Void)? // usuario y generación que se van a limpiar
+    var onForget: ((UUID, UUID) async throws -> Void)? // usuario y generacion que se van a limpiar
     private let auth: SessionAuthenticating
     private let api: APIRequesting
     init(auth: SessionAuthenticating, api: APIRequesting) {
@@ -87,7 +87,7 @@ final class SessionStore: ObservableObject {
         catch { accountError = error.localizedDescription }
     }
     /// pide quien es el usuario y sus locales, las dos no dependen una de la otra
-    /// entonces van en paralelo con async let (#31), si una falla la otra se cancela sola
+    /// entonces van en paralelo con async let, si una falla la otra se cancela sola
     func refreshAccount() async throws {
         guard let userID = profile?.id else { return }
         let expected = generation
@@ -112,7 +112,7 @@ final class SessionStore: ObservableObject {
         accountError = nil
     }
     /// cierra sesion: generacion nueva para cortar lo que estaba en camino, borra el keychain y limpia todo
-    /// El vencimiento automatico conserva pendientes. El cierre manual usa signOutAndForget.
+    /// si vence sola se conservan los pendientes, el cierre a mano usa signOutAndForget
     func signOut(message: String? = nil) {
         generation = UUID()
         auth.signOut()
@@ -125,8 +125,8 @@ final class SessionStore: ObservableObject {
         authMessage = message
         onChange?()
     }
-    /// Invalida primero las tareas de la cuenta y espera su limpieza antes de permitir otro login.
-    /// Asi una escritura vieja no puede reaparecer despues de borrar, ni se limpia otra sesion.
+    /// primero corta las tareas de la cuenta y espera que se limpie antes de dejar entrar a otro
+    /// asi una escritura vieja no reaparece despues de borrar y no se limpia otra sesion
     func signOutAndForget() async {
         guard !isForgetting, let leaving = profile?.id else { return }
         let departingGeneration = generation
@@ -160,7 +160,7 @@ final class SessionStore: ObservableObject {
     static func accountCacheKey(_ userID: UUID) -> String { "unieat.account.v1.\(userID.uuidString)" }
 }
 
-/// Datos de presentacion recibidos de /me; no contiene tokens ni se usa como autorizacion del backend.
+/// datos para mostrar que llegan de /me, no tiene tokens y el back no lo usa para dar permisos
 struct CachedAccountSnapshot: Codable {
     let profile: Profile
     let memberships: [RemoteMembership]

@@ -103,7 +103,7 @@ final class PublishViewModel: FeatureViewModel {
     var approvedEstablishments: [RemoteEstablishment] { session.approvedEstablishments }
     var isOffline: Bool { connectivity.isOffline }
     var canPublishOnline: Bool { !isOffline && session.isAccountVerified }
-    /// Agrupa cambios breves: cada tecla cambia estado ligero, no escribe disco en MainActor.
+    /// junta cambios seguidos, cada tecla solo cambia el estado, no escribe disco en el hilo principal
     func scheduleDraftSave() {
         draftTask?.cancel()
         draftSavedAt = nil
@@ -120,7 +120,7 @@ final class PublishViewModel: FeatureViewModel {
         }
     }
 
-    /// Al salir de la pantalla o pasar a segundo plano se guarda la ultima foto sin esperar el debounce.
+    /// al salir de la pantalla o pasar a segundo plano se guarda lo ultimo sin esperar el debounce
     func flushDraft() async {
         draftTask?.cancel()
         guard editingMenu == nil, hasDraftContent, !isSaving, let userID = session.profile?.id else { return }
@@ -142,7 +142,7 @@ final class PublishViewModel: FeatureViewModel {
             draftError = "No se pudo guardar el borrador en este dispositivo. Conserva el formulario e inténtalo de nuevo."
         }
     }
-    /// recupera el borrador de #33 leido en segundo plano
+    /// recupera el borrador del disco leido en segundo plano
     /// si el usuario escribio algo mientras se leia, no se pisa lo que escribio
     func restoreDraft() async {
         guard editingMenu == nil, let userID = session.profile?.id else { return }
@@ -330,7 +330,7 @@ final class PublishViewModel: FeatureViewModel {
                             entranceDescription: entranceDescription,
                             expectedVersion: editingMenu?.version)
         let replacing = editingMenu
-        // Si falla la red, el formulario enviado ya tiene una copia durable cuando el disco lo permite.
+        // si falla la red el formulario enviado ya quedo guardado en disco, si se pudo
         if editingMenu == nil, hasDraftContent {
             await persistDraft(currentDraft, userID: userID, generation: generation, request: draftRequest)
         }

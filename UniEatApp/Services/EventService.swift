@@ -2,7 +2,7 @@ import Combine
 import Foundation
 import UniEatCore
 
-/// Diagnostico local acotado; no son eventos pendientes ni se vuelve a enviar un rechazo permanente.
+/// lista corta de rechazos para revisar, no son pendientes y un rechazo permanente no se reenvia
 struct RejectedAnalyticsEvent: Codable {
     let event: RemoteEvent
     let reason: String
@@ -91,7 +91,7 @@ final class EventService: ObservableObject {
                 guard session.matches(userID, generation: expected) else { return }
                 let batchIDs = Set(batch.map(\.eventId))
                 let rejectedIDs = Set(response.rejected.compactMap(\.eventId))
-                // No se borra un lote si la respuesta no identifica coherentemente su resultado.
+                // si la respuesta no cuadra con lo enviado no se borra el lote
                 guard response.accepted >= 0, response.duplicates >= 0,
                       response.accepted + response.duplicates + response.rejected.count == batch.count,
                       rejectedIDs.count == response.rejected.count,
@@ -105,8 +105,8 @@ final class EventService: ObservableObject {
                 }
                 if rejectedEvents.count > 100 { rejectedEvents.removeFirst(rejectedEvents.count - 100) }
                 UserDefaultsStore.save(rejectedEvents, key: Self.rejectedKey(userID))
-                // Lo aceptado/duplicado se confirma. Un rechazo permanente queda diagnosticado;
-                // uno desconocido conserva el evento para no perder datos con contratos futuros.
+                // lo aceptado o duplicado se da por enviado, un rechazo permanente queda anotado
+                // y uno desconocido deja el evento en cola para no perder datos si el back cambia
                 let acknowledged = batchIDs.subtracting(rejectedIDs).union(permanentIDs)
                 pending.removeAll { acknowledged.contains($0.eventId) }
                 UserDefaultsStore.save(pending, key: key)

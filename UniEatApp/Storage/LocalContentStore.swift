@@ -2,8 +2,8 @@ import Foundation
 import SwiftData
 import UniEatCore
 
-/// guardados y copias del feed en swiftdata desde un @ModelActor (#32, #34)
-/// tiene su propio contexto que trabaja fuera del hilo principal, pero usa el MISMO ModelContainer que los reportes de #33
+/// guardados y copias del feed en swiftdata desde un @ModelActor
+/// tiene su propio contexto que trabaja fuera del hilo principal, pero usa el MISMO ModelContainer que los reportes
 /// los objetos de swiftdata nunca salen del actor, afuera solo llegan valores Codable y Sendable
 @ModelActor
 actor LocalContentStore {
@@ -72,7 +72,7 @@ actor LocalContentStore {
         let data = try UniEatDates.encoder().encode(snapshot)
         do {
             if let row = try modelContext.fetch(FetchDescriptor<FeedCacheRecord>(predicate: #Predicate { $0.key == key })).first {
-                // Una persistencia tardia del mismo contexto no pisa una respuesta mas reciente.
+                // un guardado que llega tarde no pisa una respuesta mas nueva
                 guard row.fetchedAt <= snapshot.response.fetchedAt else { return }
                 row.payload = data
                 row.fetchedAt = snapshot.response.fetchedAt
@@ -94,8 +94,8 @@ actor LocalContentStore {
         }
     }
 
-    /// Reportes y copias se borran en una sola transaccion. Los guardados se conservan,
-    /// como decidio Juan; el cierre automatico nunca llama esta operacion.
+    /// reportes y copias se borran en una sola transaccion, los guardados se quedan
+    /// porque son marcadores del usuario, cuando la sesion vence sola esto nunca se llama
     func forget(userID: UUID) throws {
         do {
             let reports = try modelContext.fetch(FetchDescriptor<MenuSnapshot>(predicate: #Predicate { $0.userId == userID }))

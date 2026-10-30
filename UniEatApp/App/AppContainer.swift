@@ -17,10 +17,10 @@ final class AppContainer: ObservableObject {
     let session: SessionStore                     // quien entro y sus permisos
     let connectivity: ConnectivityService         // si hay red o el server no responde
     let clock: ServerClock                        // hora del server
-    /// la base swiftdata: reportes (#33), menus guardados y copias del feed (#34), nil si no se pudo abrir
+    /// la base swiftdata: reportes, menus guardados y copias del feed, nil si no se pudo abrir
     let database: LocalDatabase?
     let storageError: String?                     // mensaje si la base no abrio, se muestra en perfil
-    let images: FeedImageStore                    // fotos del feed guardadas en disco (#38)
+    let images: FeedImageStore                    // fotos del feed guardadas en disco
     let pilot: WaitIndicatorPilot                 // piloto de la BQ-08, indicador de fila
 
     // viewmodels de cada pantalla, se inyectan en UniEatApp
@@ -183,7 +183,7 @@ final class AppContainer: ObservableObject {
     private func prefetchImages(_ menus: [DailyMenu]) {
         guard !connectivity.isOffline else { return }
         let urls = Set(menus.compactMap(\.photoUrl))
-        // Un refresco de los mismos menus no cancela y vuelve a iniciar su lote pendiente.
+        // si llegan los mismos menus no se cancela el lote que ya va bajando
         guard imageTask == nil || urls != imageURLs else { return }
         imageTask?.cancel()
         let id = UUID()
@@ -207,7 +207,7 @@ final class AppContainer: ObservableObject {
             guard let content else { throw APIFailure(code: "LOCAL_STORAGE_ERROR", message: "No se pudo abrir la base local.") }
             try await content.forget(userID: userID, generation: generation)
         } catch { failed = true }
-        // Se intenta limpiar tambien los archivos si fallo la base, y viceversa.
+        // si falla la base igual se intentan borrar los archivos, y al reves
         do { try await files.removeAll(userId: userID, invalidating: generation) }
         catch { failed = true }
         UserDefaultsStore.remove(key: FeedViewModel.cacheKey)

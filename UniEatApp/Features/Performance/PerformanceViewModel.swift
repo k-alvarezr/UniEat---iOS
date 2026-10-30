@@ -55,7 +55,7 @@ final class PerformanceViewModel: FeatureViewModel {
         guard let userID = session.profile?.id else { return }
         let expected = session.generation, id = UUID()
         requestID = id
-        // Sin internet se conservan las cifras disponibles y no se inicia un spinner ni una peticion.
+        // sin internet se quedan las cifras que haya, sin spinner ni peticion
         guard connectivity.isConnected else {
             isLoading = false
             return
@@ -97,7 +97,7 @@ final class PerformanceViewModel: FeatureViewModel {
     private func panels<Panel>(_ cache: PanelMemoryCache<Panel>) -> [Int: Panel] {
         var result: [Int: Panel] = [:]                  // diccionario vacio
         for days in [7, 28] {                           // las dos pestañas del selector
-            if let panel = cache.value(days: days) {    // ¿hay panel guardado de ese periodo?
+            if let panel = cache.value(days: days) {    // hay panel guardado de ese periodo?
                 result[days] = panel                    // si hay, se pone en el diccionario
             }
         }

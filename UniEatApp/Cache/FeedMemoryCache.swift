@@ -1,7 +1,7 @@
 import Foundation
 import UniEatCore
 
-/// copia del feed en memoria (#38): si se cambia de filtro y se vuelve en menos de 30 s no se pide otra vez
+/// copia del feed en memoria: si se cambia de filtro y se vuelve en menos de 30 s no se pide otra vez
 /// NSCache bota entradas solo si el celular se queda sin memoria, el vencimiento de 30 s se revisa aparte
 @MainActor
 final class FeedMemoryCache {

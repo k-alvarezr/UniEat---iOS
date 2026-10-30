@@ -76,7 +76,7 @@ final class LocalDatabase {
     
     /// lanza el error si la base no abre, inMemory y storeURL son para las pruebas
     init(inMemory: Bool = false, storeURL: URL? = nil) throws {
-        // todos los modelos de la app van en esta lista: reportes (#33), guardados y copias del feed (#34)
+        // todos los modelos de la app van en esta lista: reportes, guardados y copias del feed
         let schema = Schema([MenuSnapshot.self, PendingReport.self, SavedMenu.self, SavedDish.self, FeedCacheRecord.self])
         let config = storeURL.map { ModelConfiguration(schema: schema, url: $0) }
             ?? ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory)

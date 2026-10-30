@@ -1,7 +1,7 @@
 import Foundation
 import UniEatCore
 
-/// guarda json en archivos del celular, separado por usuario (#33)
+/// guarda json en archivos del celular, separado por usuario
 /// el detalle va en Caches porque se puede volver a bajar y el sistema lo puede borrar si falta espacio
 /// el borrador va en Application Support porque es trabajo del usuario y no se debe perder
 /// es un actor: el disco se toca fuera del hilo principal y las escrituras van en orden

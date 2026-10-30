@@ -3,7 +3,7 @@ import Foundation
 import UniEatCore
 
 /// copia de un reporte guardado con lo que hace falta para mandarlo, todo Sendable
-/// los modelos de swiftdata no pueden cambiar de hilo, por eso a la red se manda esta copia (como en #31)
+/// los modelos de swiftdata no pueden cambiar de hilo, por eso a la red se manda esta copia
 struct ReportToSend: Identifiable, Sendable {
     let id: UUID
     let body: ReportBody
@@ -22,7 +22,7 @@ protocol ReportOutbox {
     func clearRejections(userID: UUID) throws
 }
 
-/// la base de #33 cumple el protocolo, cada metodo busca por id en vez de cargar toda la cola
+/// la base local cumple el protocolo, cada metodo busca por id en vez de cargar toda la cola
 extension LocalDatabase: ReportOutbox {
     /// guarda el reporte, si ya existe ese id para el usuario no lo repite (es un reintento)
     func enqueue(userID: UUID, menu: DailyMenu, kind: ReportKind, note: String,
@@ -68,7 +68,7 @@ enum ReportSubmitResult: Equatable {
 }
 
 /// patron Facade: la hoja de reportar solo pide submitReport y esta clase coordina
-/// quien es el usuario, guardar en swiftdata (#33), mandar al server en paralelo (#31) y confirmar
+/// quien es el usuario, guardar en swiftdata, mandar al server en paralelo y confirmar
 /// solo se encarga de reportes, no maneja pantallas ni formularios
 @MainActor
 final class ReportFacade: FeatureViewModel {
@@ -140,7 +140,7 @@ final class ReportFacade: FeatureViewModel {
         return try await deliver(report, userID: userID)
     }
 
-    /// manda los reportes guardados en paralelo (#31), se llama al volver la red o el server
+    /// manda los reportes guardados en paralelo, se llama al volver la red o el server
     /// retryRejected en true vuelve a intentar tambien los rechazados, lo usa el boton de perfil
     func sendPendingReports(retryRejected: Bool = false) async {
         guard let userID = session.profile?.id else { return }
@@ -165,7 +165,7 @@ final class ReportFacade: FeatureViewModel {
             defer {
                 for report in reports { sending.remove(report.id) }
             }
-            // 2. el TaskGroup de #31 con prioridad utility, una tarea hija por reporte
+            // 2. un TaskGroup con prioridad utility, una tarea hija por reporte
             //    arrancan maxParallel y cuando termina una entra la siguiente
             var waiting = reports.makeIterator()
             let api = api

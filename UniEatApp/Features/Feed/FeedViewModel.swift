@@ -2,8 +2,8 @@ import Combine
 import Foundation
 import UniEatCore
 
-/// Identidad de una exposicion, no de la tarjeta. Copia -> vivo, nueva sesion/version o
-/// nueva evidencia pueden producir una exposicion elegible sin reconstruir la lista.
+/// identidad de una exposicion, no de la tarjeta, copia -> vivo, nueva sesion o version o
+/// nueva evidencia pueden contar como exposicion nueva sin reconstruir la lista
 struct FeedExposureKey: Hashable {
     let generation: UUID
     let sessionID: UUID
@@ -16,8 +16,8 @@ struct FeedExposureKey: Hashable {
     let indicatorShown: Bool
 }
 
-/// Hoy, filtros y recomendacion comparten este resultado. Memoria (30 s), snapshots
-/// de SwiftData y catalogo tienen propositos distintos; refrescar no vuelve a leerlos todos.
+/// hoy, filtros y recomendacion usan este mismo resultado, memoria (30 s), copias
+/// en swiftdata y catalogo sirven para cosas distintas, refrescar no los vuelve a leer todos
 @MainActor
 final class FeedViewModel: FeatureViewModel {
     @Published private(set) var menus: [DailyMenu] = []
@@ -46,7 +46,7 @@ final class FeedViewModel: FeatureViewModel {
     private var catalog: CachedFeedSnapshot?
     private var didReadCatalog = false
     private var catalogInvalidated = false
-    private let catalogTTL: TimeInterval = 30   // misma política; ahora también usa la fecha persistida
+    private let catalogTTL: TimeInterval = 30   // misma politica, tambien usa la fecha guardada
     var onServiceAvailable: (() -> Void)?
     var onMenusLoaded: (([DailyMenu]) -> Void)?
     var prepareContext: (() async -> Void)?
@@ -108,8 +108,8 @@ final class FeedViewModel: FeatureViewModel {
         refreshTask = Task { await refresh() }
     }
 
-    /// Una publicacion/edicion/cierre confirmado invalida la memoria y el catalogo, sin
-    /// borrar la copia durable que aun puede servir si se pierde la red durante la recarga.
+    /// al publicar, editar o cerrar se vacia la memoria y el catalogo, pero no
+    /// la copia en disco, que sirve si se va la red mientras recarga
     func invalidateAfterPublicationChange() {
         offlineFilters.clear()
         memory.clear()
@@ -154,7 +154,7 @@ final class FeedViewModel: FeatureViewModel {
             guard session.matches(userID, generation: generation), requestID == id, requested == filters else { return }
             clock.synchronize(response.serverNow ?? response.fetchedAt)
             let snapshot = CachedFeedSnapshot(userId: userID, filters: requested, response: response)
-            // La respuesta valida aparece antes del I/O. Un error de guardado no la esconde.
+            // la respuesta se muestra antes de guardarla, si falla el guardado igual se ve
             show(snapshot, stored: false)
             memory.insert(snapshot)
             connectivity.serverUnreachable = false
@@ -167,7 +167,7 @@ final class FeedViewModel: FeatureViewModel {
             }
             if let content {
                 do {
-                    // Un feed sin filtros ya es el catalogo: no se duplica su peticion ni su JSON en disco.
+                    // un feed sin filtros ya es el catalogo, no se pide dos veces ni se guarda doble
                     try await content.saveFeed(snapshot, isCatalog: requested.queryItems.isEmpty, generation: generation)
                 } catch {
                     if session.matches(userID, generation: generation), requestID == id {
@@ -206,8 +206,8 @@ final class FeedViewModel: FeatureViewModel {
         if locationMenus != snapshot.response.menus { locationMenus = snapshot.response.menus }
     }
 
-    /// La primera apertura recupera disco; las siguientes conservan el resultado compatible.
-    /// El catalogo se lee una vez por cuenta y se reutiliza al cambiar filtros sin red.
+    /// la primera vez lee el disco, las siguientes reusan lo que ya hay
+    /// el catalogo se lee una vez por cuenta y se reusa al cambiar filtros sin red
     private func loadCachedFeed(userID: UUID, generation: UUID, request: UUID, requested: FeedFilters) async {
         var snapshot: CachedFeedSnapshot?
         do {
@@ -215,7 +215,7 @@ final class FeedViewModel: FeatureViewModel {
                 if requested.queryItems.isEmpty {
                     if let catalog { snapshot = catalog }
                     else { snapshot = try await content.feed(userID: userID, filters: requested, catalog: true) }
-                    // La version anterior guardaba tambien el feed sin filtros bajo su llave exacta.
+                    // la version vieja tambien guardaba el feed sin filtros con su propia llave
                     if snapshot == nil { snapshot = try await content.feed(userID: userID, filters: requested) }
                 } else {
                     snapshot = try await content.feed(userID: userID, filters: requested)
@@ -291,9 +291,9 @@ final class FeedViewModel: FeatureViewModel {
                 try await content.saveFeed(snapshot, isCatalog: true, generation: generation)
                 guard session.matches(userID, generation: generation), catalogRequestID == catalogID, !Task.isCancelled else { return }
                 rememberCatalog(snapshot)
-                // Solo se precargan fotos del resultado mostrado, nunca de este calentamiento de catalogo.
+                // solo se precargan fotos de lo que se muestra, no del catalogo que se carga por debajo
             } catch {
-                // El calentamiento opcional no oculta una respuesta valida del feed.
+                // si falla esa carga por debajo no esconde el feed que si llego
             }
         }
     }
@@ -301,6 +301,6 @@ final class FeedViewModel: FeatureViewModel {
         FeedFilters(budgetCop: nil, availableMinutes: nil, diet: nil, area: nil, paymentMethod: nil)
     }
     func track(_ kind: String, menu: DailyMenu) { events.track(kind, menu: menu) }
-    /// llave de la copia vieja del feed en UserDefaults (antes del #45), ya no se lee, solo se borra al cerrar sesion
+    /// llave de la copia vieja del feed en UserDefaults, ya no se lee, solo se borra al cerrar sesion
     static let cacheKey = "unieat.remote.feed-cache.v1"
 }
