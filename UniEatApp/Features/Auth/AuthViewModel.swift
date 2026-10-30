@@ -60,8 +60,12 @@ final class AuthViewModel: FeatureViewModel {
             errorText = failure.localizedDescription
         } catch let failure as APIFailure {
             errorText = failure.message
-        } catch is URLError {
-            errorText = "Sin conexión. Revisa tu internet e inténtalo de nuevo."
+        } catch let error as URLError {
+            guard !Task.isCancelled, error.code != .cancelled else { return }
+            connectivity.serviceResponded(false)
+            errorText = connectivity.isConnected
+                ? "No pudimos contactar al servicio de acceso. Reintenta cuando esté disponible."
+                : "Sin conexión. Revisa tu internet e inténtalo de nuevo."
         } catch {
             errorText = "El servicio respondió algo inesperado. Inténtalo de nuevo."
         }

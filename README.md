@@ -4,6 +4,10 @@ UniEat is a SwiftUI app for browsing and publishing daily menus near Universidad
 
 The current architecture, patterns, concurrency and persistence boundaries are documented in [docs/architecture.md](docs/architecture.md). See [Sprint 3 implementation and evidence](docs/sprint3.md) for BQ-08, offline storage, caching, ownership and outstanding device validation; [preparation history](docs/pre-sprint3.md) records the earlier corrections. The app interface is in Spanish; UI labels below are quoted exactly as they appear on screen.
 
+The [per-screen offline matrix](docs/offline-screens.md) records local navigation and recovery across the app.
+The [Sprint 3 delivery audit](docs/sprint3-delivery-audit.md) maps Kevin's implementation, Juan's ownership,
+the Kanban and the viva voce requirements to code and outstanding evidence.
+
 ## Run on macOS
 
 Requirements: Xcode with an iPhone simulator, [XcodeGen](https://github.com/yonaskolb/XcodeGen), and a macOS version supported by your installed Xcode.

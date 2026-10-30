@@ -15,7 +15,7 @@ comprobación entre pantallas. No se presenta un error 500 como una búsqueda va
 | Login y registro | Conserva el formulario abierto y explica por qué no puede enviarse | Reintentar el servicio y luego entrar; no existe autenticación offline de cuentas nuevas |
 | Hoy | Lee copia por usuario/filtros o catálogo local; abre filtros, detalle y guardados; descarta vencidos | Fecha de copia, estado sin copia y actualización explícita al recuperar red |
 | Copia de menús | Sigue navegable desde Hoy o la galería, distingue copia ausente de copia sin coincidencias | Reintento forzado; no afirma estar sin internet si la red ya volvió |
-| Filtros | Edita/restablece filtros y aplica reglas al catálogo descargado; GPS con coordenadas disponibles | Misma regla de presupuesto/dieta por plato; no inventa coordenadas, vigencia o ranking nuevo |
+| Filtros | Edita/restablece filtros y aplica reglas al catálogo descargado; GPS con coordenadas disponibles | LRU de resultados locales recientes; invalida en cambios temporales, catálogo/cuenta/publicación; mismas reglas por plato |
 | Elige por mí | Recorre las opciones locales compatibles y abre el detalle | Señala antigüedad; no crea alternativas si falta copia compatible |
 | Guardados | Lee relaciones SwiftData por cuenta; abre el menú guardado y permite quitarlo localmente | Conserva fecha y señala vencidos; cambios remotos se verifican en detalle |
 | Detalle | Lee archivo o snapshot inicial; permite guardar, elegir, registrar llegada y preparar reporte | Sin ruta no intenta HTTP; pull-to-refresh y reconexión recargan sin inflar BQ-04 |
@@ -48,6 +48,9 @@ recuperación compartida, cancelación, expiración de un token viejo, formulari
 sin autorización, separación/borrado por usuario, métricas sin copia, pérdida de red durante una respuesta,
 recuperación, bloqueos administrativos, lista aún no descargada, respuesta de otra sesión y detalle local.
 Continúan las pruebas anteriores de filtrado, vencimiento, persistencia, borradores, imágenes y reportes.
+
+`OfflineFilterCacheTests` verifica promoción/expulsión LRU, aislamiento, borrado, retroceso de reloj y
+caducidad en vencimiento, inicio de una publicación y fin de la ventana de evidencia de fila.
 
 La compilación iOS y XCTest se ejecutan en CI macOS. No se atribuye a CI una prueba en iPhone físico.
 Registrar los escenarios reales, dispositivo, iOS, commit y capturas en #44/#59 y la wiki antes de entrega.

@@ -36,6 +36,7 @@ final class FeedViewModel: FeatureViewModel {
     private let events: EventService
     private let content: LocalContentService?
     private let memory: FeedMemoryCache
+    private let offlineFilters = OfflineFilterCache()
     private var requestID = UUID()
     private var refreshTask: Task<Void, Never>?
     private var catalogTask: Task<Void, Never>?
@@ -73,7 +74,7 @@ final class FeedViewModel: FeatureViewModel {
 
     func accountChanged() {
         refreshTask?.cancel(); catalogTask?.cancel(); catalogTask = nil; catalogRequestID = UUID()
-        requestID = UUID(); memory.clear()
+        requestID = UUID(); memory.clear(); offlineFilters.clear()
         appliedUserID = nil; appliedFilters = nil; catalog = nil; didReadCatalog = false; catalogInvalidated = false
         menus = []; locationMenus = []; isLoading = false; loadError = nil; cacheWarning = nil
         isShowingCachedFeed = false; hasSnapshot = false
@@ -91,6 +92,7 @@ final class FeedViewModel: FeatureViewModel {
     /// Una publicación/edición/cierre confirmado invalida la memoria y el catálogo, sin
     /// borrar la copia durable que aún puede servir si se pierde la red durante la recarga.
     func invalidateAfterPublicationChange() {
+        offlineFilters.clear()
         memory.clear(); catalogInvalidated = true
         catalogTask?.cancel(); catalogTask = nil; catalogRequestID = UUID()
     }
@@ -173,6 +175,7 @@ final class FeedViewModel: FeatureViewModel {
     }
 
     private func rememberCatalog(_ snapshot: CachedFeedSnapshot) {
+        offlineFilters.clear()
         catalog = snapshot; didReadCatalog = true; catalogInvalidated = false
         if locationMenus != snapshot.response.menus { locationMenus = snapshot.response.menus }
     }
@@ -198,7 +201,7 @@ final class FeedViewModel: FeatureViewModel {
                     if requested.queryItems.isEmpty { storedCatalog = snapshot }
                     else { storedCatalog = try await content.feed(userID: userID, filters: requested, catalog: true) }
                     guard session.matches(userID, generation: generation), requestID == request, requested == filters else { return }
-                    catalog = storedCatalog; didReadCatalog = true
+                    catalog = storedCatalog; didReadCatalog = true; offlineFilters.clear()
                 }
             }
         } catch {
@@ -213,9 +216,17 @@ final class FeedViewModel: FeatureViewModel {
             if let reference = catalog.timeReference { clock.restore(reference) }
             if locationMenus != catalog.response.menus { locationMenus = catalog.response.menus }
             if snapshot == nil {
+                let now = clock.now
+                let filtered: [DailyMenu]
+                if let cached = offlineFilters.value(userID: userID, filters: requested, at: now) {
+                    filtered = cached
+                } else {
+                    filtered = OfflineMenuFiltering.filter(catalog.response.menus, filters: requested, at: now)
+                    offlineFilters.insert(filtered, source: catalog.response.menus, userID: userID, filters: requested, at: now)
+                }
                 snapshot = CachedFeedSnapshot(userId: userID, filters: requested,
                     response: FeedResponse(fetchedAt: catalog.response.fetchedAt,
-                        menus: OfflineMenuFiltering.filter(catalog.response.menus, filters: requested, at: clock.now)),
+                        menus: filtered),
                     timeReference: catalog.timeReference)
             }
         }
@@ -238,7 +249,7 @@ final class FeedViewModel: FeatureViewModel {
                 if !didReadCatalog {
                     let stored = try await content.feed(userID: userID, filters: Self.allFilters, catalog: true)
                     guard session.matches(userID, generation: generation), catalogRequestID == catalogID, !Task.isCancelled else { return }
-                    catalog = stored; didReadCatalog = true
+                    catalog = stored; didReadCatalog = true; offlineFilters.clear()
                     if let stored, locationMenus != stored.response.menus { locationMenus = stored.response.menus }
                 }
                 if let catalog, !catalogInvalidated {
