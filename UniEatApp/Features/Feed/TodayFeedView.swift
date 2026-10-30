@@ -146,22 +146,26 @@ struct FoodArtwork: View {
             LinearGradient(colors: [Palette.yellow, Palette.coral.opacity(0.8)],
                            startPoint: .topLeading, endPoint: .bottomTrailing)
             Circle().fill(.white.opacity(0.45)).frame(width: 140).offset(x: 95, y: -40)
+            if photo == nil { placeholderIcon }
+        }
+        // la foto va como overlay para que tome el tamaño del cuadro y no al reves
+        // con scaledToFill adentro del zstack la foto crecia y tapaba la tarjeta de abajo
+        .overlay {
             if let photo {
                 AsyncImage(url: photo) { image in
                     image.resizable().scaledToFill()
                 } placeholder: {
                     placeholderIcon
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipped()
-            } else {
-                placeholderIcon
             }
+        }
+        // el nombre va encima de la foto para que se siga viendo
+        .overlay(alignment: .bottomLeading) {
             Text(name.uppercased())
                 .font(.rounded(12, .black))
                 .padding(7)
                 .background(Palette.paper, in: Capsule())
-                .offset(x: -75, y: 45)
+                .padding(10)
         }
         .frame(maxWidth: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: 11))

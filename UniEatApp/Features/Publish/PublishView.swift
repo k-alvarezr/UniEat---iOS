@@ -32,6 +32,26 @@ private struct DishDraft: Identifiable {
                              dietaryKnown: dietaryKnown, dietaryTags: dietaryKnown ? tags : [])
     }
 }
+/// lo que se guarda del formulario en un archivo para no perderlo si se cierra la app o se va la red
+struct PublishDraft: Codable {
+    struct Dish: Codable {
+        var name: String
+        var detail: String
+        var priceText: String
+        var vegetarian: Bool
+        var vegan: Bool
+        var dietaryKnown: Bool
+    }
+    var establishmentId: UUID?
+    var restaurantName: String
+    var area: String
+    var address: String
+    var entranceDescription: String
+    var title: String
+    var validUntil: Date
+    var paymentMethods: [String]
+    var dishes: [Dish]
+}
 
 /// pestaña publicar para restaurantes, crear editar y cerrar el menu del dia
 struct PublishView: View {
@@ -95,6 +115,8 @@ struct PublishView: View {
         .background(Palette.cream)
         .onAppear(perform: selectFirstEstablishment)
         .onChange(of: store.approvedEstablishments.map(\.id)) { _, _ in selectFirstEstablishment() }
+        .onAppear { if editingMenu == nil, let draft = store.loadDraft() { restore(draft) } }
+        .onDisappear { if editingMenu == nil && hasDraftContent { store.saveDraft(currentDraft) } }
     }
 
     // MARK: - partes del formulario
@@ -218,6 +240,52 @@ struct PublishView: View {
     }
 
     // MARK: - acciones
+    
+    // foto del formulario para guardarla en archivo
+    private var currentDraft: PublishDraft {
+        PublishDraft(establishmentId: selectedEstablishmentID,
+                     restaurantName: restaurantName,
+                     area: area,
+                     address: address,
+                     entranceDescription: entranceDescription,
+                     title: title,
+                     validUntil: validUntil,
+                     paymentMethods: Array(paymentMethods),
+                     dishes: dishes.map { PublishDraft.Dish(name: $0.name,
+                                                            detail: $0.detail,
+                                                            priceText: $0.priceText,
+                                                            vegetarian: $0.vegetarian,
+                                                            vegan: $0.vegan,
+                                                            dietaryKnown: $0.dietaryKnown) })
+    }
+    
+    // solo vale la pena guardar si escribio algun plato
+    private var hasDraftContent: Bool {
+        dishes.contains { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty || !$0.priceText.isEmpty }
+    }
+    
+    // vuelve a llenar el formulario con lo guardado
+    private func restore(_ draft: PublishDraft) {
+        selectedEstablishmentID = draft.establishmentId
+        restaurantName = draft.restaurantName
+        area = draft.area
+        address = draft.address
+        entranceDescription = draft.entranceDescription
+        title = draft.title
+        validUntil = draft.validUntil
+        paymentMethods = Set(draft.paymentMethods)
+        dishes = draft.dishes.map { saved in
+            var dish = DishDraft()
+            dish.name = saved.name
+            dish.detail = saved.detail
+            dish.priceText = saved.priceText
+            dish.vegetarian = saved.vegetarian
+            dish.vegan = saved.vegan
+            dish.dietaryKnown = saved.dietaryKnown
+            return dish
+        }
+        message = "Recuperamos tu borrador."
+    }
 
     private func selectFirstEstablishment() {
         guard selectedEstablishmentID == nil, let first = store.approvedEstablishments.first else { return }
@@ -272,6 +340,7 @@ struct PublishView: View {
                             expectedVersion: editingMenu?.version)
         do {
             try await store.publish(body, replacing: editingMenu)
+            store.clearDraft()
             dishes = [DishDraft()]
             editingMenu = nil
             message = "Menú publicado. Ya es visible para los estudiantes."
