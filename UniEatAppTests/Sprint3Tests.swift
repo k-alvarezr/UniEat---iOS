@@ -184,5 +184,16 @@ final class Sprint3Tests: XCTestCase {
         XCTAssertNil(pilot.metadata(menu: h.menu, sessionID: sessionID, live: true))
     }
 
-
+    // el panel lee los campos nuevos de BQ-04 y sigue funcionando con un back que aun no los manda
+    func testBQ04DecodesNewFieldsAndStaysCompatibleWithTheOldBackend() throws {
+        let old = Data(#"{"detailRequests":3,"activeShown":2,"expiringShown":0,"expiredShown":1,"closedShown":0,"pendingNoticesShown":0,"confirmedNoticesShown":0}"#.utf8)
+        let legacy = try UniEatDates.decoder().decode(BQ04Metrics.self, from: old)
+        XCTAssertNil(legacy.rates)
+        XCTAssertNil(legacy.unavailableShown)
+        let new = Data(#"{"detailRequests":40,"activeShown":30,"expiringShown":6,"expiredShown":3,"closedShown":1,"pendingNoticesShown":4,"confirmedNoticesShown":2,"unavailableShown":4,"distinctMenus":12,"rates":{"active":0.75,"expiring":0.15,"unavailable":0.1,"pendingNotice":0.1,"confirmedNotice":0.05,"revised":0.2}}"#.utf8)
+        let current = try UniEatDates.decoder().decode(BQ04Metrics.self, from: new)
+        XCTAssertEqual(current.unavailableShown, 4)
+        XCTAssertEqual(current.distinctMenus, 12)
+        XCTAssertEqual(current.rates?.active, 0.75)
+    }
 }

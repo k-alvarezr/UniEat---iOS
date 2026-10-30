@@ -200,23 +200,54 @@ private struct BQ03Section: View {
     }
 }
 
+/// resumen de BQ-04 para que el admin se de una idea, el detalle completo esta en el tablero html
 private struct BQ04Section: View {
     let metrics: BQ04Metrics
+    // vencidos + cerrados, si el back aun no lo manda se suma aca
+    private var unavailable: Int { metrics.unavailableShown ?? metrics.expiredShown + metrics.closedShown }
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
-            Text("BQ-04 · Vigencia y cambios").font(.title3.bold())
-            Text("Estados y avisos mostrados al consultar detalles desde iOS; un detalle puede tener más de un aviso.")
-                .font(.caption).foregroundStyle(.secondary)
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 9) {
-                MetricTile(number: "\(metrics.detailRequests)", title: "Consultas", detail: "Detalles solicitados", color: Palette.yellow)
-                MetricTile(number: "\(metrics.activeShown)", title: "Vigentes", detail: "Estado activo mostrado", color: Palette.green)
-                MetricTile(number: "\(metrics.expiringShown)", title: "Por vencer", detail: "Estado próximo a vencer", color: Palette.yellow)
-                MetricTile(number: "\(metrics.expiredShown)", title: "Vencidos", detail: "Estado vencido", color: Palette.coral)
-                MetricTile(number: "\(metrics.closedShown)", title: "Cerrados", detail: "Publicación cerrada", color: Palette.coral)
-                MetricTile(number: "\(metrics.pendingNoticesShown)", title: "Avisos pendientes", detail: "Detalles con cambio por revisar", color: Palette.cyan)
-                MetricTile(number: "\(metrics.confirmedNoticesShown)", title: "Avisos confirmados", detail: "Detalles con cambio confirmado", color: Palette.green)
+            Text("BQ-04 · ¿Los menús que se abren están vigentes?").font(.title3.bold())
+            Text(summary).font(.subheadline)
+            if metrics.detailRequests > 0 { ValidityBar(active: metrics.activeShown, expiring: metrics.expiringShown, unavailable: unavailable) }
+            if let rates = metrics.rates {
+                Text("\(percent(rates.pendingNotice)) con cambio sin revisar · \(percent(rates.confirmedNotice)) con cambio confirmado")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else if metrics.detailRequests > 0 {
+                Text("Muestra insuficiente para porcentajes, se necesitan 20 consultas.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
+    }
+    // la respuesta en una frase, con porcentajes solo si el server los mando
+    private var summary: String {
+        let menus = metrics.distinctMenus.map { " de \($0) menús" } ?? ""
+        guard let rates = metrics.rates else {
+            return "\(metrics.detailRequests) consultas\(menus): \(metrics.activeShown) vigentes, \(metrics.expiringShown) por vencer, \(unavailable) no disponibles."
+        }
+        return "\(metrics.detailRequests) consultas\(menus): \(percent(rates.active)) vigente, \(percent(rates.expiring)) por vencer, \(percent(rates.unavailable)) no disponible."
+    }
+    private func percent(_ share: Double) -> String { "\(Int((share * 100).rounded())) %" }
+}
+
+/// barra apilada vigente / por vencer / no disponible sobre el total de consultas
+private struct ValidityBar: View {
+    let active: Int
+    let expiring: Int
+    let unavailable: Int
+    var body: some View {
+        let total = CGFloat(max(active + expiring + unavailable, 1))
+        GeometryReader { proxy in
+            HStack(spacing: 0) {
+                Palette.green.frame(width: proxy.size.width * CGFloat(active) / total)
+                Palette.yellow.frame(width: proxy.size.width * CGFloat(expiring) / total)
+                Palette.coral.frame(width: proxy.size.width * CGFloat(unavailable) / total)
+            }
+        }
+        .frame(height: 14)
+        .clipShape(Capsule())
+        .accessibilityElement()
+        .accessibilityLabel("\(active) vigentes, \(expiring) por vencer, \(unavailable) no disponibles")
     }
 }
 
