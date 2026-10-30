@@ -31,9 +31,12 @@ final class EstablishmentViewModel: FeatureViewModel {
         self.session = session
         super.init()
         observe(session)
+        observe(service.connectivity)
     }
     var memberships: [RemoteMembership] { session.memberships }
     var isRestaurant: Bool { session.isRestaurant }
+    var canUseNetwork: Bool { !service.connectivity.isOffline }
+    var canGeocode: Bool { service.connectivity.isConnected }
     /// al cambiar de cuenta se limpia el formulario
     func reset() {
         showingForm = false
@@ -54,7 +57,7 @@ final class EstablishmentViewModel: FeatureViewModel {
     let methods = ["Nequi", "Daviplata", "Efectivo", "Tarjeta"]
     /// nombre, direccion, un metodo de pago y foto valida o vacia
     var canSubmit: Bool {
-        !isWorking && !name.trimmed.isEmpty &&
+        canUseNetwork && !isWorking && !name.trimmed.isEmpty &&
         !address.trimmed.isEmpty && !paymentMethods.isEmpty &&
         validPhotoURL
     }
@@ -68,6 +71,10 @@ final class EstablishmentViewModel: FeatureViewModel {
     /// busca la direccion y pone el pin aproximado
     /// si cambio la sesion o la direccion mientras buscaba no se usa el resultado
     func showAddressOnMap() async {
+        guard canGeocode else {
+            pinMessage = "Buscar una dirección requiere internet. Puedes usar el GPS o conservar el pin que ya elegiste."
+            return
+        }
         guard let userID = session.profile?.id else { return }
         let generation = session.generation, requested = address
         isGeocoding = true
@@ -78,11 +85,12 @@ final class EstablishmentViewModel: FeatureViewModel {
             setPin(found, fromAddress: true)
             pinMessage = "Ubicación aproximada según la dirección. Revísala en el mapa."
         } else {
-            pinMessage = "No encontramos esa dirección. Usa tu ubicación estando en el local o mueve el pin."
+            pinMessage = "No se pudo consultar esa dirección. Usa tu ubicación estando en el local o mueve el pin."
         }
     }
     /// direccion -> coordenadas con el geocoder de apple, en bogota
     func geocode(_ text: String) async -> CLLocationCoordinate2D? {
+        guard canGeocode else { return nil }
         let trimmed = text.trimmed
         guard !trimmed.isEmpty else { return nil }
         let placemarks = try? await CLGeocoder().geocodeAddressString("\(trimmed), Bogotá, Colombia")
@@ -97,12 +105,16 @@ final class EstablishmentViewModel: FeatureViewModel {
     }
     /// recarga la cuenta para ver si ya aprobaron el local
     func updateStatus() async {
+        guard canUseNetwork, let userID = session.profile?.id else { return }
+        let generation = session.generation
         isWorking = true
-        defer { isWorking = false }
+        defer { if session.matches(userID, generation: generation) { isWorking = false } }
         do {
             try await session.refreshAccount()
+            guard session.matches(userID, generation: generation) else { return }
             message = session.isRestaurant ? "Tu cuenta ya puede publicar menús." : "Estado actualizado. Las solicitudes pendientes requieren aprobación."
         } catch {
+            guard session.matches(userID, generation: generation) else { return }
             message = error.localizedDescription
         }
     }

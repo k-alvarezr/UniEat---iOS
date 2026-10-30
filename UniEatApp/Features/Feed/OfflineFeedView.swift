@@ -10,7 +10,7 @@ struct OfflineFeedView: View {
         TimelineView(.periodic(from: .now, by: 60)) { timeline in
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    BrandHeader(title: "UniEat · Sin conexión")
+                    BrandHeader(title: "UniEat · Copia de menús")
                     statusCard
                     HStack {
                         Sticker(text: "Filtros guardados", color: Palette.cream, icon: "slider.horizontal.3")
@@ -19,7 +19,10 @@ struct OfflineFeedView: View {
                         }
                     }
                     Text("Menús disponibles en esta copia").font(.rounded(22))
-                    if store.visibleMenus.isEmpty {
+                    if !store.hasSnapshot {
+                        ContentUnavailableView("No hay una copia descargada", systemImage: "arrow.down.circle",
+                            description: Text("Puedes volver a Hoy o ajustar los filtros. Descarga los menús cuando el servicio esté disponible."))
+                    } else if store.visibleMenus.isEmpty {
                         EmptyFeedView()
                     } else {
                         ForEach(store.visibleMenus) { menu in
@@ -36,14 +39,15 @@ struct OfflineFeedView: View {
                 .padding(16)
             }
             .background(Palette.cream)
-            .navigationTitle("Sin conexión")
+            .connectionStatus(.today)
+            .navigationTitle("Copia de menús")
             .navigationBarTitleDisplayMode(.inline)
         }
     }
 
     private var statusCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("Sin conexión", systemImage: "wifi.slash").font(.rounded(25))
+            Label("Vista guardada", systemImage: "externaldrive").font(.rounded(25))
             Text(store.hasSnapshot ? "Mostrando datos guardados el \(SpanishPresentation.dateAndTime(store.fetchedAt))" : "Aún no hay una copia descargada para estos filtros.")
                 .font(.subheadline.weight(.semibold))
             Text("Los menús vencidos se ocultan aunque sigan en la copia local.")

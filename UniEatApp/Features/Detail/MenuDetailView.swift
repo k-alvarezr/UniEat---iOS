@@ -64,6 +64,11 @@ private struct MenuDetailScreen: View {
                 .padding(16)
             }
             .background(Palette.cream)
+            .connectionStatus(.detail)
+            .refreshable { await load(automatic: true) }
+            .onChange(of: store.isConnected) { _, connected in
+                if connected { Task { await load(automatic: true) } }
+            }
             .navigationBarTitleDisplayMode(.inline)
             // al cerrar la hoja se recarga para ver el reporte que se acabo de mandar
             .sheet(isPresented: $showingReport, onDismiss: { Task { await load(automatic: true) } }) {

@@ -13,7 +13,7 @@ struct APIFailure: LocalizedError, Decodable {
 
     private struct Envelope: Decodable { let error: APIFailure }
 
-    static let offline = APIFailure(code: "OFFLINE", message: "Sin conexión con el servidor. Se muestra la última copia guardada.")
+    static let offline = APIFailure(code: "OFFLINE", message: "No se pudo conectar con UniEat. Revisa la conexión e inténtalo de nuevo.")
     static let unexpected = APIFailure(code: "INTERNAL_ERROR", message: "El servidor respondió con un error inesperado.")
     static let invalidResponse = APIFailure(code: "INVALID_RESPONSE", message: "La app no entendio la respuesta del servidor. Actualiza la app e intenta de nuevo.")
 
@@ -63,6 +63,7 @@ final class APIClient: APIRequesting {
     private let sessionIdentity: () -> UUID
     private let transport: URLSession            // URLSession inyectable para las pruebas
     var onUnauthorized: (() -> Void)?            // lo pone AppStore, cierra sesion si el server dice 401
+    var onServiceAvailability: ((Bool) -> Void)?
 
     /// sesion sin cache http: las respuestas llevan datos del usuario con su token
     /// y una cache que solo mira la url podria devolverle a otra cuenta lo que pidio la anterior
@@ -86,6 +87,20 @@ final class APIClient: APIRequesting {
     /// pedir algo al server, sin cuerpo
     func get<Response: Decodable>(_ path: String, query: [URLQueryItem] = []) async throws -> Response {
         try await send("GET", path, query: query, body: NoBody?.none)
+    }
+
+    /// /health es público: no necesita renovar un token ni abrir una sesión para reintentar.
+    func checkHealth() async throws {
+        guard let base = configuration.apiBaseURL else { throw AuthFailure.unconfigured }
+        var request = URLRequest(url: base.appending(path: "health"), timeoutInterval: 10)
+        request.setValue(configuration.publishableKey, forHTTPHeaderField: "apikey")
+        let (data, response) = try await receive(request, identity: sessionIdentity())
+        struct Health: Decodable { let status: String }
+        guard (200..<300).contains(response.statusCode),
+              (try? JSONDecoder().decode(Health.self, from: data))?.status == "ok" else {
+            onServiceAvailability?(false)
+            throw APIFailure.unexpected
+        }
     }
 
     /// mandar una peticion con metodo, ruta, parametros y cuerpo opcional
@@ -114,9 +129,19 @@ final class APIClient: APIRequesting {
         let token: String
         do { token = try await accessToken() }
         catch AuthFailure.expired {
+            guard identity == sessionIdentity(), !Task.isCancelled else { throw CancellationError() }
             // token muerto -> cerrar sesion
             onUnauthorized?()
             throw AuthFailure.expired
+        }
+        catch {
+            guard identity == sessionIdentity(), !Task.isCancelled else { throw CancellationError() }
+            if let failure = error as? URLError {
+                if failure.code == .cancelled { throw CancellationError() }
+                onServiceAvailability?(false)
+                throw APIFailure.offline
+            }
+            throw error
         }
         guard identity == sessionIdentity() else { throw CancellationError() }
         request.setValue(configuration.publishableKey, forHTTPHeaderField: "apikey")  // clave publica del proyecto supabase
@@ -130,20 +155,10 @@ final class APIClient: APIRequesting {
         }
 
         // 3. enviarla, si no hay respuesta es porque no hay internet
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await transport.data(for: request)
-        } catch {
-            // si se cancelo (ej salir de la pantalla) no es falta de red, no se muestra sin conexion
-            if Task.isCancelled || (error as? URLError)?.code == .cancelled { throw CancellationError() }
-            throw APIFailure.offline
-        }
-        try Task.checkCancellation()
-        guard identity == sessionIdentity() else { throw CancellationError() }
+        let (data, response) = try await receive(request, identity: identity)
 
         // 4. revisar la respuesta: si no es 2xx se lee el error del server, si esta bien se convierte
-        guard let status = (response as? HTTPURLResponse)?.statusCode else { throw APIFailure.unexpected }
+        let status = response.statusCode
         guard (200..<300).contains(status) else {
             if status == 401 { onUnauthorized?() }   // sesion vencida en el server
             throw APIFailure.from(data)
@@ -155,6 +170,26 @@ final class APIClient: APIRequesting {
             // pasa si el back cambio el contrato y la app no se actualizo
             throw APIFailure.invalidResponse
         }
+    }
+
+    private func receive(_ request: URLRequest, identity: UUID) async throws -> (Data, HTTPURLResponse) {
+        try Task.checkCancellation()
+        guard identity == sessionIdentity() else { throw CancellationError() }
+        let data: Data
+        let response: URLResponse
+        do { (data, response) = try await transport.data(for: request) }
+        catch {
+            // Una petición cancelada o de otra cuenta no cambia el aviso de conexión actual.
+            guard identity == sessionIdentity(), !Task.isCancelled,
+                  (error as? URLError)?.code != .cancelled else { throw CancellationError() }
+            onServiceAvailability?(false)
+            throw APIFailure.offline
+        }
+        try Task.checkCancellation()
+        guard identity == sessionIdentity() else { throw CancellationError() }
+        guard let http = response as? HTTPURLResponse else { throw APIFailure.unexpected }
+        onServiceAvailability?(http.statusCode < 500)
+        return (data, http)
     }
 }
 
@@ -286,7 +321,7 @@ struct MeResponse: Decodable {
 }
 
 /// un local del usuario y si ya esta aprobado para publicar
-struct RemoteMembership: Decodable, Identifiable {
+struct RemoteMembership: Codable, Identifiable {
     let establishmentId: UUID
     let establishmentName: String
     let area: String
@@ -296,7 +331,7 @@ struct RemoteMembership: Decodable, Identifiable {
 }
 
 /// los datos de un local del usuario
-struct RemoteEstablishment: Decodable, Identifiable {
+struct RemoteEstablishment: Codable, Identifiable {
     let id: UUID
     let name: String
     let area: String

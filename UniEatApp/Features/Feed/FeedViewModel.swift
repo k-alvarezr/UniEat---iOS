@@ -152,7 +152,7 @@ final class FeedViewModel: FeatureViewModel {
         } catch is CancellationError { }
         catch {
             guard session.matches(userID, generation: generation), requestID == id, requested == filters else { return }
-            connectivity.serverUnreachable = (error as? APIFailure)?.code == "OFFLINE"
+            if (error as? APIFailure)?.code == "OFFLINE" { connectivity.serviceResponded(false) }
             loadError = error.localizedDescription
             if hasCompatibleSnapshot(userID: userID, filters: requested) {
                 isShowingCachedFeed = true

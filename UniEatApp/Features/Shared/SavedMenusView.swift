@@ -40,6 +40,7 @@ struct SavedMenusView: View {
             .padding(16)
         }
         .background(Palette.cream)
+        .connectionStatus(.saved)
         .navigationTitle("Guardados")
     }
 }

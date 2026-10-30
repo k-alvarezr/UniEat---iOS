@@ -100,6 +100,7 @@ final class PublishViewModel: FeatureViewModel {
     }
     var approvedEstablishments: [RemoteEstablishment] { session.approvedEstablishments }
     var isOffline: Bool { connectivity.isOffline }
+    var canPublishOnline: Bool { !isOffline && session.isAccountVerified }
     /// Agrupa cambios breves: cada tecla cambia estado ligero, no escribe disco en MainActor.
     func scheduleDraftSave() {
         draftTask?.cancel()
@@ -288,7 +289,7 @@ final class PublishViewModel: FeatureViewModel {
     }
     /// cierra el menu antes de que venza, sin red no se intenta
     func close(_ menu: DailyMenu) async {
-        guard let userID = session.profile?.id, !isOffline else { return }
+        guard let userID = session.profile?.id, canPublishOnline else { return }
         let generation = session.generation
         do {
             try await service.close(menu)
@@ -306,7 +307,7 @@ final class PublishViewModel: FeatureViewModel {
     /// crea o edita el menu, sin red no se intenta y el borrador se conserva
     /// si otro edito primero el server dice VERSION_CONFLICT y se recarga la version actual
     func publish() async {
-        guard isValid, !isSaving, !isOffline, let userID = session.profile?.id else { return }
+        guard isValid, !isSaving, canPublishOnline, let userID = session.profile?.id else { return }
         let generation = session.generation
         draftTask?.cancel()
         draftRequest = UUID()

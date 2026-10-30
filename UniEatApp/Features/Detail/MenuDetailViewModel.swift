@@ -47,6 +47,7 @@ final class MenuDetailViewModel: FeatureViewModel {
     var isAdmin: Bool { session.isAdmin }
     var isRestaurant: Bool { session.isRestaurant }
     var isOffline: Bool { connectivity.isOffline }
+    var isConnected: Bool { connectivity.isConnected }
     var showsWaitIndicator: Bool { pilot?.showsWaitIndicator ?? true }
     var fetchedAt: Date { detail?.serverNow ?? initialFetchedAt ?? menu.publishedAt }
     func isOpen() -> Bool {
@@ -79,6 +80,14 @@ final class MenuDetailViewModel: FeatureViewModel {
         requestID = id
         isLoading = true
         defer { if requestID == id { isLoading = false } }
+        // Sin ruta de red se consulta solo el archivo. No se espera un timeout para navegar o reportar.
+        if !connectivity.isConnected {
+            let copy = await service.cached(initialMenu, generation: expected)
+            guard session.matches(userID, generation: expected), requestID == id else { return }
+            if detail == nil { detail = copy }
+            loadError = .offline
+            return
+        }
         // copia del disco y server en paralelo con async let (#31), la copia se muestra mientras llega el server
         async let cached = service.cached(initialMenu, generation: expected)
         async let fresh = service.load(initialMenu, automatic: automatic, generation: expected)

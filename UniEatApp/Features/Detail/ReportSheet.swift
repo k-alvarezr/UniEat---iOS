@@ -49,6 +49,7 @@ private struct ReportScreen: View {
             }
             .background(Palette.cream)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Cerrar") { dismiss() } } }
+            .connectionStatus(.reporting)
         }
     }
 

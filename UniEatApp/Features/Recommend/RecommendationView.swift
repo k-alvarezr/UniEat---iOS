@@ -40,6 +40,7 @@ struct RecommendationView: View {
             .padding(16)
         }
         .background(Palette.cream)
+        .connectionStatus(.recommendation)
         .navigationBarTitleDisplayMode(.inline)
     }
 

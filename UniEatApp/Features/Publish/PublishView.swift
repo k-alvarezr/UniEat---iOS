@@ -45,14 +45,14 @@ struct PublishView: View {
                             icon: "arrow.right", color: Palette.coral) {
                     Task { await model.publish() }
                 }
-                .disabled(!model.isValid || model.isSaving || model.isOffline)
-                if model.isOffline { Text("Sin conexión. Tu borrador se conserva; publicar y cerrar requieren conexión.").font(.footnote) }
+                .disabled(!model.isValid || model.isSaving || !model.canPublishOnline)
                 myMenus
             }
             .padding(16)
         }
         .disabled(model.isSaving)
         .background(Palette.cream)
+        .connectionStatus(.publishing)
         .task {
             await model.restoreDraft()
             model.selectFirstEstablishment()
@@ -169,7 +169,7 @@ struct PublishView: View {
                             }
                             if menu.isActive() {
                                 Button("Cerrar publicación", role: .destructive) { Task { await model.close(menu) } }
-                                    .disabled(model.isOffline || model.isSaving)
+                                    .disabled(!model.canPublishOnline || model.isSaving)
                                     .buttonStyle(.bordered)
                             }
                         }

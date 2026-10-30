@@ -11,6 +11,13 @@ final class ConnectivityService: ObservableObject {
     @Published var serverUnreachable = false         // hay internet pero el server no responde
     /// sin internet o con el server caido
     var isOffline: Bool { !isConnected || serverUnreachable }
+    /// NWPathMonitor solo confirma una ruta de red; no garantiza que UniEat responda.
+    var issue: ConnectionIssue? {
+        if !isConnected { return .noInternet }
+        return serverUnreachable ? .serviceUnavailable : nil
+    }
+    @Published private(set) var isChecking = false
+    var checkService: (() async throws -> Void)?
     var onReconnect: (() -> Void)?                    // lo pone AppStore para mandar las colas al volver la red
     private let monitor = NWPathMonitor()             // avisa cuando cambia la conexion
     /// monitorNetwork en false es para las pruebas, asi no depende de la red real
@@ -33,5 +40,32 @@ final class ConnectivityService: ObservableObject {
             onReconnect?()
         }
     }
+    /// Todas las rutas de la API informan el resultado, no solo el feed.
+    func serviceResponded(_ available: Bool) {
+        guard serverUnreachable == available else { return }
+        serverUnreachable = !available
+    }
+    /// Una comprobación pública y sin credenciales permite recuperarse incluso desde login.
+    /// Se comparte una sola comprobación entre todas las pantallas.
+    func retry() async {
+        guard isConnected, !isChecking, let checkService else { return }
+        isChecking = true
+        defer { isChecking = false }
+        do {
+            try await checkService()
+            serviceResponded(true)
+        } catch is CancellationError { }
+        catch { serviceResponded(false) }
+    }
     deinit { monitor.cancel() }
+}
+
+enum ConnectionIssue: Equatable {
+    case noInternet, serviceUnavailable
+    var title: String {
+        switch self {
+        case .noInternet: "Sin conexión a internet"
+        case .serviceUnavailable: "No podemos conectar con UniEat"
+        }
+    }
 }

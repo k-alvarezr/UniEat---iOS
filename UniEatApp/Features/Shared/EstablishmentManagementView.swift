@@ -31,7 +31,7 @@ struct EstablishmentManagementView: View {
                 Button(model.isWorking ? "Actualizando…" : "Actualizar estado") {
                     Task { await model.updateStatus() }
                 }
-                .disabled(model.isWorking)
+                .disabled(!model.canUseNetwork || model.isWorking)
 
                 DisclosureGroup("Solicitar un establecimiento", isExpanded: $model.showingForm) {
                     VStack(alignment: .leading, spacing: 10) {
@@ -99,7 +99,7 @@ struct EstablishmentManagementView: View {
                 Button(model.isGeocoding ? "Buscando…" : "Buscar dirección") {
                     Task { await model.showAddressOnMap() }
                 }
-                .disabled(model.isGeocoding || model.address.trimmed.isEmpty)
+                .disabled(!model.canGeocode || model.isGeocoding || model.address.trimmed.isEmpty)
                 Button {
                     model.pinMessage = nil
                     location.request()
@@ -154,7 +154,12 @@ struct AdminApprovalsView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Solicitudes de restaurantes").font(.headline)
                 Button("Actualizar solicitudes") { Task { await model.load() } }
-                if model.requests.isEmpty {
+                    .disabled(!model.canUseNetwork || model.isLoading)
+                if model.isLoading { ProgressView("Consultando solicitudes…") }
+                if !model.hasLoaded && !model.isLoading {
+                    Text("Aún no hay una lista descargada. Actualiza las solicitudes cuando el servicio esté disponible.")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                } else if model.requests.isEmpty && model.hasLoaded {
                     Text("No hay solicitudes pendientes.")
                         .font(.subheadline).foregroundStyle(.secondary)
                 }
@@ -167,7 +172,7 @@ struct AdminApprovalsView: View {
                             Task { await model.approve(request) }
                         }
                         .buttonStyle(.borderedProminent)
-                        .disabled(model.workingId != nil)
+                        .disabled(!model.canUseNetwork || model.workingId != nil)
                     }
                 }
                 if let message = model.message { Text(message).font(.footnote) }

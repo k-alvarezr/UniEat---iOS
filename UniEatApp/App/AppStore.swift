@@ -83,7 +83,7 @@ final class AppStore: ObservableObject {
         let saved = SavedMenusViewModel(session: session, events: events, clock: clock, content: content)
         let feed = FeedViewModel(api: api, session: session, connectivity: connectivity, clock: clock, events: events, content: content)
         let reports = ReportingFacade(api: api, outbox: database, session: session, connectivity: connectivity, clock: clock)
-        let accounts = AccountService(api: api, session: session)
+        let accounts = AccountService(api: api, session: session, connectivity: connectivity)
         self.session = session
         self.connectivity = connectivity
         self.clock = clock
@@ -93,7 +93,7 @@ final class AppStore: ObservableObject {
         self.feed = feed
         self.reports = reports
         details = MenuDetailService(api: api, session: session, files: files, clock: clock)
-        authentication = AuthViewModel(session: session)
+        authentication = AuthViewModel(session: session, connectivity: connectivity)
         filters = FiltersViewModel(feed: feed)
         recommendation = RecommendationViewModel(feed: feed)
         publication = PublishViewModel(service: PublishingService(api: api, session: session, files: files),
@@ -106,6 +106,11 @@ final class AppStore: ObservableObject {
 
         // 4. conexiones: que pasa cuando vence la sesion, cambia la cuenta o vuelve la red
         api.onUnauthorized = { [weak session] in session?.signOut(message: "Tu sesión terminó. Inicia sesión de nuevo.") }
+        api.onServiceAvailability = { [weak connectivity] in connectivity?.serviceResponded($0) }
+        connectivity.checkService = { [weak api] in
+            guard let api else { throw CancellationError() }
+            try await api.checkHealth()
+        }
         session.onChange = { [weak self] in self?.accountChanged() }
         session.onForget = { [weak self] userID, generation in
             guard let self else { return }

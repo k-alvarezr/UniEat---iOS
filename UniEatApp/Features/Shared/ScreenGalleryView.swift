@@ -42,6 +42,7 @@ struct ScreenGalleryView: View {
         }
         .background(Palette.cream)
         .navigationTitle("Todas las pantallas")
+        .connectionStatus(.gallery)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $reportMenu) { menu in ReportSheet(menu: menu) }
     }

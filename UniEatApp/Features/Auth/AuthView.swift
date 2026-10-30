@@ -67,7 +67,7 @@ struct AuthView: View {
                                     icon: "arrow.right", color: Palette.yellow) {
                             Task { await model.submit() }
                         }
-                        .disabled(model.isSubmitting || model.isClosingSession || model.email.isEmpty || model.password.isEmpty ||
+                        .disabled(!model.canUseNetwork || model.isSubmitting || model.isClosingSession || model.email.isEmpty || model.password.isEmpty ||
                                   (model.isRegistering && RegistrationRules.nameError(model.displayName) != nil))
                     }
                 }
@@ -77,6 +77,7 @@ struct AuthView: View {
             .padding(20)
         }
         .background(Palette.cream)
+        .connectionStatus(.authentication)
     }
 
 }
