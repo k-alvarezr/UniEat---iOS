@@ -2,6 +2,13 @@ import Combine
 import Foundation
 import UniEatCore
 
+/// Diagnóstico local acotado; no son eventos pendientes ni se vuelve a enviar un rechazo permanente.
+struct RejectedAnalyticsEvent: Codable {
+    let event: RemoteEvent
+    let reason: String
+    let rejectedAt: Date
+}
+
 /// la cola de eventos de analitica sale del AppStore viejo a su propio servicio
 /// es la misma logica de antes (eventId del celular, una vez por sesion, tope 500, lotes de 100)
 /// lo nuevo es que la cola se guarda por usuario y se revisa la sesion antes de aplicar cada respuesta
@@ -14,6 +21,7 @@ final class EventService: ObservableObject {
     private(set) var sessionID = UUID()
     private var counted: Set<String> = []
     private var pending: [RemoteEvent] = []
+    private(set) var rejectedEvents: [RejectedAnalyticsEvent] = []
     private var flushingGeneration: UUID?
     var metadataProvider: ((DailyMenu) -> ExperimentEventMetadata?)?
     init(api: APIRequesting, session: SessionStore, connectivity: ConnectivityService, clock: ServerClock) {
@@ -26,12 +34,14 @@ final class EventService: ObservableObject {
     private var key: String { Self.pendingKey(session.profile?.id) }
     /// llave de la cola de un usuario, AppStore la usa para borrarla al cerrar sesion
     static func pendingKey(_ userID: UUID?) -> String { "unieat.remote.pending-events.\(userID?.uuidString ?? "signed-out")" }
+    static func rejectedKey(_ userID: UUID) -> String { "unieat.remote.rejected-events.\(userID.uuidString)" }
     /// al cambiar de cuenta: sesion nueva, nada contado y se carga la cola de ese usuario
     func accountChanged() {
         objectWillChange.send()
         sessionID = UUID()
         counted = []
         pending = session.profile == nil ? [] : LocalValues.load([RemoteEvent].self, key: key) ?? []
+        rejectedEvents = session.profile.map { LocalValues.load([RejectedAnalyticsEvent].self, key: Self.rejectedKey($0.id)) ?? [] } ?? []
     }
     // llave de una accion sobre un menu, con la version para que un menu editado cuente aparte
     private func eventKey(_ kind: String, _ menu: DailyMenu) -> String { "\(kind):\(menu.id):\(menu.version)" }
@@ -77,11 +87,37 @@ final class EventService: ObservableObject {
         while !pending.isEmpty && !connectivity.isOffline && session.matches(userID, generation: expected) {
             let batch = Array(pending.prefix(100))
             do {
-                let _: BatchResponse = try await api.send("POST", "events/batch", body: EventBatch(events: batch))
+                let response: BatchResponse = try await api.send("POST", "events/batch", body: EventBatch(events: batch))
                 guard session.matches(userID, generation: expected) else { return }
-                pending.removeAll { batch.contains($0) }
+                let batchIDs = Set(batch.map(\.eventId))
+                let rejectedIDs = Set(response.rejected.compactMap(\.eventId))
+                // No se borra un lote si la respuesta no identifica coherentemente su resultado.
+                guard response.accepted >= 0, response.duplicates >= 0,
+                      response.accepted + response.duplicates + response.rejected.count == batch.count,
+                      rejectedIDs.count == response.rejected.count,
+                      rejectedIDs.isSubset(of: batchIDs) else { return }
+                let permanent = response.rejected.filter { Self.permanentReasons.contains($0.reason) }
+                let permanentIDs = Set(permanent.compactMap(\.eventId))
+                for rejection in permanent {
+                    if let event = batch.first(where: { $0.eventId == rejection.eventId }) {
+                        rejectedEvents.append(RejectedAnalyticsEvent(event: event, reason: rejection.reason, rejectedAt: clock.now))
+                    }
+                }
+                if rejectedEvents.count > 100 { rejectedEvents.removeFirst(rejectedEvents.count - 100) }
+                LocalValues.save(rejectedEvents, key: Self.rejectedKey(userID))
+                // Lo aceptado/duplicado se confirma. Un rechazo permanente queda diagnosticado;
+                // uno desconocido conserva el evento para no perder datos con contratos futuros.
+                let acknowledged = batchIDs.subtracting(rejectedIDs).union(permanentIDs)
+                pending.removeAll { acknowledged.contains($0.eventId) }
                 LocalValues.save(pending, key: key)
+                if permanent.count != response.rejected.count { return }
             } catch { return }
         }
     }
+
+    private static let permanentReasons: Set<String> = [
+        "INVALID_EVENT_ID", "INVALID_SESSION_ID", "INVALID_PUBLICATION_ID", "INVALID_VERSION",
+        "UNSUPPORTED_KIND", "INVALID_OCCURRED_AT", "OCCURRED_AT_OUT_OF_WINDOW",
+        "UNKNOWN_VERSION", "INVALID_EXPERIMENT_ASSIGNMENT"
+    ]
 }

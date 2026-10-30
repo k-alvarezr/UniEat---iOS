@@ -1,6 +1,11 @@
 import Foundation
 import UniEatCore
 
+struct DetailLoadResult: Sendable {
+    let detail: MenuDetail
+    let cacheWarning: String?
+}
+
 /// lo de pedir y guardar el detalle sale del AppStore viejo a este servicio
 /// lo usan los MenuDetailViewModel, uno por pantalla de detalle
 @MainActor
@@ -18,7 +23,7 @@ final class MenuDetailService {
     /// trae la version actual del menu y guarda la copia en Caches (#33)
     /// si automatic es true el server no la cuenta en las metricas, son recargas que no hizo el usuario
     /// generation es la sesion con la que arranco la pantalla, si ya es otra se cancela
-    func load(_ menu: DailyMenu, automatic: Bool, generation: UUID? = nil) async throws -> MenuDetail {
+    func load(_ menu: DailyMenu, automatic: Bool, generation: UUID? = nil) async throws -> DetailLoadResult {
         guard let userID = session.profile?.id else { throw AuthFailure.expired }
         if let generation, generation != session.generation { throw CancellationError() }
         let expected = session.generation
@@ -28,8 +33,17 @@ final class MenuDetailService {
         guard session.matches(userID, generation: expected) else { throw CancellationError() }
         // la hora del server ajusta el reloj de la app
         clock.synchronize(detail.serverNow)
-        files.save(detail, name: "detail-\(menu.id.uuidString)", folder: .caches, userId: userID)
-        return detail
+        let reference = clock.snapshot()
+        var warning: String?
+        do {
+            try await files.save(detail, name: "detail-\(menu.id.uuidString)", folder: .caches,
+                                 userId: userID, generation: expected)
+            try await files.save(reference, name: "detail-clock-\(menu.id.uuidString)", folder: .caches,
+                                 userId: userID, generation: expected)
+        } catch is CancellationError { throw CancellationError() }
+        catch { warning = "El detalle se actualizó, pero no se pudo guardar su copia para usarla sin conexión." }
+        guard session.matches(userID, generation: expected) else { throw CancellationError() }
+        return DetailLoadResult(detail: detail, cacheWarning: warning)
     }
     /// lectura de la copia del detalle en segundo plano con Task.detached utility (#31), el disco y el json no traban la pantalla
     /// si cambio la sesion mientras se leia se bota el resultado
@@ -39,10 +53,13 @@ final class MenuDetailService {
         let expected = session.generation
         let files = files
         let id = menu.id
-        let detail = await Task.detached(priority: .utility) {
-            files.load(MenuDetail.self, name: "detail-\(id.uuidString)", folder: .caches, userId: userID)
+        let (detail, reference) = await Task.detached(priority: .utility) {
+            let detail = try? await files.load(MenuDetail.self, name: "detail-\(id.uuidString)", folder: .caches, userId: userID)
+            let reference = try? await files.load(ServerTimeReference.self, name: "detail-clock-\(id.uuidString)", folder: .caches, userId: userID)
+            return (detail, reference)
         }.value
         guard session.matches(userID, generation: expected), !Task.isCancelled else { return nil }
+        if let reference { clock.restore(reference) }
         return detail
     }
 }

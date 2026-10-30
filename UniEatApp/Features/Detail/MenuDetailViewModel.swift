@@ -9,6 +9,7 @@ final class MenuDetailViewModel: FeatureViewModel {
     @Published private(set) var detail: MenuDetail?
     @Published private(set) var loadError: APIFailure?
     @Published private(set) var isLoading = false
+    @Published private(set) var cacheWarning: String?
     let initialMenu: DailyMenu
     let clock: ServerClock
     private let service: MenuDetailService
@@ -87,7 +88,8 @@ final class MenuDetailViewModel: FeatureViewModel {
         do {
             let value = try await fresh
             guard session.matches(userID, generation: expected), requestID == id else { return }
-            detail = value
+            detail = value.detail
+            cacheWarning = value.cacheWarning
             loadError = nil
         } catch is CancellationError { }
         catch {
