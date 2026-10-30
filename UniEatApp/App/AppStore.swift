@@ -126,9 +126,10 @@ final class AppStore: ObservableObject {
         }
     }
 
-    func makeDetail(_ menu: DailyMenu) -> MenuDetailViewModel {
+    func makeDetail(_ menu: DailyMenu, cachedAt: Date? = nil) -> MenuDetailViewModel {
         MenuDetailViewModel(menu: menu, service: details, session: session, events: events,
-                             saved: saved, connectivity: connectivity, clock: clock, pilot: pilot)
+                             saved: saved, connectivity: connectivity, clock: clock, pilot: pilot,
+                             initialFetchedAt: cachedAt ?? feed.fetchedAt)
     }
     func makeReport(_ menu: DailyMenu, kind: ReportKind, waitObservation: Bool = false) -> ReportViewModel {
         ReportViewModel(menu: menu, kind: kind, reports: reports, waitObservation: waitObservation)

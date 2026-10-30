@@ -15,12 +15,15 @@ final class MenuDetailViewModel: FeatureViewModel {
     private let saved: SavedMenusViewModel
     private let connectivity: ConnectivityService
     private let pilot: WaitIndicatorPilot?
+    private let initialFetchedAt: Date?
     private var requestID = UUID()
     init(menu: DailyMenu, service: MenuDetailService, session: SessionStore, events: EventService,
-         saved: SavedMenusViewModel, connectivity: ConnectivityService, clock: ServerClock, pilot: WaitIndicatorPilot? = nil) {
+         saved: SavedMenusViewModel, connectivity: ConnectivityService, clock: ServerClock, pilot: WaitIndicatorPilot? = nil,
+         initialFetchedAt: Date? = nil) {
         initialMenu = menu; self.service = service; self.session = session; self.events = events
         self.saved = saved; self.connectivity = connectivity; self.clock = clock
         self.pilot = pilot
+        self.initialFetchedAt = initialFetchedAt
         super.init(); observe(saved); observe(session); observe(connectivity); observe(clock); observe(events)
         if let pilot { observe(pilot) }
     }
@@ -30,7 +33,7 @@ final class MenuDetailViewModel: FeatureViewModel {
     var isRestaurant: Bool { session.isRestaurant }
     var isOffline: Bool { connectivity.isOffline }
     var showsWaitIndicator: Bool { pilot?.showsWaitIndicator ?? true }
-    var fetchedAt: Date { detail?.serverNow ?? menu.publishedAt }
+    var fetchedAt: Date { detail?.serverNow ?? initialFetchedAt ?? menu.publishedAt }
     func isOpen() -> Bool {
         !isGone && (detail?.status(at: clock.now).acceptsActions ?? menu.isActive(at: clock.now))
     }

@@ -18,7 +18,7 @@ struct SavedMenusView: View {
                                            description: Text("Abre un menú y toca Guardar menú."))
                 } else {
                     ForEach(store.savedMenus) { entry in
-                        NavigationLink(destination: MenuDetailView(menu: entry.menu)) {
+                        NavigationLink(destination: MenuDetailView(menu: entry.menu, cachedAt: entry.savedAt)) {
                             SurfaceCard {
                                 VStack(alignment: .leading, spacing: 5) {
                                     Text(entry.menu.establishmentName).font(.headline)

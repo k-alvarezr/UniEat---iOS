@@ -7,7 +7,8 @@ import UniEatCore
 struct MenuDetailView: View {
     @EnvironmentObject private var app: AppStore
     let menu: DailyMenu
-    var body: some View { MenuDetailScreen(model: app.makeDetail(menu)) }
+    var cachedAt: Date? = nil
+    var body: some View { MenuDetailScreen(model: app.makeDetail(menu, cachedAt: cachedAt)) }
 }
 
 private struct MenuDetailScreen: View {

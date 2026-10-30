@@ -2,7 +2,7 @@
 
 UniEat is a SwiftUI app for browsing and publishing daily menus near Universidad de los Andes. It follows the [UniEat project wiki](https://github.com/EstebanRojas01/Moviles/wiki) and the ten MS7 screens from Sprint 1. It runs against the [shared backend](https://github.com/EstebanRojas01/UniEat---iOS-Back) through its Supabase API v1.
 
-The current architecture, patterns, concurrency and persistence boundaries are documented in [docs/architecture.md](docs/architecture.md). The preparation changes and the ownership of pending Sprint 3 issues are tracked in [docs/pre-sprint3.md](docs/pre-sprint3.md). The app interface is in Spanish; UI labels below are quoted exactly as they appear on screen.
+The current architecture, patterns, concurrency and persistence boundaries are documented in [docs/architecture.md](docs/architecture.md). See [Sprint 3 implementation and evidence](docs/sprint3.md) for BQ-08, offline storage, caching, ownership and outstanding device validation; [preparation history](docs/pre-sprint3.md) records the earlier corrections. The app interface is in Spanish; UI labels below are quoted exactly as they appear on screen.
 
 ## Run on macOS
 

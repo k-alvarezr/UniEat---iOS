@@ -1,5 +1,8 @@
 # Preparación antes de Sprint 3
 
+Registro de la fase de preparación. El estado posterior y el reparto vigente están en
+[Sprint 3](sprint3.md); la tabla de pendientes de este documento describe ese momento anterior.
+
 Base integrada: PR #40 (almacenamiento) y #41 (concurrencia) de Juan Esteban.
 Los cambios se revisan en dos PR: [backend #13](https://github.com/EstebanRojas01/UniEat---iOS-Back/pull/13)
 y [iOS #42](https://github.com/k-alvarezr/UniEat---iOS/pull/42). Se recomienda aceptar y desplegar
