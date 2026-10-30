@@ -10,8 +10,6 @@ struct PublishView: View {
     private let areas = ["Centro", "Norte", "Sur", "Fuera del campus"]
     private let paymentChoices = ["Nequi", "Daviplata", "Efectivo", "Tarjeta"]
 
-
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 15) {
@@ -99,7 +97,7 @@ struct PublishView: View {
             VStack(alignment: .leading, spacing: 10) {
                 sectionTitle("Menú de hoy")
                 TextField("Nombre del menú", text: $model.title).textFieldStyle(.roundedBorder)
-                DatePicker("Válido hasta", selection: $model.validUntil, in: Date.now..., displayedComponents: [.date, .hourAndMinute])
+                DatePicker("Válido hasta", selection: $model.validUntil, in: model.clock.now..., displayedComponents: [.date, .hourAndMinute])
                 Text("La publicación dejará de aparecer al vencer. La vigencia máxima es de 24 horas.")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -168,26 +166,12 @@ struct PublishView: View {
         Text(text).font(.rounded(17))
     }
 
-
-
     // MARK: - acciones
     
     // foto del formulario para guardarla en archivo
 
-    
     // solo vale la pena guardar si escribio algun plato
 
-    
     // vuelve a llenar el formulario con lo guardado
-
-
-
-
-
-
-
-
-
-
 
 }

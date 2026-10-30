@@ -51,6 +51,7 @@ targets:
         SWIFT_VERSION: 5.0
     dependencies:
       - target: UniEat
+      - package: UniEatCore
 schemes:
   UniEat:
     build:

@@ -41,7 +41,7 @@ final class AppStore: ObservableObject {
         let files = FileStore()
         let database: LocalDatabase?
         do { database = try LocalDatabase(); storageError = nil }
-        catch { database = nil; storageError = "No se pudo abrir el almacenamiento local. Se conservó la base existente: \(error.localizedDescription)" }
+        catch { database = nil; storageError = "No se pudieron cargar los datos guardados. Se conservaron para intentar recuperarlos; los reportes nuevos aún no se pueden guardar." }
         let events = EventService(api: api, session: session, connectivity: connectivity, clock: clock)
         let saved = SavedMenusViewModel(session: session, events: events, clock: clock)
         let feed = FeedViewModel(api: api, session: session, connectivity: connectivity, clock: clock, events: events)
@@ -56,7 +56,7 @@ final class AppStore: ObservableObject {
         publication = PublishViewModel(service: PublishingService(api: api, session: session, files: files),
                                        feed: feed, session: session, connectivity: connectivity, clock: clock)
         performance = PerformanceViewModel(api: api, session: session, events: events, connectivity: connectivity)
-        profile = ProfileViewModel(session: session, saved: saved, reports: reports)
+        profile = ProfileViewModel(session: session, saved: saved, reports: reports, storageError: storageError)
         establishments = EstablishmentViewModel(service: accounts, session: session)
         approvals = AdminApprovalsViewModel(service: accounts, session: session)
         roles = AdminRolesViewModel(service: accounts, session: session)

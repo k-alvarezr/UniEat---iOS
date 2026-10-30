@@ -7,8 +7,10 @@ final class ProfileViewModel: FeatureViewModel {
     private let session: SessionStore
     private let saved: SavedMenusViewModel
     let reports: ReportingFacade
-    init(session: SessionStore, saved: SavedMenusViewModel, reports: ReportingFacade) {
+    let storageError: String?
+    init(session: SessionStore, saved: SavedMenusViewModel, reports: ReportingFacade, storageError: String? = nil) {
         self.session = session; self.saved = saved; self.reports = reports
+        self.storageError = storageError
         super.init(); observe(session); observe(saved); observe(reports)
     }
     var profile: Profile? { session.profile }

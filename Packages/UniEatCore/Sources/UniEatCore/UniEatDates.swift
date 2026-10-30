@@ -1,5 +1,6 @@
 import Foundation
 
+/// fechas iso 8601 con o sin milisegundos como las manda la api
 public enum UniEatDates {
     public static func decoder() -> JSONDecoder {
         let decoder = JSONDecoder()

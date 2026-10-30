@@ -56,6 +56,7 @@ final class ReportingFacade: FeatureViewModel {
     func accountChanged() {
         syncMessage = nil
         failures = LocalValues.load([String: String].self, key: failureKey) ?? [:]
+        if let reason = failures.values.first { syncMessage = "Un reporte requiere revisión y sigue guardado: \(reason)" }
         updateCount()
     }
     private var failureKey: String { "unieat.report-failures.\(session.profile?.id.uuidString ?? "signed-out")" }

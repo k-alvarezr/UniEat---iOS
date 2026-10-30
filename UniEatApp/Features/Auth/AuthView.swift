@@ -78,5 +78,4 @@ struct AuthView: View {
         .background(Palette.cream)
     }
 
-
 }

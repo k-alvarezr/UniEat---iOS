@@ -351,7 +351,6 @@ private struct MenuDetailScreen: View {
 
     private func load(automatic: Bool = false) async { await store.load(automatic: automatic) }
 
-
     /// recarga antes de abrir la hoja para que el reporte quede con la version actual
     /// y si cerraron el menu mientras tanto no se abre
     private func openReport() async {

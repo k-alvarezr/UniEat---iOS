@@ -16,7 +16,7 @@ struct UniEatApp: App {
                 .environmentObject(store.recommendation)
                 .environmentObject(store.publication)
                 .environmentObject(store.performance)
-                .environmentObject(session.profile)
+                .environmentObject(store.profile)
                 .environmentObject(store.establishments)
                 .environmentObject(store.approvals)
                 .environmentObject(store.roles)

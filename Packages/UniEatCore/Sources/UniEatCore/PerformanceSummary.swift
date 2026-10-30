@@ -1,5 +1,6 @@
 import Foundation
 
+/// actividad de ios en un periodo, las tasas llegan vacias si hay muy pocos datos
 public struct PerformanceSummary: Codable, Sendable {
     public let periodDays: Int           // periodo de las cifras, 7 o 28 dias
     public let impressions: Int          // cuantas veces se vio una tarjeta en el feed

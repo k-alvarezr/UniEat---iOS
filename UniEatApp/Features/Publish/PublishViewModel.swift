@@ -53,7 +53,6 @@ struct PublishDraft: Codable, Sendable, Equatable {
     var dishes: [Dish]
 }
 
-
 @MainActor
 final class PublishViewModel: FeatureViewModel {
     @Published var selectedEstablishmentID: UUID?

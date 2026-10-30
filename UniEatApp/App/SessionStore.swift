@@ -56,8 +56,8 @@ final class SessionStore: ObservableObject {
         let expected = generation
         // Preserve Juan's PR #41: the two independent reads execute concurrently.
         async let account: MeResponse = try api.get("me", query: [])
-        async let establishments: EstablishmentsResponse = try api.get("establishments/mine", query: [])
-        let (me, mine) = try await (account, establishments)
+        async let owned: EstablishmentsResponse = try api.get("establishments/mine", query: [])
+        let (me, mine) = try await (account, owned)
         guard matches(userID, generation: expected) else { throw CancellationError() }
         guard me.id == userID else { signOut(); throw AuthFailure.expired }
         profile = me.profile; memberships = me.establishments; establishments = mine.establishments

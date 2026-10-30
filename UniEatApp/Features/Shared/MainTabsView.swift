@@ -71,6 +71,7 @@ struct ProfileView: View {
                         Text(error).font(.footnote)
                         Button("Actualizar cuenta") { Task { await store.refreshAccount() } }
                     }
+                    if let error = store.storageError { Text(error).font(.footnote).foregroundStyle(Palette.coral) }
                     if store.reports.pendingReportCount > 0 {
                         Text("Reportes guardados: \(store.reports.pendingReportCount)").font(.footnote)
                         if let message = store.reports.syncMessage { Text(message).font(.footnote) }

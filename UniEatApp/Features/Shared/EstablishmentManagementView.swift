@@ -5,15 +5,11 @@ import SwiftUI
 /// perfil de estudiante o restaurante, estado de sus locales y pedir uno nuevo con su ubicacion
 struct EstablishmentManagementView: View {
     @EnvironmentObject private var model: EstablishmentViewModel
-    // model.pin del local, sale de la direccion o del gps y el dueño lo confirma en el mapa
+    // pin del local, sale de la direccion o del gps y el dueño lo confirma en el mapa
     @StateObject private var location = LocationContextService()
 
     private let areas = ["Centro", "Norte", "Sur", "Fuera del campus"]
     private let methods = ["Nequi", "Daviplata", "Efectivo", "Tarjeta"]
-
-
-
-
 
     var body: some View {
         SurfaceCard {
@@ -48,7 +44,7 @@ struct EstablishmentManagementView: View {
                         TextField("Dirección", text: $model.address)
                             .textFieldStyle(.roundedBorder)
                             .onChange(of: model.address) { _, _ in
-                                // si cambia la direccion el model.pin de la direccion ya no sirve, el del gps si se queda
+                                // si cambia la direccion el pin de la direccion ya no sirve, el del gps si se queda
                                 if model.pinFromAddress { model.pin = nil; model.pinMessage = nil }
                             }
                         pinPicker
@@ -91,7 +87,7 @@ struct EstablishmentManagementView: View {
         }
     }
 
-    /// ubicacion del local, buscar la direccion o usar el gps y mover el model.pin en el mapa si hace falta
+    /// ubicacion del local, buscar la direccion o usar el gps y mover el pin en el mapa si hace falta
     @ViewBuilder private var pinPicker: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Ubicación del local").font(.subheadline.weight(.semibold))
@@ -139,16 +135,8 @@ struct EstablishmentManagementView: View {
         }
     }
 
-
-
     /// pasa la direccion a coordenadas con el geocodificador de apple, en el celular y sin clave
     /// se le pone la ciudad porque las direcciones tipo Calle 19 #1-21 no la traen
-
-
-
-
-
-
 
 }
 
@@ -187,9 +175,6 @@ struct AdminApprovalsView: View {
         }
         .task { await model.load() }
     }
-
-
-
 
 }
 

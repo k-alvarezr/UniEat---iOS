@@ -1,5 +1,6 @@
 import Foundation
 
+/// una version del menu del dia tal cual la manda la api
 public struct DailyMenu: Codable, Hashable, Identifiable, Sendable {
     public let id: UUID
     public let title: String
