@@ -9,6 +9,10 @@ struct RecommendationView: View {
     private var options: [DailyMenu] { store.visibleMenus }
 
     var body: some View {
+        TimelineView(.periodic(from: .now, by: 60)) { _ in content }
+    }
+
+    private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 BrandHeader(title: "UniEat · Elige por mí")
@@ -18,7 +22,16 @@ struct RecommendationView: View {
                     .font(.subheadline)
                 filtersSummary
                 if store.isShowingCachedFeed { OfflineNotice(fetchedAt: store.fetchedAt) }
-                if options.isEmpty {
+                if let error = store.loadError {
+                    Text(error).font(.footnote).foregroundStyle(Palette.coral)
+                    Button("Actualizar opciones") { Task { await store.refresh() } }
+                }
+                if options.isEmpty && store.isLoading {
+                    ProgressView("Buscando opciones…")
+                } else if options.isEmpty && store.loadError != nil {
+                    ContentUnavailableView("No hay una copia compatible", systemImage: "wifi.slash",
+                        description: Text("Reintenta cuando puedas actualizar los menús."))
+                } else if options.isEmpty {
                     EmptyFeedView()
                 } else {
                     recommendation(options[store.index % options.count])
@@ -59,7 +72,7 @@ struct RecommendationView: View {
             .padding(.vertical, 20)
         }
         .background(Palette.cyan, in: RoundedRectangle(cornerRadius: 16))
-        MenuCard(menu: menu)
+        MenuCard(menu: menu, at: store.now)
         SolidButton(title: "Ver siguiente opción", icon: "arrow.clockwise", color: Palette.yellow) {
             store.next()
         }

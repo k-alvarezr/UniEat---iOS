@@ -62,9 +62,9 @@ struct OfflineFeedView: View {
     }
 
     private func retry() async {
-        await store.refresh()
-        retryMessage = store.isOffline
+        await store.refresh(force: true)
+        retryMessage = store.loadError ?? (store.isOffline
             ? "La copia local sigue disponible. No hay conexión nueva."
-            : "La vista se actualizó."
+            : "La vista se actualizó.")
     }
 }

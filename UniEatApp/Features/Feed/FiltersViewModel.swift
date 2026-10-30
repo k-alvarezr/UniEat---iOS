@@ -10,6 +10,8 @@ final class FiltersViewModel: FeatureViewModel {
     private let feed: FeedViewModel
     init(feed: FeedViewModel) { self.feed = feed; super.init(); observe(feed) }
     var filters: FeedFilters { feed.filters }
+    var usesCachedCatalog: Bool { feed.isOffline || feed.isShowingCachedFeed }
+    var fetchedAt: Date { feed.fetchedAt }
     func reset() { draft = feed.filters; locationMessage = nil }
     func apply() { feed.updateFilters(draft) }
     func suggest(_ position: CLLocation?) {

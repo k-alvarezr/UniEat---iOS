@@ -110,6 +110,19 @@ final class Sprint3Tests: XCTestCase {
         XCTAssertEqual(second["observedWaitMinutes"] as? Int, 5)
     }
 
+    func testRecommendationAndFiltersIdentifyACopyAsSoonAsNetworkIsLost() async throws {
+        let h = try await Harness.make()
+        h.api.feed = { try feedData(menu: h.menu) }
+        await h.feed.refresh()
+        let recommendation = RecommendationViewModel(feed: h.feed), filters = FiltersViewModel(feed: h.feed)
+        XCTAssertFalse(recommendation.isShowingCachedFeed)
+        h.connectivity.update(isConnected: false)
+        XCTAssertTrue(recommendation.isShowingCachedFeed)
+        XCTAssertTrue(filters.usesCachedCatalog)
+        XCTAssertEqual(recommendation.visibleMenus.count, 1)
+        XCTAssertEqual(recommendation.fetchedAt, h.feed.fetchedAt)
+    }
+
     func testPilotIsOptInAndControlDoesNotLeakTheWaitInExplanations() async throws {
         let h = try await Harness.make(), sessionID = UUID()
         let pilot = WaitIndicatorPilot(api: h.api, session: h.session, clock: h.clock)

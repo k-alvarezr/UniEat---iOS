@@ -15,6 +15,10 @@ struct FiltersView: View {
                 BrandHeader(title: "Filtros y presupuesto")
                 Text("Ajusta tus prioridades")
                     .font(.rounded(25))
+                if model.usesCachedCatalog {
+                    Text("Aplicaremos los filtros a los datos guardados el \(SpanishPresentation.dateAndTime(model.fetchedAt)). La disponibilidad se comprobará al recuperar conexión.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
                 SurfaceCard {
                     VStack(alignment: .leading, spacing: 10) {
                         sectionTitle("Presupuesto por plato", icon: "banknote")
