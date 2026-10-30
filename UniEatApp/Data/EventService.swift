@@ -28,9 +28,16 @@ final class EventService: ObservableObject {
     func track(_ kind: String, menu: DailyMenu) {
         guard session.profile != nil else { return }
         objectWillChange.send()
-        if ["feed_impression", "selection", "arrival"].contains(kind), !counted.insert(eventKey(kind, menu)).inserted { return }
+        let metadata = metadataProvider?(menu)
+        var dedupKey = eventKey(kind, menu)
+        if kind == "feed_impression" {
+            // A cached impression must not consume the later eligible live exposure. Existing
+            // engagement SQL still counts distinct session/publication/version, not these rows.
+            dedupKey += ":\(metadata?.assignmentId.uuidString ?? "ordinary"):\(metadata?.indicatorAvailable ?? false)"
+        }
+        if ["feed_impression", "selection", "arrival"].contains(kind), !counted.insert(dedupKey).inserted { return }
         pending.append(RemoteEvent(eventId: UUID(), sessionId: sessionID, publicationId: menu.id,
-                                    version: menu.version, kind: kind, occurredAt: clock.now, metadata: metadataProvider?(menu)))
+                                    version: menu.version, kind: kind, occurredAt: clock.now, metadata: metadata))
         if pending.count > 500 { pending.removeFirst(pending.count - 500) }
         LocalValues.save(pending, key: key)
         if !connectivity.isOffline { Task { await flush() } }

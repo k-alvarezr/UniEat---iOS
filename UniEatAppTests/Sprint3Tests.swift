@@ -124,6 +124,49 @@ final class Sprint3Tests: XCTestCase {
         XCTAssertEqual(recommendation.fetchedAt, h.feed.fetchedAt)
     }
 
+    func testCachedFirstLaunchKeepsJuansUpdatingStateUntilFreshFeedArrives() async throws {
+        let h = try await Harness.make(), content = LocalContentService(container: h.database.container)
+        let menu = h.menu
+        try await content.saveFeed(CachedFeedSnapshot(userId: h.auth.profile.id, filters: FeedFilters(),
+            response: FeedResponse(fetchedAt: .now, menus: [menu])))
+        let started = expectation(description: "network started")
+        var pending: CheckedContinuation<Data, Error>?
+        h.api.feed = { try await withCheckedThrowingContinuation { pending = $0; started.fulfill() } }
+        let events = EventService(api: h.api, session: h.session, connectivity: h.connectivity, clock: h.clock)
+        let feed = FeedViewModel(api: h.api, session: h.session, connectivity: h.connectivity, clock: h.clock, events: events, content: content)
+        let load = Task { await feed.refresh() }
+        await fulfillment(of: [started], timeout: 3)
+        XCTAssertTrue(feed.isLoading)
+        XCTAssertTrue(feed.isShowingCachedFeed)
+        XCTAssertEqual(feed.visibleMenus.map(\.id), [menu.id])
+        pending?.resume(returning: try feedData(menu: menu))
+        // The optional catalog warm-up must not suspend on the test's one-shot continuation.
+        h.api.feed = { try feedData(menu: menu) }
+        await load.value
+        XCTAssertFalse(feed.isLoading)
+        XCTAssertFalse(feed.isShowingCachedFeed)
+    }
+
+    func testCachedImpressionDoesNotConsumeTheLaterEligiblePilotExposure() async throws {
+        let h = try await Harness.make(), menu = h.menu
+        h.connectivity.update(isConnected: false)
+        let events = EventService(api: h.api, session: h.session, connectivity: h.connectivity, clock: h.clock)
+        events.accountChanged()
+        let key = "unieat.remote.pending-events.\(h.auth.profile.id.uuidString)"
+        defer { UserDefaults.standard.removeObject(forKey: key) }
+        var metadata: ExperimentEventMetadata?
+        events.metadataProvider = { _ in metadata }
+        events.track("feed_impression", menu: menu); events.track("feed_impression", menu: menu)
+        metadata = ExperimentEventMetadata(assignmentId: UUID(), experimentKey: "bq08-wait-v1", variant: "treatment",
+            indicatorAvailable: true, indicatorShown: true, source: "live")
+        events.track("feed_impression", menu: menu); events.track("feed_impression", menu: menu)
+        let rows = try XCTUnwrap(LocalValues.load([RemoteEvent].self, key: key))
+        XCTAssertEqual(rows.count, 2)
+        XCTAssertNil(rows[0].metadata)
+        XCTAssertEqual(rows[1].metadata, metadata)
+        XCTAssertEqual(rows[0].sessionId, rows[1].sessionId)
+    }
+
     func testPilotIsOptInAndControlDoesNotLeakTheWaitInExplanations() async throws {
         let h = try await Harness.make(), sessionID = UUID()
         let pilot = WaitIndicatorPilot(api: h.api, session: h.session, clock: h.clock)

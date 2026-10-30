@@ -67,6 +67,9 @@ final class FeedViewModel: FeatureViewModel {
             if session.matches(userID, generation: generation), requestID == id { loadError = APIFailure.offline.message }
             return
         }
+        // Preserve Juan's cached-first launch: show the copy while its refresh is pending.
+        await loadCachedFeed(userID: userID, generation: generation, request: id, requested: requested)
+        guard session.matches(userID, generation: generation), requestID == id, !Task.isCancelled else { return }
         do {
             await prepareContext?()
             guard session.matches(userID, generation: generation), requestID == id else { return }
