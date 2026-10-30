@@ -158,7 +158,7 @@ final class Sprint3Tests: XCTestCase {
         metadata = ExperimentEventMetadata(assignmentId: UUID(), experimentKey: "bq08-wait-v1", variant: "treatment",
             indicatorAvailable: true, indicatorShown: true, source: "live")
         events.track("feed_impression", menu: menu); events.track("feed_impression", menu: menu)
-        let rows = try XCTUnwrap(LocalValues.load([RemoteEvent].self, key: key))
+        let rows = try XCTUnwrap(UserDefaultsStore.load([RemoteEvent].self, key: key))
         XCTAssertEqual(rows.count, 2)
         XCTAssertNil(rows[0].metadata)
         XCTAssertEqual(rows[1].metadata, metadata)

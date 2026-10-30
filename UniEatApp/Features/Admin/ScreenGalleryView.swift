@@ -20,7 +20,7 @@ struct ScreenGalleryView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
-                row("01", "Hoy · Menús", icon: "fork.knife") { TodayFeedContent() }
+                row("01", "Hoy · Menús", icon: "fork.knife") { FeedContent() }
                 row("02", "Filtros", icon: "slider.horizontal.3") { FiltersView() }
                 row("03", "Elige por mí", icon: "sparkles") { RecommendationView() }
                 row("04", "Publicar menú", icon: "plus.circle") { PublishView() }

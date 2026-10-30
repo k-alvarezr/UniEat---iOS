@@ -5,7 +5,7 @@ import UniEatCore
 /// detalle del menu BQ-04, sigue vigente y que cambios reportaron
 /// muestra de una la copia del feed y luego la cambia por la version actual del server
 struct MenuDetailView: View {
-    @EnvironmentObject private var app: AppStore
+    @EnvironmentObject private var app: AppContainer
     let menu: DailyMenu
     var cachedAt: Date? = nil
     var body: some View { MenuDetailScreen(model: app.makeDetail(menu, cachedAt: cachedAt)) }
@@ -16,7 +16,7 @@ private struct MenuDetailScreen: View {
     @StateObject private var store: MenuDetailViewModel
     @State private var showingReport = false
     // gps para decir que tan lejos queda el local, se lee una vez y no se guarda ni se manda
-    @StateObject private var location = LocationContextService()
+    @StateObject private var location = LocationService()
 
     // el viewmodel se crea una sola vez: StateObject guarda el primero y no vuelve a llamar model()
     // antes se creaba uno nuevo en cada redibujado de la vista de afuera y se botaba
@@ -360,21 +360,5 @@ private struct MenuDetailScreen: View {
     /// y si cerraron el menu mientras tanto no se abre
     private func openReport() async {
         if await store.canReport() { showingReport = true }
-    }
-}
-
-struct InsufficientEvidenceView: View {
-    let count: Int
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Label("Información insuficiente", systemImage: "hourglass").font(.rounded(17))
-            Text("Hay \(count) reporte(s) en los últimos 30 minutos. Se necesitan al menos tres para mostrar una estimación.")
-                .font(.subheadline)
-            Text("Puedes informar el tiempo de fila después de visitar el local.")
-                .font(.caption).foregroundStyle(.secondary)
-        }
-        .padding(10)
-        .background(Palette.cream, in: RoundedRectangle(cornerRadius: 10))
     }
 }

@@ -3,7 +3,7 @@ import Foundation
 import UniEatCore
 
 /// estado de la hoja de reportar que antes estaba en ReportSheet
-/// se crea uno cada vez que se abre la hoja (AppStore.makeReport) y manda por ReportingFacade
+/// se crea uno cada vez que se abre la hoja (AppContainer.makeReport) y manda por ReportFacade
 @MainActor
 final class ReportViewModel: ObservableObject {
     @Published var kind: ReportKind
@@ -14,11 +14,11 @@ final class ReportViewModel: ObservableObject {
     @Published private(set) var errorText: String?
     @Published private(set) var isSending = false
     private let menu: DailyMenu
-    private let reports: ReportingFacade
+    private let reports: ReportFacade
     // id fijo de este reporte, si se toca enviar otra vez no se duplica
     private var requestID = UUID()
     private let waitObservation: Bool   // true si es un reporte de fila desde el piloto, ahi si van los minutos
-    init(menu: DailyMenu, kind: ReportKind, reports: ReportingFacade, waitObservation: Bool = false) {
+    init(menu: DailyMenu, kind: ReportKind, reports: ReportFacade, waitObservation: Bool = false) {
         self.menu = menu
         self.kind = kind
         self.reports = reports

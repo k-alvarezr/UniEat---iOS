@@ -11,7 +11,7 @@ struct LocalContentService: Sendable {
     init(container: ModelContainer) {
         worker = Task.detached(priority: .utility) { LocalContentStore(modelContainer: container) }
     }
-    /// AppStore abre la puerta con la sesion nueva
+    /// AppContainer abre la puerta con la sesion nueva
     func setSession(userID: UUID?, generation: UUID) {
         sessions.setSession(userID: userID, generation: generation)
     }

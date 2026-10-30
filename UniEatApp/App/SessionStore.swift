@@ -20,7 +20,7 @@ final class SessionStore: ObservableObject {
     /// las tareas guardan la generacion con la que arrancaron y si al terminar es otra botan el resultado
     /// asi una respuesta vieja nunca le llega al usuario siguiente
     private(set) var generation = UUID()
-    var onChange: (() -> Void)?            // lo pone AppStore, se llama cuando entra o sale alguien
+    var onChange: (() -> Void)?            // lo pone AppContainer, se llama cuando entra o sale alguien
     var onForget: ((UUID, UUID) async throws -> Void)? // usuario y generación que se van a limpiar
     private let auth: SessionAuthenticating
     private let api: APIRequesting
@@ -63,10 +63,10 @@ final class SessionStore: ObservableObject {
         }
         await start(signedIn)
     }
-    // arranca la sesion: generacion nueva, limpia lo anterior, avisa a AppStore y pide la cuenta al server
+    // arranca la sesion: generacion nueva, limpia lo anterior, avisa a AppContainer y pide la cuenta al server
     private func start(_ signedIn: Profile) async {
         generation = UUID()
-        let cached = LocalValues.load(CachedAccountSnapshot.self, key: Self.accountCacheKey(signedIn.id))
+        let cached = UserDefaultsStore.load(CachedAccountSnapshot.self, key: Self.accountCacheKey(signedIn.id))
         if let cached, cached.profile.id == signedIn.id {
             profile = cached.profile
             memberships = cached.memberships
@@ -107,7 +107,7 @@ final class SessionStore: ObservableObject {
         isAccountVerified = true
         let savedAt = Date()
         cachedAccountDate = savedAt
-        LocalValues.save(CachedAccountSnapshot(profile: me.profile, memberships: me.establishments,
+        UserDefaultsStore.save(CachedAccountSnapshot(profile: me.profile, memberships: me.establishments,
             establishments: mine.establishments, savedAt: savedAt), key: Self.accountCacheKey(userID))
         accountError = nil
     }
@@ -130,7 +130,7 @@ final class SessionStore: ObservableObject {
     func signOutAndForget() async {
         guard !isForgetting, let leaving = profile?.id else { return }
         let departingGeneration = generation
-        LocalValues.remove(key: Self.accountCacheKey(leaving))
+        UserDefaultsStore.remove(key: Self.accountCacheKey(leaving))
         isForgetting = true
         signOut()
         defer { isForgetting = false }

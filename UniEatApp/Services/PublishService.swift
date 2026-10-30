@@ -4,7 +4,7 @@ import UniEatCore
 /// publicar, cerrar y el borrador salen del AppStore viejo a este servicio
 /// el borrador sigue siendo el archivo en Application Support de #33
 @MainActor
-final class PublishingService {
+final class PublishService {
     private let api: APIRequesting
     let session: SessionStore
     private let files: FileStore
