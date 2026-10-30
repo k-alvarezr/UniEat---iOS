@@ -65,9 +65,10 @@ struct TodayFeedContent: View {
                                 MenuCard(menu: menu, at: store.clock.now)
                             }
                             .buttonStyle(.plain)
-                            .onAppear { store.track("feed_impression", menu: menu) }
+                            // La fila mantiene su identidad. Solo cambia la tarea de exposición cuando
+                            // cambia la sesión, versión o elegibilidad del piloto (incluye copia -> vivo).
+                            .task(id: store.exposureKey(for: menu)) { store.track("feed_impression", menu: menu) }
                         }
-                        .id(store.contentRevision)
                     }
                 }
                 .padding(16)
@@ -170,7 +171,6 @@ struct MenuCard: View {
 /// foto del local si tiene url https, si no un dibujo con el nombre
 struct FoodArtwork: View {
     @EnvironmentObject private var app: AppStore
-    @State private var localPhoto: URL?
     let name: String
     var photoUrl: String?
 
@@ -190,17 +190,7 @@ struct FoodArtwork: View {
         // con scaledToFill adentro del zstack la foto crecia y tapaba la tarjeta de abajo
         .overlay {
             if let photo {
-                // Kingfisher (#38): primero la foto guardada en disco, si no la de la red
-                // sin red solo se usa lo que ya esta en cache, las fotos se achican a 720 x 480
-                KFImage(source: localPhoto.map {
-                    .provider(LocalFileImageDataProvider(fileURL: $0, cacheKey: photo.absoluteString))
-                } ?? .network(ImageResource(downloadURL: photo)))
-                .placeholder { placeholderIcon }
-                .setProcessor(DownsamplingImageProcessor(size: CGSize(width: 720, height: 480)))
-                .cacheOriginalImage()
-                .onlyFromCache(app.connectivity.isOffline && localPhoto == nil)
-                .cancelOnDisappear(true)
-                .resizable().scaledToFill()
+                CachedFoodPhoto(url: photo, images: app.images, connectivity: app.connectivity)
             }
         }
         // el nombre va encima de la foto para que se siga viendo
@@ -214,17 +204,44 @@ struct FoodArtwork: View {
         .frame(maxWidth: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: 11))
         .accessibilityLabel(photo == nil ? "Ilustración de \(name)" : "Foto de \(name)")
-        // busca la foto en el disco cada vez que cambia la url, leer el disco va en segundo plano
-        .task(id: photo?.absoluteString) {
-            localPhoto = nil
-            if let photo { localPhoto = await app.images.localFile(photo) }
-        }
     }
 
     private var placeholderIcon: some View {
         Image(systemName: "fork.knife.circle.fill")
             .font(.system(size: 68))
             .foregroundStyle(Palette.ink.opacity(0.75))
+    }
+}
+
+/// Solo este fragmento observa la conexión. La vista de Kingfisher nunca inicia otra descarga:
+/// su tarea pide la imagen al coordinador compartido y después muestra el mismo caché procesado.
+private struct CachedFoodPhoto: View {
+    let url: URL
+    let images: FeedImageStore
+    @ObservedObject var connectivity: ConnectivityService
+    @State private var readyURL: URL?
+
+    private struct RequestKey: Hashable { let url: URL; let online: Bool }
+    var body: some View {
+        Group {
+            if readyURL == url {
+                KFImage(url)
+                    .targetCache(images.cache)
+                    .setProcessor(ImageLibraryConfiguration.processor)
+                    .onlyFromCache()
+                    .cancelOnDisappear(true)
+                    .resizable().scaledToFill()
+            } else {
+                Image(systemName: "fork.knife.circle.fill")
+                    .font(.system(size: 68)).foregroundStyle(Palette.ink.opacity(0.75))
+            }
+        }
+        .task(id: RequestKey(url: url, online: !connectivity.isOffline)) {
+            if readyURL != url { readyURL = nil }
+            let ready = await images.load(url, allowNetwork: !connectivity.isOffline)
+            guard !Task.isCancelled else { return }
+            if ready { readyURL = url }
+        }
     }
 }
 
