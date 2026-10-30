@@ -20,6 +20,9 @@ private struct CachedFeed: Codable {
 /// pestañas de la app, para poder cambiar de pestaña desde cualquier pantalla
 enum AppTab { case today, second, metrics, profile }
 
+/// como le fue a un reporte guardado al mandarlo (se envio bien, falla por red, el server lo rechaza)
+private enum SendResult { case sent, retry, rejected }
+
 /// este es el viewmodel de toda la app, las pantallas leen de aca y le piden cosas
 /// el server decide vigencia orden y permisos, aca solo se muestra lo que responde
 /// todo lo @Published avisa a las pantallas cuando cambia, y private(set) hace que solo el store lo cambie
@@ -139,13 +142,15 @@ final class AppStore: ObservableObject {
         await refresh()
     }
 
-    /// pide al server quien es el usuario, su rol y sus locales
+    /// pide al server quien es el usuario y sus locales, las dos no dependen una de la otra
+    /// entonces van en paralelo, si una falla la otra se cancela sola al salir de la funcion
     private func loadAccount() async throws {
-        let me: MeResponse = try await api.get("me")
-        profile = me.profile
-        memberships = me.establishments
-        let mine: EstablishmentsResponse = try await api.get("establishments/mine")
-        establishments = mine.establishments
+        async let me: MeResponse = try await api.get("me")
+        async let mine: EstablishmentsResponse = try await api.get("establishments/mine")
+        let (account, owned) = try await (me, mine)
+        profile = account.profile
+        memberships = account.establishments
+        establishments = owned.establishments
     }
 
     /// vuelve a pedir la cuenta y el feed, por ejemplo despues de que aprueban un local
@@ -300,9 +305,15 @@ final class AppStore: ObservableObject {
         }
     
     /// ultima copia guardada del detalle, nil si nunca se abrio con red
-    func cachedDetail(for menu: DailyMenu) -> MenuDetail? {
+    /// leer el disco y decodificar va en un hilo de fondo con prioridad utility (es util pero el usuario no lo ve, puede esperar un poquito) (no traba la pantalla)
+    /// .value espera el resultado de esa tarea, y como AppStore es @MainActor la linea despues del await ya corre en el hilo principal
+    func cachedDetail(for menu: DailyMenu) async -> MenuDetail? {
         guard let userId = profile?.id else { return nil }
-        return files.load(MenuDetail.self, name: "detail-\(menu.id.uuidString)", folder: .caches, userId: userId)
+        let files = files // copia de la estructura para llevarla al otro hilo
+        let name = "detail-\(menu.id.uuidString)"
+        return await Task.detached(priority: .utility){
+            files.load(MenuDetail.self, name: name, folder: .caches, userId: userId)
+        }.value
     }
 
 
@@ -336,25 +347,45 @@ final class AppStore: ObservableObject {
         pendingReportCount = database.pendingReports(userId: userId).count
     }
     
-    /// manda los reportes guardados en orden, si se va la red para y sigue en el proximo refresh
+    /// manda todos los reportes guardados a la vez, cada uno en una tarea hija del grupo
     private func flushReports() async {
-        guard let userId = profile?.id, !isOffline, !isFlushingReports else {return}
+        guard let userId = profile?.id, !isOffline, !isFlushingReports else {return} //lista de reportes a mandar
         isFlushingReports = true
         defer { isFlushingReports = false }
-        for report in database.pendingReports(userId: userId){
-            guard let body = report.body else { database.remove(report);
-                continue}
-            do {
-                let _: ReportResponse = try await api.send("POST", "reports", body: body)
-                database.remove(report)
-                }
-            catch let failure as APIFailure where failure.code == "OFFLINE" { break }
-            catch {
-                // el server lo rechazo, por ejemplo menu cerrado o version vieja, reintentar no sirve
-                database.remove(report)
-            }
+        
+        // 1. sacar de swiftdata lo que se va a mandar, los modelos de la base no pueden cambiar de hilo
+        //    entonces se copian el id y el body que si son Sendable
+        var outbox: [(id: UUID, body: ReportBody)] = []
+        for report in database.pendingReports(userId: userId) {
+            if let body = report.body   { outbox.append((report.id, body)) }
+            else { database.remove(report) }
         }
-        pendingReportCount = database.pendingReports(userId: userId).count
+        guard !outbox.isEmpty else { return } //que la lista a mandar no este vacia, o aborta
+        
+        // 2. una tarea hija por reporte con prioridad utility, todas esperan la red al mismo tiempo
+        //    el grupo no termina hasta que terminan todas sus hijas (prioridad utility, como el resto)
+        let api = api
+        let results = await withTaskGroup(of: (UUID, SendResult).self){
+            group in
+            for item in outbox {
+                group.addTask(priority: .utility) {
+                    do {
+                        let _: ReportResponse = try await api.send("POST", "reports", body: item.body)
+                        return (item.id, .sent)       // todo salio cool
+                    } catch let failure as APIFailure where failure.code == "OFFLINE" {
+                        return (item.id, .retry)      // sin red, se queda para la proxima
+                    } catch {
+                        return (item.id, .rejected)   // el server lo rechazo, reintentar no sirve
+                    }
+                }
+            }
+            var all: [(UUID, SendResult)] = []
+            for await result in group { all.append(result) }
+            return all
+        }
+        // 3. de vuelta en el hilo principal se actualiza la base, swiftdata solo se toca aca
+        for (id, result) in results where result != .retry { database.remove(id: id) } //remueve todo lo que no sea para reintentar
+                pendingReportCount = database.pendingReports(userId: userId).count     //actualiza cuantos reportes pendientes quedan
     }
 
     // MARK: - publicar restaurantes
@@ -386,9 +417,16 @@ final class AppStore: ObservableObject {
         files.save(draft, name: "publish-draft", folder: .support, userId: userId)
     }
 
-    func loadDraft() -> PublishDraft? {
+    /// lee el borrador en un hilo de fondo, igual que el detalle
+    /// guardar si va directo para que nunca un borrador viejo pise uno nuevo (que el archivo termine con el borrador viejo encima del nuevo)
+    /// (.utility: es util pero el usuario no lo ve, puede esperar un poquito) (no traba la pantalla)
+    /// .value espera el resultado de esa tarea, y como AppStore es @MainActor la linea despues del await ya corre en el hilo principal
+    func loadDraft() async -> PublishDraft? {
         guard let userId = profile?.id else { return nil }
-        return files.load(PublishDraft.self, name: "publish-draft", folder: .support, userId: userId)
+        let files = files
+        return await Task.detached(priority: .utility){
+            files.load(PublishDraft.self, name: "publish-draft", folder: .support, userId: userId)
+        }.value
     }
 
     func clearDraft() {

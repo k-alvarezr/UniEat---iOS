@@ -33,8 +33,8 @@ private struct DishDraft: Identifiable {
     }
 }
 /// lo que se guarda del formulario en un archivo para no perderlo si se cierra la app o se va la red
-struct PublishDraft: Codable {
-    struct Dish: Codable {
+struct PublishDraft: Codable, Sendable {
+    struct Dish: Codable, Sendable {
         var name: String
         var detail: String
         var priceText: String
@@ -115,7 +115,7 @@ struct PublishView: View {
         .background(Palette.cream)
         .onAppear(perform: selectFirstEstablishment)
         .onChange(of: store.approvedEstablishments.map(\.id)) { _, _ in selectFirstEstablishment() }
-        .onAppear { if editingMenu == nil, let draft = store.loadDraft() { restore(draft) } }
+        .task { if editingMenu == nil, let draft = await store.loadDraft() { restore(draft) } }
         .onDisappear { if editingMenu == nil && hasDraftContent { store.saveDraft(currentDraft) } }
     }
 
