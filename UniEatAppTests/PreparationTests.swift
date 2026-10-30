@@ -32,7 +32,7 @@ final class PreparationTests: XCTestCase {
         h.session.signOut(message: "Tu sesión terminó.")
         XCTAssertTrue(forgotten.isEmpty)
         XCTAssertEqual(try h.database.pending(userID: userID).count, 1)
-        // a mano: se avisa a AppStore con el id de la cuenta y la base borra sus reportes
+        // a mano: se avisa a AppContainer con el id de la cuenta y la base borra sus reportes
         try await h.session.signIn(email: "test@example.invalid", password: "test")
         await h.session.signOutAndForget()
         XCTAssertEqual(forgotten, [userID])
@@ -59,10 +59,10 @@ final class PreparationTests: XCTestCase {
         XCTAssertEqual(before.count, 1)
         XCTAssertEqual(before[0].body.observedAt!.timeIntervalSince1970, observed.timeIntervalSince1970, accuracy: 1)
         h.api.failure = APIFailure(code: "INTERNAL_ERROR", message: "Temporal")
-        await h.reports.flushReports()
+        await h.reports.sendPendingReports()
         XCTAssertEqual(try h.database.pending(userID: h.auth.profile.id).count, 1)
         h.api.failure = nil
-        await h.reports.flushReports()
+        await h.reports.sendPendingReports()
         XCTAssertEqual(try h.database.pending(userID: h.auth.profile.id).count, 0)
         let ids = try h.api.reportBodies.map { try JSONSerialization.jsonObject(with: $0) as! [String: Any] }
         XCTAssertEqual(Set(ids.compactMap { $0["clientReportId"] as? String }).count, 1)
@@ -81,10 +81,10 @@ final class PreparationTests: XCTestCase {
         XCTAssertEqual(h.reports.needsReviewCount, 1)
         XCTAssertEqual(h.reports.pendingReportCount, 0)
         let attempts = h.api.reportBodies.count
-        await h.reports.flushReports()
+        await h.reports.sendPendingReports()
         XCTAssertEqual(h.api.reportBodies.count, attempts, "Rejected rows wait for an explicit retry")
         h.api.failure = nil
-        await h.reports.flushReports(retryRejected: true)
+        await h.reports.sendPendingReports(retryRejected: true)
         XCTAssertEqual(try h.database.pending(userID: h.auth.profile.id).count, 0)
     }
 
@@ -110,7 +110,7 @@ final class PreparationTests: XCTestCase {
 
     func testStorageFailureNeverClaimsReportWasQueued() async throws {
         let h = try await Harness.make()
-        let facade = ReportingFacade(api: h.api, outbox: nil, session: h.session,
+        let facade = ReportFacade(api: h.api, outbox: nil, session: h.session,
             connectivity: h.connectivity, clock: h.clock)
         do {
             _ = try await facade.submitReport(for: h.menu, kind: .price, note: "", waitMinutes: nil)
@@ -127,7 +127,7 @@ final class PreparationTests: XCTestCase {
         }
         h.connectivity.update(isConnected: true)
         h.api.onReport = { h.session.signOut() }
-        await h.reports.flushReports()
+        await h.reports.sendPendingReports()
         XCTAssertEqual(h.api.reportBodies.count, 1, "The remaining child tasks must fail their session preflight")
         XCTAssertEqual(try h.database.pending(userID: h.auth.profile.id).count, 3,
                        "Even the in-flight row is retained for an idempotent retry by its owner")
@@ -232,7 +232,7 @@ struct Harness {
     let api: FakeAPI
     let session: SessionStore
     let database: LocalDatabase
-    let reports: ReportingFacade
+    let reports: ReportFacade
     let connectivity: ConnectivityService
     let clock: ServerClock
     let feed: FeedViewModel
@@ -243,7 +243,7 @@ struct Harness {
         try await session.signIn(email: "test@example.invalid", password: "test")
         let connectivity = ConnectivityService(monitorNetwork: false), clock = ServerClock()
         let database = try LocalDatabase(inMemory: true)
-        let reports = ReportingFacade(api: api, outbox: database, session: session, connectivity: connectivity, clock: clock)
+        let reports = ReportFacade(api: api, outbox: database, session: session, connectivity: connectivity, clock: clock)
         let events = EventService(api: api, session: session, connectivity: connectivity, clock: clock)
         let feed = FeedViewModel(api: api, session: session, connectivity: connectivity, clock: clock, events: events)
         return Harness(auth: auth, api: api, session: session, database: database, reports: reports,

@@ -3,7 +3,7 @@ import Foundation
 import UniEatCore
 
 /// estado del detalle BQ-04 que antes estaba en MenuDetailView con @State
-/// uno por pantalla de detalle, lo crea AppStore.makeDetail
+/// uno por pantalla de detalle, lo crea AppContainer.makeDetail
 @MainActor
 final class MenuDetailViewModel: FeatureViewModel {
     @Published private(set) var detail: MenuDetail?
@@ -82,15 +82,15 @@ final class MenuDetailViewModel: FeatureViewModel {
         defer { if requestID == id { isLoading = false } }
         // Sin ruta de red se consulta solo el archivo. No se espera un timeout para navegar o reportar.
         if !connectivity.isConnected {
-            let copy = await service.cached(initialMenu, generation: expected)
+            let copy = await service.savedCopy(initialMenu, generation: expected)
             guard session.matches(userID, generation: expected), requestID == id else { return }
             if detail == nil { detail = copy }
             loadError = .offline
             return
         }
         // copia del disco y server en paralelo con async let (#31), la copia se muestra mientras llega el server
-        async let cached = service.cached(initialMenu, generation: expected)
-        async let fresh = service.load(initialMenu, automatic: automatic, generation: expected)
+        async let cached = service.savedCopy(initialMenu, generation: expected)
+        async let fresh = service.fetch(initialMenu, automatic: automatic, generation: expected)
         if let copy = await cached, session.matches(userID, generation: expected), requestID == id, detail == nil {
             detail = copy
         }

@@ -3,11 +3,11 @@ import MapKit
 import SwiftUI
 
 /// perfil de estudiante o restaurante, estado de sus locales y pedir uno nuevo con su ubicacion
-struct EstablishmentManagementView: View {
+struct EstablishmentView: View {
     // el formulario del local vive en EstablishmentViewModel
     @EnvironmentObject private var model: EstablishmentViewModel
     // pin del local, sale de la direccion o del gps y el dueño lo confirma en el mapa
-    @StateObject private var location = LocationContextService()
+    @StateObject private var location = LocationService()
 
     private let areas = ["Centro", "Norte", "Sur", "Fuera del campus"]
     private let methods = ["Nequi", "Daviplata", "Efectivo", "Tarjeta"]
@@ -142,44 +142,4 @@ struct EstablishmentManagementView: View {
 
 private extension String {
     var trimmed: String { trimmingCharacters(in: .whitespacesAndNewlines) }
-}
-
-/// admin aprueba los locales, al aprobar el usuario pasa a restaurante
-struct AdminApprovalsView: View {
-    // las solicitudes viven en AdminApprovalsViewModel
-    @EnvironmentObject private var model: AdminApprovalsViewModel
-
-    var body: some View {
-        SurfaceCard {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Solicitudes de restaurantes").font(.headline)
-                Button("Actualizar solicitudes") { Task { await model.load() } }
-                    .disabled(!model.canUseNetwork || model.isLoading)
-                if model.isLoading { ProgressView("Consultando solicitudes…") }
-                if !model.hasLoaded && !model.isLoading {
-                    Text("Aún no hay una lista descargada. Actualiza las solicitudes cuando el servicio esté disponible.")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                } else if model.requests.isEmpty && model.hasLoaded {
-                    Text("No hay solicitudes pendientes.")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                }
-                ForEach(model.requests) { request in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(request.establishmentName).font(.subheadline.weight(.bold))
-                        Text("\(request.area) · \(request.displayName)")
-                            .font(.caption).foregroundStyle(.secondary)
-                        Button(model.workingId == request.id ? "Aprobando…" : "Aprobar local") {
-                            Task { await model.approve(request) }
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(!model.canUseNetwork || model.workingId != nil)
-                    }
-                }
-                if let message = model.message { Text(message).font(.footnote) }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .task { await model.load() }
-    }
-
 }

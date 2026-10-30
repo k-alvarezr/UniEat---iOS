@@ -65,7 +65,7 @@ final class PerformanceViewModel: FeatureViewModel {
                 try await session.refreshAccount()
                 accountCheckedAt = .now
             }
-            await events.flush()
+            await events.sendPending()
             guard session.matches(userID, generation: expected), requestID == id,
                   connectivity.isConnected, !Task.isCancelled else { return }
             let query = [URLQueryItem(name: "days", value: String(days))]

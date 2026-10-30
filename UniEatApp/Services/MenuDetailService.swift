@@ -23,7 +23,7 @@ final class MenuDetailService {
     /// trae la version actual del menu y guarda la copia en Caches (#33)
     /// si automatic es true el server no la cuenta en las metricas, son recargas que no hizo el usuario
     /// generation es la sesion con la que arranco la pantalla, si ya es otra se cancela
-    func load(_ menu: DailyMenu, automatic: Bool, generation: UUID? = nil) async throws -> DetailLoadResult {
+    func fetch(_ menu: DailyMenu, automatic: Bool, generation: UUID? = nil) async throws -> DetailLoadResult {
         guard let userID = session.profile?.id else { throw AuthFailure.expired }
         if let generation, generation != session.generation { throw CancellationError() }
         let expected = session.generation
@@ -47,7 +47,7 @@ final class MenuDetailService {
     }
     /// lectura de la copia del detalle en segundo plano con Task.detached utility (#31), el disco y el json no traban la pantalla
     /// si cambio la sesion mientras se leia se bota el resultado
-    func cached(_ menu: DailyMenu, generation: UUID? = nil) async -> MenuDetail? {
+    func savedCopy(_ menu: DailyMenu, generation: UUID? = nil) async -> MenuDetail? {
         guard let userID = session.profile?.id else { return nil }
         if let generation, generation != session.generation { return nil }
         let expected = session.generation

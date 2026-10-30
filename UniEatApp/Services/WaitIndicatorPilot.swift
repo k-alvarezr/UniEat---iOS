@@ -34,7 +34,7 @@ final class WaitIndicatorPilot: FeatureViewModel {
     private let clock: ServerClock
     private var assigning: Task<PilotAssignment, Error>?   // pedido de variante en camino, se reutiliza
     private var requestID = UUID()
-    var onParticipationChanged: (() -> Void)?             // AppStore reinicia la sesion de eventos y el feed
+    var onParticipationChanged: (() -> Void)?             // AppContainer reinicia la sesion de eventos y el feed
     init(api: APIRequesting, session: SessionStore, clock: ServerClock) {
         self.api = api
         self.session = session

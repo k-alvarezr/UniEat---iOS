@@ -57,7 +57,7 @@ struct PublishDraft: Codable, Sendable, Equatable {
 }
 
 /// todo el estado del formulario de publicar que antes eran @State en PublishView
-/// la vista solo dibuja, publicar cerrar y el borrador pasan por PublishingService
+/// la vista solo dibuja, publicar cerrar y el borrador pasan por PublishService
 @MainActor
 final class PublishViewModel: FeatureViewModel {
     @Published var selectedEstablishmentID: UUID?
@@ -80,7 +80,7 @@ final class PublishViewModel: FeatureViewModel {
     @Published private(set) var hasLoadedOwnMenus = false
     @Published private(set) var isRefreshingOwnMenus = false
     let paymentChoices = ["Nequi", "Daviplata", "Efectivo", "Tarjeta"]
-    private let service: PublishingService
+    private let service: PublishService
     private let feed: FeedViewModel
     private let session: SessionStore
     private let connectivity: ConnectivityService
@@ -88,7 +88,7 @@ final class PublishViewModel: FeatureViewModel {
     private var draftRequest = UUID()
     private let draftSaveDelay: Duration
     let clock: ServerClock
-    init(service: PublishingService, feed: FeedViewModel, session: SessionStore,
+    init(service: PublishService, feed: FeedViewModel, session: SessionStore,
          connectivity: ConnectivityService, clock: ServerClock, draftSaveDelay: Duration = .milliseconds(400)) {
         self.service = service
         self.feed = feed

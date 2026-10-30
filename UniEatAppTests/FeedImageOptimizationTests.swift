@@ -63,7 +63,7 @@ final class FeedImageOptimizationTests: XCTestCase {
         let cachedFile = await images.localFile(url)
         let file = try XCTUnwrap(cachedFile)
         XCTAssertEqual(file.path, cache.cachePath(forKey: url.absoluteString,
-            processorIdentifier: ImageLibraryConfiguration.processor.identifier))
+            processorIdentifier: KingfisherSetup.processor.identifier))
         let source = try XCTUnwrap(CGImageSourceCreateWithURL(file as CFURL, nil))
         let thumbnail = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
         XCTAssertLessThanOrEqual(max(thumbnail.width, thumbnail.height), 720)
@@ -80,7 +80,7 @@ final class FeedImageOptimizationTests: XCTestCase {
             UIColor.blue.setFill(); context.fill(CGRect(x: 0, y: 0, width: 900, height: 600))
         }
         try await oldCache.store(image, forKey: url.absoluteString,
-            processorIdentifier: ImageLibraryConfiguration.processor.identifier)
+            processorIdentifier: KingfisherSetup.processor.identifier)
         oldCache.clearMemoryCache()
         let images = FeedImageStore(cache: newCache, legacyDirectory: nil, legacyCache: oldCache)
         let ready = await images.load(url, allowNetwork: false)
@@ -88,7 +88,7 @@ final class FeedImageOptimizationTests: XCTestCase {
         let copiedFile = await images.localFile(url)
         XCTAssertNotNil(copiedFile)
         XCTAssertNil(oldCache.cacheFileURLIfOnDisk(forKey: url.absoluteString,
-            processorIdentifier: ImageLibraryConfiguration.processor.identifier))
+            processorIdentifier: KingfisherSetup.processor.identifier))
         await oldCache.clearDiskCache(); await newCache.clearDiskCache()
     }
 }

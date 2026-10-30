@@ -7,7 +7,7 @@ struct FiltersView: View {
     // el borrador de filtros vive en FiltersViewModel, se aplica al feed compartido
     @EnvironmentObject private var model: FiltersViewModel
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var location = LocationContextService()
+    @StateObject private var location = LocationService()
     private let areas = ["Centro", "Norte", "Sur", "Fuera del campus"]
 
     var body: some View {

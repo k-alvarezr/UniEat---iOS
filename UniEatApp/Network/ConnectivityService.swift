@@ -18,7 +18,7 @@ final class ConnectivityService: ObservableObject {
     }
     @Published private(set) var isChecking = false
     var checkService: (() async throws -> Void)?
-    var onReconnect: (() -> Void)?                    // lo pone AppStore para mandar las colas al volver la red
+    var onReconnect: (() -> Void)?                    // lo pone AppContainer para mandar las colas al volver la red
     private let monitor = NWPathMonitor()             // avisa cuando cambia la conexion
     /// monitorNetwork en false es para las pruebas, asi no depende de la red real
     init(monitorNetwork: Bool = true) {

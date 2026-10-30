@@ -81,7 +81,7 @@ final class LocalDatabase {
         let config = storeURL.map { ModelConfiguration(schema: schema, url: $0) }
             ?? ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory)
         // si no abre no se borra el archivo, puede tener reportes del usuario
-        // AppStore sigue sin base y Perfil avisa del problema
+        // AppContainer sigue sin base y Perfil avisa del problema
         container = try ModelContainer(for: schema, configurations: config)
     }
     

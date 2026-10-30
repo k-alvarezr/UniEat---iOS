@@ -57,12 +57,12 @@ extension APIRequesting {
 @MainActor
 final class APIClient: APIRequesting {
     private let configuration: AppConfiguration
-    // funcion que entrega un token valido, la pone AppStore con auth.validAccessToken()
+    // funcion que entrega un token valido, la pone AppContainer con auth.validAccessToken()
     private let accessToken: () async throws -> String
     // generacion de la sesion de auth, si cambia en medio de una peticion su respuesta se bota
     private let sessionIdentity: () -> UUID
     private let transport: URLSession            // URLSession inyectable para las pruebas
-    var onUnauthorized: (() -> Void)?            // lo pone AppStore, cierra sesion si el server dice 401
+    var onUnauthorized: (() -> Void)?            // lo pone AppContainer, cierra sesion si el server dice 401
     var onServiceAvailability: ((Bool) -> Void)?
 
     /// sesion sin cache http: las respuestas llevan datos del usuario con su token
