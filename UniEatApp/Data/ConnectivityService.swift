@@ -24,9 +24,14 @@ final class ConnectivityService: ObservableObject {
     }
     /// si estaba sin red y vuelve, se limpia lo del server caido y se avisa para mandar las colas
     func update(isConnected connected: Bool) {
+        // el monitor avisa varias veces aunque la red no cambie, sin este guard cada aviso redibuja las pantallas
+        guard connected != isConnected else { return }
         let reconnecting = !isConnected && connected
         isConnected = connected
-        if reconnecting { serverUnreachable = false; onReconnect?() }
+        if reconnecting {
+            serverUnreachable = false
+            onReconnect?()
+        }
     }
     deinit { monitor.cancel() }
 }

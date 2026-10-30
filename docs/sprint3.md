@@ -60,7 +60,10 @@ confirmar. Sus métricas y su endpoint siguen pendientes en las issues iOS #43 y
 - Migración desde `unieat.saved-menus.<usuario>`: deduplica, conserva filas existentes y confirma la transacción
   antes de eliminar la clave anterior. Un fallo conserva el origen e informa el error.
 - `FeedCacheRecord`: snapshots por usuario/filtros y catálogo sin filtros; hasta 24 combinaciones por cuenta
-  más un catálogo. El calentamiento automático no cuenta como búsqueda BQ-03.
+  más un catálogo. El calentamiento automático no cuenta como búsqueda BQ-03 una vez desplegado el backend
+  de la BQ-08 (antes de eso, el `refresh=auto` del feed sí se cuenta). Cerrar sesión desde Perfil borra estas
+  filas de la cuenta; los `SavedMenu` se conservan. La copia ya no guarda referencia de hora: `ServerClock`
+  usa la diferencia con el servidor de la última respuesta.
 - Miniaturas públicas en `Caches/unieat-feed-images/<SHA256(URL)>.jpg`: escritura atómica, siete días,
   limpieza de archivos más antiguos por encima de 50 MiB. Es caché recuperable, no persistencia garantizada.
 

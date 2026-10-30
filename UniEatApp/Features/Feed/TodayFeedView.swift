@@ -22,6 +22,7 @@ struct TodayFeedContent: View {
                     header(date: timeline.date)
                     // al abrir se muestra la copia mientras llega el server, eso no es estar sin conexion
                     // el aviso sale solo si no hay red o si la carga ya termino y no se pudo actualizar
+                    // y solo si hay una copia descargada, si no hay ninguna se dice que no hay copia todavia
                     if (store.isOffline || (store.isShowingCachedFeed && !store.isLoading)) && store.hasSnapshot {
                         NavigationLink(destination: OfflineFeedView()) {
                             OfflineNotice(fetchedAt: store.fetchedAt)
@@ -46,6 +47,7 @@ struct TodayFeedContent: View {
                             }
                         }
                     }
+                    // la copia no se pudo leer o guardar en swiftdata, el feed igual se ve
                     if let warning = store.cacheWarning {
                         Label(warning, systemImage: "externaldrive.badge.exclamationmark")
                             .font(.footnote).foregroundStyle(Palette.coral)
@@ -139,6 +141,7 @@ struct MenuCard: View {
                 Text(menu.title).font(.rounded(14, .bold))
                 HStack(spacing: 7) {
                     Sticker(text: menu.area, color: Palette.cyan, icon: "mappin")
+                    // piloto BQ-08: en el grupo control no se muestra la fila
                     if !pilot.showsWaitIndicator {
                         Sticker(text: "Evaluación en curso", color: Palette.cream, icon: "clock")
                     } else if let wait = menu.waitMinutes, menu.hasWaitEvidence(at: date) {
@@ -187,6 +190,8 @@ struct FoodArtwork: View {
         // con scaledToFill adentro del zstack la foto crecia y tapaba la tarjeta de abajo
         .overlay {
             if let photo {
+                // Kingfisher (#38): primero la foto guardada en disco, si no la de la red
+                // sin red solo se usa lo que ya esta en cache, las fotos se achican a 720 x 480
                 KFImage(source: localPhoto.map {
                     .provider(LocalFileImageDataProvider(fileURL: $0, cacheKey: photo.absoluteString))
                 } ?? .network(ImageResource(downloadURL: photo)))
@@ -209,6 +214,7 @@ struct FoodArtwork: View {
         .frame(maxWidth: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: 11))
         .accessibilityLabel(photo == nil ? "Ilustración de \(name)" : "Foto de \(name)")
+        // busca la foto en el disco cada vez que cambia la url, leer el disco va en segundo plano
         .task(id: photo?.absoluteString) {
             localPhoto = nil
             if let photo { localPhoto = await app.images.localFile(photo) }

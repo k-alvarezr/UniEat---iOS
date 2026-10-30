@@ -4,9 +4,9 @@ import MapKit
 import SwiftUI
 import Foundation
 
-@MainActor
 /// estado del formulario para pedir un local que antes estaba en EstablishmentManagementView
 /// incluye el pin del mapa, la direccion y la foto publica https
+@MainActor
 final class EstablishmentViewModel: FeatureViewModel {
     @Published var showingForm = false
     @Published var name = ""
@@ -27,15 +27,29 @@ final class EstablishmentViewModel: FeatureViewModel {
     private let service: AccountService
     private let session: SessionStore
     init(service: AccountService, session: SessionStore) {
-        self.service = service; self.session = session; super.init(); observe(session)
+        self.service = service
+        self.session = session
+        super.init()
+        observe(session)
     }
     var memberships: [RemoteMembership] { session.memberships }
     var isRestaurant: Bool { session.isRestaurant }
     /// al cambiar de cuenta se limpia el formulario
     func reset() {
-        showingForm = false; name = ""; area = "Centro"; address = ""; entranceDescription = ""
-        photoURL = ""; paymentMethods = ["Efectivo"]; isWorking = false; message = nil
-        pin = nil; pinFromAddress = false; pinMessage = nil; isGeocoding = false; mapPosition = .automatic
+        showingForm = false
+        name = ""
+        area = "Centro"
+        address = ""
+        entranceDescription = ""
+        photoURL = ""
+        paymentMethods = ["Efectivo"]
+        isWorking = false
+        message = nil
+        pin = nil
+        pinFromAddress = false
+        pinMessage = nil
+        isGeocoding = false
+        mapPosition = .automatic
     }
     let methods = ["Nequi", "Daviplata", "Efectivo", "Tarjeta"]
     /// nombre, direccion, un metodo de pago y foto valida o vacia

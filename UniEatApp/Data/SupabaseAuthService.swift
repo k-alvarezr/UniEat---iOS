@@ -45,7 +45,10 @@ final class SupabaseAuthService: SessionAuthenticating {
 
     func signIn(email: String, password: String) async throws -> Profile {
         // generacion nueva y se cancela cualquier renovacion de la sesion anterior
-        generation = UUID(); renewing?.cancel(); renewing = nil; renewalID = nil
+        generation = UUID()
+        renewing?.cancel()
+        renewing = nil
+        renewalID = nil
         let expected = generation
         let data = try await request(path: "auth/v1/token", query: "grant_type=password",
                                      body: ["email": email, "password": password])
@@ -56,7 +59,10 @@ final class SupabaseAuthService: SessionAuthenticating {
     }
 
     func signUp(email: String, password: String, name: String) async throws -> Profile? {
-        generation = UUID(); renewing?.cancel(); renewing = nil; renewalID = nil
+        generation = UUID()
+        renewing?.cancel()
+        renewing = nil
+        renewalID = nil
         let expected = generation
         if let error = RegistrationRules.nameError(name) ?? RegistrationRules.passwordError(password) {
             throw AuthFailure.service(error)
@@ -124,7 +130,12 @@ final class SupabaseAuthService: SessionAuthenticating {
         }
         renewing = task
         renewalID = id
-        defer { if renewalID == id { renewing = nil; renewalID = nil } }
+        defer {
+            if renewalID == id {
+                renewing = nil
+                renewalID = nil
+            }
+        }
         return try await task.value
     }
 

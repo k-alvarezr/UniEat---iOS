@@ -112,17 +112,23 @@ o la respuesta, su resultado se cancela. Al cerrar sesión se cancela la renovac
 impedir que escriba otra vez en Keychain. Las respuestas de feed comprueban también identificador
 de solicitud, usuario y filtros: una solicitud vieja con filtros idénticos tampoco pisa la última.
 
-`ServerClock` toma la hora del servidor y avanza con `systemUptime`, independiente de cambios manuales
-en el reloj del teléfono durante el proceso. Las copias guardan referencia de recepción para estimar
-el tiempo al abrir de nuevo. Tras un reinicio sin red, esa estimación depende del tiempo local transcurrido;
-la UI identifica los datos como copia y vuelve a sincronizar cuando hay respuesta del servidor.
+`ServerClock` guarda la diferencia entre la hora del servidor y la del teléfono en cada respuesta,
+y la hora de la app es la del teléfono más esa diferencia. Un teléfono con la hora mal puesta no altera
+la vigencia ni la hora de los reportes. Sin respuesta del servidor en esta apertura se usa la hora del
+teléfono; la UI identifica los datos como copia y se corrige con la siguiente respuesta. El reloj no
+publica cambios: las pantallas se redibujan con los datos que llegan en esa misma respuesta.
 
 Los reportes se guardan antes de enviarse. Su UUID es estable y se envía como `clientReportId`;
 `observedAt` conserva la observación original. Solo una respuesta aceptada permite borrar la fila.
 Los errores de red, 429, 5xx o de sesión conservan el reporte. Los rechazos definitivos conservan
-la fila, muestran un aviso en Perfil y esperan un reintento explícito. Cambiar de cuenta limpia
-la presentación; los pendientes y borradores permanecen separados por usuario para que su dueño
-pueda retomarlos al volver a entrar.
+la fila con su motivo (`PendingReport.rejectedReason`), muestran un aviso en Perfil y esperan un
+reintento explícito. Un reporte que ya está en camino no se vuelve a enviar desde otro flujo.
+
+Cerrar sesión desde Perfil intenta enviar los reportes pendientes y luego borra lo que la cuenta dejó
+en el teléfono: reportes, copias del feed y catálogo en SwiftData (`FeedCacheRecord`), copias de detalle,
+borrador y eventos sin enviar. Si quedan
+reportes sin enviar, Perfil lo avisa antes. Los menús guardados se conservan. Si la sesión vence sola,
+no se borra nada, para que su dueño retome los pendientes al volver a entrar.
 
 Una base que no abre se conserva: no se elimina el archivo ni se informa falsamente que un reporte
 quedó guardado. Este caso se muestra en Perfil y el formulario informa el fallo de persistencia.

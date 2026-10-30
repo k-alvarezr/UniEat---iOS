@@ -5,15 +5,42 @@ import UniEatCore
 /// Regression tests for the cross-screen/session boundaries changed by this preparation.
 @MainActor
 final class PreparationTests: XCTestCase {
-    func testServerClockAdvancesWithUptimeDespiteAnIncorrectPhoneClock() {
-        var uptime: TimeInterval = 100
+    func testServerClockUsesServerTimeEvenIfThePhoneClockIsWrong() {
+        // el celular dice una hora muy distinta a la del server
         var wall = Date(timeIntervalSince1970: 5_000_000)
-        let clock = ServerClock(uptime: { uptime }, wallTime: { wall })
+        let clock = ServerClock(wallTime: { wall })
         let server = Date(timeIntervalSince1970: 1_000)
         clock.synchronize(server)
-        uptime += 60
-        wall = wall.addingTimeInterval(-86_400)
+        XCTAssertEqual(clock.now, server)
+        // pasa un minuto en el celular, la hora sigue la del server
+        wall = wall.addingTimeInterval(60)
         XCTAssertEqual(clock.now, server.addingTimeInterval(60))
+    }
+
+    func testExpiredSessionKeepsLocalDataButManualSignOutForgetsIt() async throws {
+        let h = try await Harness.make()
+        let userID = h.auth.profile.id
+        var forgotten: [UUID] = []
+        h.session.onForget = { forgotten.append($0) }
+        h.connectivity.update(isConnected: false)
+        _ = try await h.reports.submitReport(for: h.menu, kind: .price, note: "", waitMinutes: nil)
+        // la sesion vencio sola: no se borra nada, el reporte espera a que vuelva a entrar
+        h.session.signOut(message: "Tu sesión terminó.")
+        XCTAssertTrue(forgotten.isEmpty)
+        XCTAssertEqual(try h.database.pending(userID: userID).count, 1)
+        // a mano: se avisa a AppStore con el id de la cuenta y la base borra sus reportes
+        try await h.session.signIn(email: "test@example.invalid", password: "test")
+        h.session.signOut(forgetData: true)
+        XCTAssertEqual(forgotten, [userID])
+        // la copia del feed de la cuenta tambien se borra
+        let content = LocalContentService(container: h.database.container)
+        let all = FeedFilters(budgetCop: nil, availableMinutes: nil, diet: nil, area: nil, paymentMethod: nil)
+        try await content.saveFeed(CachedFeedSnapshot(userId: userID, filters: all,
+            response: FeedResponse(fetchedAt: .now, menus: [h.menu])), isCatalog: true)
+        try h.database.deleteAll(userId: userID)
+        XCTAssertEqual(try h.database.pending(userID: userID).count, 0)
+        let catalog = try await content.feed(userID: userID, filters: all, catalog: true)
+        XCTAssertNil(catalog)
     }
 
     func testReportRetriesKeepIdentityObservationTimeAndOnlyDeleteAfterAcknowledgement() async throws {
@@ -22,7 +49,7 @@ final class PreparationTests: XCTestCase {
         h.clock.synchronize(observed)
         h.api.failure = APIFailure(code: "RATE_LIMITED", message: "Espera")
         let status = try await h.reports.submitReport(for: h.menu, kind: .longLine, note: "", waitMinutes: 15)
-        XCTAssertEqual(status, "queued")
+        XCTAssertEqual(status, .queued)
         let before = try h.database.pending(userID: h.auth.profile.id)
         XCTAssertEqual(before.count, 1)
         XCTAssertEqual(before[0].body.observedAt!.timeIntervalSince1970, observed.timeIntervalSince1970, accuracy: 1)
@@ -41,9 +68,13 @@ final class PreparationTests: XCTestCase {
         let h = try await Harness.make()
         h.api.failure = APIFailure(code: "VALIDATION_ERROR", message: "Revisa el reporte")
         let status = try await h.reports.submitReport(for: h.menu, kind: .price, note: "", waitMinutes: nil)
-        XCTAssertEqual(status, "needs_review")
+        XCTAssertEqual(status, .needsReview)
         XCTAssertEqual(try h.database.pending(userID: h.auth.profile.id).count, 1)
         XCTAssertNotNil(h.reports.syncMessage)
+        // el motivo queda en la misma fila de swiftdata y se cuenta aparte de los que esperan red
+        XCTAssertEqual(try h.database.pending(userID: h.auth.profile.id).first?.rejectedReason, "Revisa el reporte")
+        XCTAssertEqual(h.reports.needsReviewCount, 1)
+        XCTAssertEqual(h.reports.pendingReportCount, 0)
         let attempts = h.api.reportBodies.count
         await h.reports.flushReports()
         XCTAssertEqual(h.api.reportBodies.count, attempts, "Rejected rows wait for an explicit retry")

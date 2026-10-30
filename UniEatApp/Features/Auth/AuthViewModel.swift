@@ -2,9 +2,9 @@ import Combine
 import Foundation
 import UniEatCore
 
-@MainActor
 /// estado del login y registro que antes vivia en AuthView con @State
 /// la pantalla solo dibuja y llama submit, la sesion la maneja SessionStore
+@MainActor
 final class AuthViewModel: FeatureViewModel {
     @Published var email = ""
     @Published var password = ""
@@ -15,11 +15,21 @@ final class AuthViewModel: FeatureViewModel {
     @Published var isSubmitting = false
     @Published var errorText: String?
     private let session: SessionStore
-    init(session: SessionStore) { self.session = session; super.init(); observe(session) }
+    init(session: SessionStore) {
+        self.session = session
+        super.init()
+        observe(session)
+    }
     /// aviso de la sesion, ej revisar el correo para confirmar
     var authMessage: String? { session.authMessage }
+    /// al cambiar de cuenta se borra la contraseña escrita y cualquier error
+    func reset() {
+        password = ""
+        errorText = nil
+        isSubmitting = false
+    }
     /// entra o crea la cuenta, al registrarse primero valida nombre y contraseña en el celular
-    /// cualquier error que no sea de auth se muestra como problema de conexion
+    /// cada tipo de error tiene su mensaje, asi se sabe si es la red, el server o la cuenta
     func submit() async {
         isSubmitting = true
         errorText = nil
@@ -34,9 +44,14 @@ final class AuthViewModel: FeatureViewModel {
             } else {
                 try await session.signIn(email: email, password: password)
             }
+        } catch is CancellationError {
+            // otro inicio o cierre de sesion le gano a este, no hay nada que mostrar
+        } catch let failure as AuthFailure {
+            errorText = failure.localizedDescription
+        } catch is URLError {
+            errorText = "Sin conexión. Revisa tu internet e inténtalo de nuevo."
         } catch {
-            errorText = (error as? AuthFailure)?.localizedDescription ??
-                "No se pudo conectar con el servicio. Inténtalo de nuevo."
+            errorText = "El servicio respondió algo inesperado. Inténtalo de nuevo."
         }
     }
 }

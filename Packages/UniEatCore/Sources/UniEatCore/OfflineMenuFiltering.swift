@@ -1,6 +1,7 @@
 import Foundation
 
-/// A cached catalog can answer compatibility, but cannot claim fresh availability or ranking.
+/// filtra sin red el catalogo guardado con los mismos criterios que rank-v1 (#36)
+/// puede decir si un menu es compatible, pero no que siga disponible ni en que orden va
 public enum OfflineMenuFiltering {
     public static func filter(_ menus: [DailyMenu], filters: FeedFilters, at date: Date) -> [DailyMenu] {
         menus.filter { menu in
@@ -11,7 +12,7 @@ public enum OfflineMenuFiltering {
                 (filters.diet == nil || (dish.dietaryKnown && dish.dietaryTags.contains(filters.diet!)))
             }) else { return false }
             if let area = filters.area, let available = filters.availableMinutes {
-                let travel = menu.area == area ? 5 : 12 // Same approximate rule as rank-v1.
+                let travel = menu.area == area ? 5 : 12   // minutos caminando aproximados, la misma regla de rank-v1
                 if travel > available { return false }
                 if menu.hasWaitEvidence(at: date), travel + (menu.waitMinutes ?? 0) > available { return false }
             }
@@ -23,7 +24,7 @@ public enum OfflineMenuFiltering {
 }
 
 public extension DailyMenu {
-    /// Copies the immutable snapshot while preserving every identity/version/location field.
+    /// copia del menu cambiando solo los platos o la explicacion, el resto (id, version, ubicacion) queda igual
     func replacing(items: [MenuDish]? = nil, explanation: String? = nil) -> DailyMenu {
         DailyMenu(id: id, title: title, version: version, validUntil: validUntil, publishedAt: publishedAt,
             closedAt: closedAt, establishmentId: establishmentId, establishmentName: establishmentName,
