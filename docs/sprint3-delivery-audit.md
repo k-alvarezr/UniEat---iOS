@@ -2,7 +2,6 @@
 
 Referencias revisadas: descripción de la actividad (seis páginas) y rúbrica `VivaVoce3` (una página),
 entregadas por el equipo. Fecha de entrega indicada: **31 de octubre de 2026, 05:00 America/Bogota**.
-El uso de IA sigue la autorización actual comunicada por Kevin; no se reproduce la advertencia anterior.
 
 Esta matriz distingue código, integración, pruebas automatizadas, evidencia real y evaluación oral.
 Cumplir un mínimo técnico no equivale a prometer una nota ni a certificar una explicación individual.
@@ -65,6 +64,15 @@ La integración del front requiere revisión de Juan: #52 → #53 → #61, actua
 No se afirma una aprobación ni un merge antes de que ocurran. Backend usa commits y push a `main`
 por acuerdo explícito del equipo, con CI; no se crean PR de backend. Conservar commits, milestones,
 issues y revisión del front como evidencia real del proceso.
+
+## Verificación del código
+
+La revisión `d3788d9` pasó la [compilación y las pruebas en CI macOS](https://github.com/k-alvarezr/UniEat---iOS/actions/runs/41067140778):
+**12 pruebas del núcleo y 65 XCTest de la aplicación, con cero fallos**, además de la compilación para
+simulador. Incluye 17 regresiones de pantallas/conectividad y tres de la LRU offline. El código de Kevin
+para BQ-08, concurrencia, almacenamiento, cachés y navegación offline está implementado; las correcciones
+finales permanecen en revisión hasta integrar #52/#53/#61. Los checks del HEAD del PR son la referencia
+si se añaden commits. Este resultado no acredita pruebas físicas, mediciones ni una entrega realizada.
 
 ## Comprobación individual antes del viva voce
 

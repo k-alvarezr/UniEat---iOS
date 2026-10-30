@@ -52,5 +52,7 @@ Continúan las pruebas anteriores de filtrado, vencimiento, persistencia, borrad
 `OfflineFilterCacheTests` verifica promoción/expulsión LRU, aislamiento, borrado, retroceso de reloj y
 caducidad en vencimiento, inicio de una publicación y fin de la ventana de evidencia de fila.
 
-La compilación iOS y XCTest se ejecutan en CI macOS. No se atribuye a CI una prueba en iPhone físico.
+La revisión `d3788d9` pasó [CI macOS](https://github.com/k-alvarezr/UniEat---iOS/actions/runs/41067140778):
+compilación para simulador, 12 pruebas del núcleo y 65 XCTest de la aplicación, con cero fallos.
+No se atribuye a CI una prueba en iPhone físico.
 Registrar los escenarios reales, dispositivo, iOS, commit y capturas en #44/#59 y la wiki antes de entrega.
