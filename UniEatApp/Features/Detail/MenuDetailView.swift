@@ -7,10 +7,12 @@ import UniEatCore
 struct MenuDetailView: View {
     @EnvironmentObject private var app: AppStore
     let menu: DailyMenu
+    // la vista de afuera solo crea el viewmodel del detalle con AppStore y lo pasa a la pantalla
     var body: some View { MenuDetailScreen(model: app.makeDetail(menu)) }
 }
 
 private struct MenuDetailScreen: View {
+    // el estado del detalle ahora vive en MenuDetailViewModel, no en @State
     @StateObject private var store: MenuDetailViewModel
     @State private var showingReport = false
     // gps para decir que tan lejos queda el local, se lee una vez y no se guarda ni se manda

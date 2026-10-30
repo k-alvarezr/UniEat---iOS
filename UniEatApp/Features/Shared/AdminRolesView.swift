@@ -2,6 +2,7 @@ import SwiftUI
 
 /// la api vuelve a revisar que sea admin en cada cambio de rol y lo deja registrado
 struct AdminRolesView: View {
+    // la lista de usuarios y el cambio de rol viven en AdminRolesViewModel
     @EnvironmentObject private var model: AdminRolesViewModel
 
     var body: some View {

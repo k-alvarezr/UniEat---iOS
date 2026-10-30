@@ -4,6 +4,7 @@ import SwiftUI
 
 /// perfil de estudiante o restaurante, estado de sus locales y pedir uno nuevo con su ubicacion
 struct EstablishmentManagementView: View {
+    // el formulario del local vive en EstablishmentViewModel
     @EnvironmentObject private var model: EstablishmentViewModel
     // pin del local, sale de la direccion o del gps y el dueño lo confirma en el mapa
     @StateObject private var location = LocationContextService()
@@ -146,6 +147,7 @@ private extension String {
 
 /// admin aprueba los locales, al aprobar el usuario pasa a restaurante
 struct AdminApprovalsView: View {
+    // las solicitudes viven en AdminApprovalsViewModel
     @EnvironmentObject private var model: AdminApprovalsViewModel
 
     var body: some View {

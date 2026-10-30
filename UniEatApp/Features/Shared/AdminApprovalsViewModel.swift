@@ -4,8 +4,10 @@ import MapKit
 import Foundation
 
 @MainActor
+/// estado de las solicitudes de locales que el admin aprueba, antes estaba en la vista
 final class AdminApprovalsViewModel: FeatureViewModel {
     @Published var requests: [PendingMembership] = []
+    // solicitud que se esta aprobando, para mostrar el cargando en esa fila
     @Published var workingId: String?
     @Published var message: String?
     private let service: AccountService
@@ -15,6 +17,7 @@ final class AdminApprovalsViewModel: FeatureViewModel {
     }
     var memberships: [RemoteMembership] { session.memberships }
     var isRestaurant: Bool { session.isRestaurant }
+    /// pide las solicitudes pendientes
     func load() async {
         do {
             requests = try await service.pendingMembershipRequests()
@@ -23,6 +26,7 @@ final class AdminApprovalsViewModel: FeatureViewModel {
             message = error.localizedDescription
         }
     }
+    /// aprueba y vuelve a pedir la lista, el dueño ve el cambio cuando actualiza su cuenta
     func approve(_ request: PendingMembership) async {
         workingId = request.id
         defer { workingId = nil }
@@ -37,4 +41,5 @@ final class AdminApprovalsViewModel: FeatureViewModel {
     }
 }
 
+// no se usa en este archivo, revisar si se puede borrar
 private extension String { var trimmed: String { trimmingCharacters(in: .whitespacesAndNewlines) } }

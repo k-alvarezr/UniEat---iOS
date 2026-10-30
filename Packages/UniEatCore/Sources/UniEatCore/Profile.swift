@@ -1,5 +1,6 @@
 import Foundation
 
+/// usuario con su nombre y rol, el rol lo decide el server
 public struct Profile: Codable, Sendable {
     public let id: UUID
     public let displayName: String

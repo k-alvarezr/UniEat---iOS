@@ -3,6 +3,7 @@ import UniEatCore
 
 /// pestaña rendimiento solo admin, BQ-03 BQ-04 y actividad de ios en el mismo panel
 struct PerformanceView: View {
+    // las metricas viven en PerformanceViewModel, antes en el AppStore viejo
     @EnvironmentObject private var store: PerformanceViewModel
 
     var body: some View {
@@ -41,6 +42,7 @@ struct PerformanceView: View {
 
 /// mis metricas para restaurantes, solo la actividad de sus menus
 struct RestaurantPerformanceView: View {
+    // las metricas viven en PerformanceViewModel, antes en el AppStore viejo
     @EnvironmentObject private var store: PerformanceViewModel
 
     var body: some View {

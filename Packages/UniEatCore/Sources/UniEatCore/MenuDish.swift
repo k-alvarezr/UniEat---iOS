@@ -1,5 +1,6 @@
 import Foundation
 
+/// plato de un menu con su precio y dieta
 public struct MenuDish: Codable, Hashable, Identifiable, Sendable {
     public let id: UUID
     public let name: String
