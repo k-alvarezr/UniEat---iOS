@@ -18,3 +18,8 @@ jobs:
         run: xcodegen generate
       - name: Build for iOS Simulator
         run: xcodebuild -project UniEat.xcodeproj -scheme UniEat -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+      - name: Select available iPhone simulator
+        run: |
+          xcrun simctl list devices available -j | python3 -c 'import json,sys; devices=json.load(sys.stdin)["devices"]; print("SIMULATOR_ID=" + next(d["udid"] for ds in devices.values() for d in ds if "iPhone" in d["name"]))' >> "$GITHUB_ENV"
+      - name: Test presentation and durable report synchronization
+        run: xcodebuild -project UniEat.xcodeproj -scheme UniEat -configuration Debug -destination "id=$SIMULATOR_ID" CODE_SIGNING_ALLOWED=NO test

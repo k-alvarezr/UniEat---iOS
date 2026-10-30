@@ -39,6 +39,18 @@ targets:
         CODE_SIGN_STYLE: Automatic
     dependencies:
       - package: UniEatCore
+  UniEatTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: UniEatAppTests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: co.edu.uniandes.unieat.tests
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: 5.0
+    dependencies:
+      - target: UniEat
 schemes:
   UniEat:
     build:
@@ -48,3 +60,6 @@ schemes:
       config: Debug
       language: es
       region: CO
+    test:
+      targets:
+        - UniEatTests
