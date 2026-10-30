@@ -346,8 +346,14 @@ struct MenuDetailView: View {
     private func load(automatic: Bool = false) async {
         isLoading = true
         defer { isLoading = false }
+        // arrancan las dos a la vez: leer la copia del disco y pedir la version al server
+        async let cached = store.cachedDetail(for: initialMenu)
+        async let fresh = store.menuDetail(initialMenu, automatic: automatic)
+        
+        // la copia casi siempre llega primero, se muestra mientras responde el server
+        if detail == nil, let copy = await cached{ detail = copy }
         do {
-            detail = try await store.menuDetail(initialMenu, automatic: automatic)
+            detail = try await fresh
             loadError = nil
         } catch let failure as APIFailure {
             loadError = failure

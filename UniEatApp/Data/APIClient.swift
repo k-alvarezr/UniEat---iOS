@@ -153,7 +153,7 @@ struct CloseResponse: Decodable { let closedAt: Date }
 // MARK: - reportes
 
 /// lo que se manda al reportar un cambio, va con la version que vio el estudiante
-struct ReportBody: Encodable {
+struct ReportBody: Encodable, Sendable {
     let publicationId: UUID
     let version: Int
     let kind: String
