@@ -2,6 +2,8 @@ import Combine
 import Foundation
 import UniEatCore
 
+/// borrador de un plato del formulario
+/// sale de PublishView aca, ya no es private
 struct DishDraft: Identifiable {
     let id = UUID()
     var name = ""
@@ -33,6 +35,7 @@ struct DishDraft: Identifiable {
     }
 }
 /// lo que se guarda del formulario en un archivo para no perderlo si se cierra la app o se va la red
+/// se mueve de PublishView aca y ahora es Equatable para comparar si el formulario cambio
 struct PublishDraft: Codable, Sendable, Equatable {
     struct Dish: Codable, Sendable, Equatable {
         var name: String
@@ -54,6 +57,8 @@ struct PublishDraft: Codable, Sendable, Equatable {
 }
 
 @MainActor
+/// todo el estado del formulario de publicar que antes eran @State en PublishView
+/// la vista solo dibuja, publicar cerrar y el borrador pasan por PublishingService
 final class PublishViewModel: FeatureViewModel {
     @Published var selectedEstablishmentID: UUID?
     @Published var restaurantName = ""
@@ -64,9 +69,11 @@ final class PublishViewModel: FeatureViewModel {
     @Published var validUntil = Date.now.addingTimeInterval(4 * 60 * 60)
     @Published var paymentMethods: Set<String> = ["Nequi", "Efectivo"]
     @Published var dishes = [DishDraft()]
+    // menu que se esta editando, nil si es uno nuevo
     @Published var editingMenu: DailyMenu?
     @Published var message: String?
     @Published var isSaving = false
+    // menus del restaurante, antes estaban en el AppStore viejo
     @Published private(set) var ownMenus: [DailyMenu] = []
     let paymentChoices = ["Nequi", "Daviplata", "Efectivo", "Tarjeta"]
     private let service: PublishingService
@@ -83,17 +90,22 @@ final class PublishViewModel: FeatureViewModel {
     var approvedEstablishments: [RemoteEstablishment] { session.approvedEstablishments }
     var isOffline: Bool { connectivity.isOffline }
     func saveDraft(_ draft: PublishDraft) { service.saveDraft(draft) }
+    /// recupera el borrador de #33 leido en segundo plano
+    /// si el usuario escribio algo mientras se leia, no se pisa lo que escribio
     func restoreDraft() async {
         guard editingMenu == nil else { return }
         let expected = currentDraft
         if let draft = await service.loadDraft(), editingMenu == nil, currentDraft == expected { restore(draft) }
     }
+    /// al cambiar de cuenta se limpia el formulario para que el siguiente no vea nada
     func reset() {
         ownMenus = []; selectedEstablishmentID = nil; restaurantName = ""; area = "Centro"
         address = ""; entranceDescription = ""; title = "Almuerzo completo"
         paymentMethods = ["Nequi", "Efectivo"]; dishes = [DishDraft()]; editingMenu = nil
         message = nil; isSaving = false; validUntil = clock.now.addingTimeInterval(4 * 3600)
     }
+    /// pide los menus propios y despues refresca el feed para ver el cambio
+    /// si cambio la sesion mientras tanto se bota la respuesta
     func refresh() async {
         guard let userID = session.profile?.id else { return }
         let generation = session.generation
@@ -108,6 +120,7 @@ final class PublishViewModel: FeatureViewModel {
         guard session.matches(userID, generation: generation) else { return }
         await feed.refresh()
     }
+    /// nombre, titulo, vigencia de maximo 24 horas, local aprobado, pago y platos completos
     var isValid: Bool {
         !restaurantName.trimmingCharacters(in: .whitespaces).isEmpty
             && !title.trimmingCharacters(in: .whitespaces).isEmpty
@@ -116,6 +129,7 @@ final class PublishViewModel: FeatureViewModel {
             && !paymentMethods.isEmpty
             && !dishes.isEmpty && dishes.allSatisfy(\.isComplete)
     }
+    /// foto del formulario para guardarla en archivo
     var currentDraft: PublishDraft {
         PublishDraft(establishmentId: selectedEstablishmentID,
                      restaurantName: restaurantName,
@@ -132,13 +146,16 @@ final class PublishViewModel: FeatureViewModel {
                                                             vegan: $0.vegan,
                                                             dietaryKnown: $0.dietaryKnown) })
     }
+    /// solo vale la pena guardar si escribio algun plato
     var hasDraftContent: Bool {
         dishes.contains { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty || !$0.priceText.isEmpty }
     }
+    /// texto de estado de un menu propio con la hora del server
     func statusText(_ menu: DailyMenu) -> String {
         if menu.closedAt != nil { return "cerrada" }
         return menu.isActive(at: clock.now) ? "vigente" : "vencida"
     }
+    /// vuelve a llenar el formulario con lo guardado
     func restore(_ draft: PublishDraft) {
         selectedEstablishmentID = draft.establishmentId
         restaurantName = draft.restaurantName
@@ -160,11 +177,13 @@ final class PublishViewModel: FeatureViewModel {
         }
         message = "Recuperamos tu borrador."
     }
+    /// si no hay local elegido se toma el primero aprobado
     func selectFirstEstablishment() {
         guard selectedEstablishmentID == nil, let first = approvedEstablishments.first else { return }
         selectedEstablishmentID = first.id
         fill(from: first)
     }
+    /// llena los datos del local en el formulario
     func fill(from establishment: RemoteEstablishment) {
         restaurantName = establishment.name
         area = establishment.area
@@ -172,6 +191,7 @@ final class PublishViewModel: FeatureViewModel {
         entranceDescription = establishment.entranceDescription
         paymentMethods = Set(establishment.paymentMethods)
     }
+    /// carga un menu para editarlo, guardar crea una version nueva
     func edit(_ menu: DailyMenu) {
         editingMenu = menu
         selectedEstablishmentID = menu.establishmentId
@@ -185,6 +205,7 @@ final class PublishViewModel: FeatureViewModel {
         paymentMethods = Set(menu.paymentMethods)
         message = "Editando versión \(menu.version). Guardar creará una versión nueva."
     }
+    /// cierra el menu antes de que venza, sin red no se intenta
     func close(_ menu: DailyMenu) async {
         guard let userID = session.profile?.id, !isOffline else { return }
         let generation = session.generation
@@ -200,6 +221,8 @@ final class PublishViewModel: FeatureViewModel {
             message = (error as? APIFailure)?.message ?? "No se pudo cerrar la publicación. Inténtalo de nuevo."
         }
     }
+    /// crea o edita el menu, sin red no se intenta y el borrador se conserva
+    /// si otro edito primero el server dice VERSION_CONFLICT y se recarga la version actual
     func publish() async {
         guard isValid, !isOffline, let userID = session.profile?.id else { return }
         let generation = session.generation

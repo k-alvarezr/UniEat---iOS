@@ -1,5 +1,6 @@
 import Foundation
 
+/// filtros del estudiante para el feed BQ-03: presupuesto, minutos, dieta, zona y pago
 public struct FeedFilters: Codable, Hashable, Sendable {
     public var budgetCop: Int?
     public var availableMinutes: Int?

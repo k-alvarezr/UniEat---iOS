@@ -1,5 +1,6 @@
 import Foundation
 
+/// tipos de reporte que puede hacer el estudiante
 public enum ReportKind: String, CaseIterable, Codable, Sendable {
     case unavailable
     case price

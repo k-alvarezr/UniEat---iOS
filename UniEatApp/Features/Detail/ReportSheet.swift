@@ -8,6 +8,7 @@ struct ReportSheet: View {
     @EnvironmentObject private var app: AppStore
     let menu: DailyMenu
     var initialKind: ReportKind = .unavailable
+    // se crea el viewmodel de la hoja con AppStore y lo usa la pantalla de adentro
     var body: some View { ReportScreen(menu: menu, model: app.makeReport(menu, kind: initialKind)) }
 }
 
@@ -96,6 +97,7 @@ struct WaitTimeCard: View {
     @EnvironmentObject private var app: AppStore
     let menu: DailyMenu
     var onSent: () async -> Void = {}
+    // la tarjeta de fila tambien manda por ReportViewModel, como un reporte de fila larga
     var body: some View { WaitTimeScreen(model: app.makeReport(menu, kind: .longLine), onSent: onSent) }
 }
 
