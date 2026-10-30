@@ -25,18 +25,41 @@ struct APIFailure: LocalizedError, Decodable {
 // cuerpo vacio para los get, que no mandan nada
 struct NoBody: Codable {}
 
+@MainActor
+protocol APIRequesting {
+    func get<Response: Decodable>(_ path: String, query: [URLQueryItem]) async throws -> Response
+    func send<Response: Decodable, Body: Encodable>(_ method: String, _ path: String,
+        query: [URLQueryItem], body: Body?) async throws -> Response
+}
+
+extension APIRequesting {
+    func get<Response: Decodable>(_ path: String) async throws -> Response {
+        try await get(path, query: [])
+    }
+    func send<Response: Decodable, Body: Encodable>(_ method: String, _ path: String, body: Body?) async throws -> Response {
+        try await send(method, path, query: [], body: body)
+    }
+}
+
 // MARK: - cliente
 
 /// adapter de la api v1, pone la apikey y el token del usuario y lee el json
 /// con las fechas igual que UniEatCore
 @MainActor
-final class APIClient {
+final class APIClient: APIRequesting {
     private let configuration: AppConfiguration
     // funcion que entrega un token valido, la pone AppStore con auth.validAccessToken()
     private let accessToken: () async throws -> String
+    private let sessionIdentity: () -> UUID
+    private let transport: URLSession
+    var onUnauthorized: (() -> Void)?
 
-    init(configuration: AppConfiguration, accessToken: @escaping () async throws -> String) {
+    init(configuration: AppConfiguration, session: URLSession = .shared,
+         sessionIdentity: @escaping () -> UUID = { UUID.zero },
+         accessToken: @escaping () async throws -> String) {
         self.configuration = configuration
+        transport = session
+        self.sessionIdentity = sessionIdentity
         self.accessToken = accessToken
     }
 
@@ -48,6 +71,8 @@ final class APIClient {
     /// mandar una peticion con metodo, ruta, parametros y cuerpo opcional
     /// devuelve la respuesta ya convertida al tipo que se pidio
     func send<Response: Decodable, Body: Encodable>(_ method: String, _ path: String, query: [URLQueryItem] = [], body: Body?) async throws -> Response {
+        let identity = sessionIdentity()
+        try Task.checkCancellation()
         
         // 1. armar la url: base de la api + ruta + parametros
         // components toma toda la url y la divide en piezas
@@ -65,7 +90,10 @@ final class APIClient {
         request.httpMethod = method                               // GET, POST, PUT, PATCH...
 
         // cabeceras que pide el server en todas las llamadas
-        let token = try await accessToken()                                           // token del usuario, se renueva si esta por vencer
+        let token: String
+        do { token = try await accessToken() }
+        catch AuthFailure.expired { onUnauthorized?(); throw AuthFailure.expired }
+        guard identity == sessionIdentity() else { throw CancellationError() }
         request.setValue(configuration.publishableKey, forHTTPHeaderField: "apikey")  // clave publica del proyecto supabase
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")      // quien es el usuario
         request.setValue("ios", forHTTPHeaderField: "X-UniEat-Platform")              // para separar metricas de ios y android
@@ -80,14 +108,20 @@ final class APIClient {
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await URLSession.shared.data(for: request)
+            (data, response) = try await transport.data(for: request)
         } catch {
+            if Task.isCancelled || (error as? URLError)?.code == .cancelled { throw CancellationError() }
             throw APIFailure.offline
         }
+        try Task.checkCancellation()
+        guard identity == sessionIdentity() else { throw CancellationError() }
 
         // 4. revisar la respuesta: si no es 2xx se lee el error del server, si esta bien se convierte
         guard let status = (response as? HTTPURLResponse)?.statusCode else { throw APIFailure.unexpected }
-        guard (200..<300).contains(status) else { throw APIFailure.from(data) }
+        guard (200..<300).contains(status) else {
+            if status == 401 { onUnauthorized?() }
+            throw APIFailure.from(data)
+        }
         do {
             return try UniEatDates.decoder().decode(Response.self, from: data)
         } catch {
@@ -159,10 +193,16 @@ struct ReportBody: Encodable {
     let kind: String
     let note: String
     let observedWaitMinutes: Int?
+    var clientReportId: UUID? = nil
+    var observedAt: Date? = nil
 }
 
 /// respuesta al reportar, el estado en que quedo pending confirmed u observation
 struct ReportResponse: Decodable { let status: String }
+
+private extension UUID {
+    static let zero = UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+}
 
 // MARK: - eventos de analitica
 

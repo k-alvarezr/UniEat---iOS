@@ -5,11 +5,13 @@ import UniEatCore
 /// detalle del menu BQ-04, sigue vigente y que cambios reportaron
 /// muestra de una la copia del feed y luego la cambia por la version actual del server
 struct MenuDetailView: View {
-    @EnvironmentObject private var store: AppStore
-    private let initialMenu: DailyMenu
-    @State private var detail: MenuDetail?
-    @State private var loadError: APIFailure?
-    @State private var isLoading = false
+    @EnvironmentObject private var app: AppStore
+    let menu: DailyMenu
+    var body: some View { MenuDetailScreen(model: app.makeDetail(menu)) }
+}
+
+private struct MenuDetailScreen: View {
+    @StateObject private var store: MenuDetailViewModel
     @State private var showingReport = false
     // version que se eligio en esta pantalla, para que el boton cambie apenas se toca
     @State private var chosenVersion: Int?
@@ -18,7 +20,11 @@ struct MenuDetailView: View {
     // gps para decir que tan lejos queda el local, se lee una vez y no se guarda ni se manda
     @StateObject private var location = LocationContextService()
 
-    init(menu: DailyMenu) { initialMenu = menu }
+    init(model: MenuDetailViewModel) { _store = StateObject(wrappedValue: model) }
+    private var initialMenu: DailyMenu { store.initialMenu }
+    private var detail: MenuDetail? { store.detail }
+    private var loadError: APIFailure? { store.loadError }
+    private var isLoading: Bool { store.isLoading }
 
     /// la version del server si ya llego, si no la de la tarjeta
     private var menu: DailyMenu { detail?.menu ?? initialMenu }
@@ -29,14 +35,14 @@ struct MenuDetailView: View {
     /// se puede elegir o reportar ahora, usa el estado del server avanzado con el reloj
     private func isOpen(at date: Date) -> Bool {
         if isGone { return false }
-        if let detail { return detail.status(at: date).acceptsActions }
-        return menu.isActive(at: date)
+        if let detail { return detail.status(at: store.clock.now).acceptsActions }
+        return menu.isActive(at: store.clock.now)
     }
 
     private func statusLabel(at date: Date) -> String {
         if isGone { return "No disponible" }
-        if let detail { return detail.status(at: date).label }
-        return menu.isActive(at: date) ? "Vigente" : "Vencido"
+        if let detail { return detail.status(at: store.clock.now).label }
+        return menu.isActive(at: store.clock.now) ? "Vigente" : "Vencido"
     }
 
     var body: some View {
@@ -47,13 +53,13 @@ struct MenuDetailView: View {
                     BrandHeader(title: "Detalle del plato")
                     FoodArtwork(name: menu.establishmentName, photoUrl: menu.photoUrl).frame(height: 180)
                     titleRow
-                    statusRow(at: timeline.date)
+                    statusRow(at: store.clock.now)
                     validityCard
-                    waitCard(at: timeline.date)
+                    waitCard(at: store.clock.now)
                     dishesSection
                     locationCard
                     paymentCard
-                    actions(at: timeline.date)
+                    actions(at: store.clock.now)
                 }
                 .padding(16)
             }
@@ -343,24 +349,13 @@ struct MenuDetailView: View {
         }
     }
 
-    private func load(automatic: Bool = false) async {
-        isLoading = true
-        defer { isLoading = false }
-        do {
-            detail = try await store.menuDetail(initialMenu, automatic: automatic)
-            loadError = nil
-        } catch let failure as APIFailure {
-            loadError = failure
-        } catch {
-            loadError = .unexpected
-        }
-    }
+    private func load(automatic: Bool = false) async { await store.load(automatic: automatic) }
 
     /// recarga antes de abrir la hoja para que el reporte quede con la version actual
     /// y si cerraron el menu mientras tanto no se abre
     private func openReport() async {
         await load(automatic: true)
-        if isOpen(at: .now) { showingReport = true }
+        if isOpen(at: store.clock.now) { showingReport = true }
     }
 }
 

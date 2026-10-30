@@ -4,8 +4,7 @@ import UniEatCore
 /// elige por mi, muestra la mejor opcion con los filtros y deja pasar a la siguiente
 /// el orden y el motivo vienen del server, aca solo se recorre la lista
 struct RecommendationView: View {
-    @EnvironmentObject private var store: AppStore
-    @State private var index = 0
+    @EnvironmentObject private var store: RecommendationViewModel
 
     private var options: [DailyMenu] { store.visibleMenus }
 
@@ -21,7 +20,7 @@ struct RecommendationView: View {
                 if options.isEmpty {
                     EmptyFeedView()
                 } else {
-                    recommendation(options[index % options.count])
+                    recommendation(options[store.index % options.count])
                 }
             }
             .padding(16)
@@ -61,7 +60,7 @@ struct RecommendationView: View {
         .background(Palette.cyan, in: RoundedRectangle(cornerRadius: 16))
         MenuCard(menu: menu)
         SolidButton(title: "Ver siguiente opción", icon: "arrow.clockwise", color: Palette.yellow) {
-            index += 1
+            store.next()
         }
         NavigationLink(destination: MenuDetailView(menu: menu)) {
             Text("Ver publicación completa  →")

@@ -9,7 +9,7 @@ struct TodayFeedView: View {
 
 /// pestaña hoy BQ-03, menus vigentes en el orden del server con su motivo
 struct TodayFeedContent: View {
-    @EnvironmentObject private var store: AppStore
+    @EnvironmentObject private var store: FeedViewModel
     var hidesNavigationBar = false
 
     var body: some View {
@@ -32,7 +32,7 @@ struct TodayFeedContent: View {
                     } else {
                         ForEach(store.visibleMenus) { menu in
                             NavigationLink(destination: MenuDetailView(menu: menu)) {
-                                MenuCard(menu: menu, at: timeline.date)
+                                MenuCard(menu: menu, at: store.clock.now)
                             }
                             .buttonStyle(.plain)
                             .onAppear { store.track("feed_impression", menu: menu) }
