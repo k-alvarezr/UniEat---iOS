@@ -12,6 +12,7 @@ final class EventService: ObservableObject {
     private var counted: Set<String> = []
     private var pending: [RemoteEvent] = []
     private var flushingGeneration: UUID?
+    var metadataProvider: ((DailyMenu) -> ExperimentEventMetadata?)?
     init(api: APIRequesting, session: SessionStore, connectivity: ConnectivityService, clock: ServerClock) {
         self.api = api; self.session = session; self.connectivity = connectivity; self.clock = clock
     }
@@ -22,13 +23,14 @@ final class EventService: ObservableObject {
         pending = session.profile == nil ? [] : LocalValues.load([RemoteEvent].self, key: key) ?? []
     }
     private func eventKey(_ kind: String, _ menu: DailyMenu) -> String { "\(kind):\(menu.id):\(menu.version)" }
+    func restartSession() { objectWillChange.send(); sessionID = UUID(); counted = [] }
     func hasCounted(_ kind: String, menu: DailyMenu) -> Bool { counted.contains(eventKey(kind, menu)) }
     func track(_ kind: String, menu: DailyMenu) {
         guard session.profile != nil else { return }
         objectWillChange.send()
         if ["feed_impression", "selection", "arrival"].contains(kind), !counted.insert(eventKey(kind, menu)).inserted { return }
         pending.append(RemoteEvent(eventId: UUID(), sessionId: sessionID, publicationId: menu.id,
-                                    version: menu.version, kind: kind, occurredAt: clock.now))
+                                    version: menu.version, kind: kind, occurredAt: clock.now, metadata: metadataProvider?(menu)))
         if pending.count > 500 { pending.removeFirst(pending.count - 500) }
         LocalValues.save(pending, key: key)
         if !connectivity.isOffline { Task { await flush() } }

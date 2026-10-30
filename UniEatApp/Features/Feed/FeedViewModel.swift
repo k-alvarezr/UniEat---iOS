@@ -13,6 +13,7 @@ final class FeedViewModel: FeatureViewModel {
     @Published private(set) var isShowingCachedFeed = false
     @Published private(set) var loadError: String?
     @Published private(set) var cacheWarning: String?
+    @Published private(set) var contentRevision = UUID()
     private let api: APIRequesting
     let session: SessionStore
     let connectivity: ConnectivityService
@@ -26,6 +27,7 @@ final class FeedViewModel: FeatureViewModel {
     private var catalogAt: Date?
     var onServiceAvailable: (() -> Void)?
     var onMenusLoaded: (([DailyMenu]) -> Void)?
+    var prepareContext: (() async -> Void)?
     init(api: APIRequesting, session: SessionStore, connectivity: ConnectivityService,
          clock: ServerClock, events: EventService, content: LocalContentService? = nil,
          memory: FeedMemoryCache? = nil) {
@@ -65,6 +67,8 @@ final class FeedViewModel: FeatureViewModel {
             return
         }
         do {
+            await prepareContext?()
+            guard session.matches(userID, generation: generation), requestID == id else { return }
             let feed: FeedResponse = try await api.get("feed", query: requested.queryItems)
             try Task.checkCancellation()
             guard session.matches(userID, generation: generation), requestID == id, requested == filters else { return }
@@ -90,6 +94,7 @@ final class FeedViewModel: FeatureViewModel {
     private func apply(_ snapshot: CachedFeedSnapshot, stored: Bool) {
         if let reference = snapshot.timeReference { clock.restore(reference) }
         menus = snapshot.response.menus; fetchedAt = snapshot.response.fetchedAt; isShowingCachedFeed = stored
+        contentRevision = UUID() // remount cards after a pilot/context change so exposure is recorded.
         if locationMenus.isEmpty { locationMenus = menus }
     }
     private func loadCachedFeed(userID: UUID, generation: UUID, request: UUID, requested: FeedFilters) async {

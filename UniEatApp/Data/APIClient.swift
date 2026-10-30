@@ -224,6 +224,7 @@ struct RemoteEvent: Codable, Equatable {
     let version: Int
     let kind: String
     let occurredAt: Date
+    var metadata: ExperimentEventMetadata? = nil
 }
 
 /// un lote de eventos para mandarlos juntos, hasta 100
@@ -337,6 +338,27 @@ struct AdminDashboardSnapshot: Decodable {
     let bq03: BQ03Metrics
     let bq04: BQ04Metrics
     let engagement: PerformanceSummary
+    var bq08: BQ08Metrics? = nil
+}
+
+struct BQ08Metrics: Decodable {
+    struct Groups: Decodable { let control: Group; let treatment: Group }
+    struct Group: Decodable {
+        let assignedSessions: Int
+        let exposedSessions: Int
+        let initialSelections: Int
+        let completeSelections: Int
+        let incompleteSelections: Int
+        let longLineOutcomes: Int
+        let switchOutcomes: Int
+        let combinedOutcomes: Int
+        let outcomeRate: Double?
+    }
+    let groups: Groups
+    let insufficientData: Bool
+    let rateDifference: Double?
+    let followUpMinutes: Int
+    let minimumSampleSize: Int
 }
 
 /// cifras de BQ-03, cuantas veces se pidio el feed y como le fue

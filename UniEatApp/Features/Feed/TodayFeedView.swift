@@ -36,6 +36,10 @@ struct TodayFeedContent: View {
                             }
                         }
                     }
+                    if let warning = store.cacheWarning {
+                        Label(warning, systemImage: "externaldrive.badge.exclamationmark")
+                            .font(.footnote).foregroundStyle(Palette.coral)
+                    }
                     if store.isLoading && store.visibleMenus.isEmpty {
                         ProgressView("Cargando menús…")
                     } else if store.visibleMenus.isEmpty && store.loadError != nil {
@@ -51,6 +55,7 @@ struct TodayFeedContent: View {
                             .buttonStyle(.plain)
                             .onAppear { store.track("feed_impression", menu: menu) }
                         }
+                        .id(store.contentRevision)
                     }
                 }
                 .padding(16)
@@ -102,6 +107,7 @@ struct TodayFeedContent: View {
 
 /// tarjeta del menu, lo que se ve de BQ-03
 struct MenuCard: View {
+    @EnvironmentObject private var pilot: WaitIndicatorPilot
     let menu: DailyMenu
     let date: Date
 
@@ -123,7 +129,9 @@ struct MenuCard: View {
                 Text(menu.title).font(.rounded(14, .bold))
                 HStack(spacing: 7) {
                     Sticker(text: menu.area, color: Palette.cyan, icon: "mappin")
-                    if let wait = menu.waitMinutes, menu.hasWaitEvidence(at: date) {
+                    if !pilot.showsWaitIndicator {
+                        Sticker(text: "Evaluación en curso", color: Palette.cream, icon: "clock")
+                    } else if let wait = menu.waitMinutes, menu.hasWaitEvidence(at: date) {
                         Sticker(text: "~\(wait) min de fila", color: Palette.green, icon: "clock")
                     } else {
                         Sticker(text: "Fila sin datos", color: Palette.cream, icon: "clock")
@@ -137,7 +145,7 @@ struct MenuCard: View {
                     Label("Menú por vencer", systemImage: "hourglass")
                         .font(.caption).foregroundStyle(Palette.coral)
                 }
-                Text(menu.explanation)
+                Text(pilot.explanation(menu.explanation))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

@@ -22,6 +22,7 @@ struct PerformanceView: View {
                                 .font(.caption).foregroundStyle(.secondary)
                             BQ03Section(metrics: snapshot.bq03)
                             BQ04Section(metrics: snapshot.bq04)
+                            if let metrics = snapshot.bq08 { BQ08Section(metrics: metrics) }
                             EngagementSection(summary: snapshot.engagement)
                         } else if store.performanceError == nil {
                             ProgressView("Cargando métricas del servidor…")
@@ -82,6 +83,43 @@ private extension View {
                 try? await Task.sleep(for: .seconds(10))
             }
         }
+    }
+}
+
+private struct BQ08Section: View {
+    let metrics: BQ08Metrics
+    var body: some View {
+        SurfaceCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("BQ-08 · ¿Ayuda mostrar la fila?").font(.rounded(21))
+                Text("Comparamos selecciones seguidas por una queja de fila o por elegir otro local en los siguientes diez minutos.")
+                    .font(.subheadline)
+                group("Sin indicador", metrics.groups.control, color: Palette.cyan)
+                group("Con indicador", metrics.groups.treatment, color: Palette.green)
+                if let difference = metrics.rateDifference {
+                    Text("Diferencia observada con − sin indicador: \(String(format: "%+.1f", difference * 100)) puntos porcentuales.")
+                } else {
+                    Text("Muestra insuficiente: se necesitan al menos \(metrics.minimumSampleSize) selecciones con ventana completa en cada variante.")
+                }
+                Text("Cada sesión aporta una selección inicial con exposición registrada. Las ventanas en curso se excluyen de las tasas. Reportar minutos de espera no equivale a una queja. Una diferencia observada no demuestra causalidad por sí sola.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+    private func group(_ title: String, _ group: BQ08Metrics.Group, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title).font(.headline)
+            Text("Expuestas: \(group.exposedSessions) · completas: \(group.completeSelections) · en curso: \(group.incompleteSelections)")
+                .font(.caption)
+            Text("Resultado combinado: \(group.combinedOutcomes). Quejas: \(group.longLineOutcomes); cambios de local: \(group.switchOutcomes).")
+                .font(.caption)
+            if let rate = group.outcomeRate {
+                ProgressView(value: rate).tint(color)
+                Text("\(Int((rate * 100).rounded())) % de selecciones elegibles").font(.caption.weight(.bold))
+            } else { Text("Tasa pendiente de muestra suficiente").font(.caption) }
+        }
+        .padding(10).background(color.opacity(0.18), in: RoundedRectangle(cornerRadius: 10))
     }
 }
 

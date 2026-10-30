@@ -11,10 +11,11 @@ final class AppStore: ObservableObject {
     let session: SessionStore
     let connectivity: ConnectivityService
     let clock: ServerClock
-    /// One container for Juan's report models and the future models in issue #34.
+    /// One container for Juan's report models, saved dishes and feed snapshots.
     let database: LocalDatabase?
     let storageError: String?
     let images: FeedImageStore
+    let pilot: WaitIndicatorPilot
     let feed: FeedViewModel
     let saved: SavedMenusViewModel
     let authentication: AuthViewModel
@@ -50,6 +51,8 @@ final class AppStore: ObservableObject {
         ImageLibraryConfiguration.configure()
         Task { await images.clean() }
         let events = EventService(api: api, session: session, connectivity: connectivity, clock: clock)
+        let pilot = WaitIndicatorPilot(api: api, session: session, clock: clock)
+        self.pilot = pilot
         let saved = SavedMenusViewModel(session: session, events: events, clock: clock, content: content)
         let feed = FeedViewModel(api: api, session: session, connectivity: connectivity, clock: clock, events: events, content: content)
         let reports = ReportingFacade(api: api, outbox: database, session: session, connectivity: connectivity, clock: clock)
@@ -63,7 +66,7 @@ final class AppStore: ObservableObject {
         publication = PublishViewModel(service: PublishingService(api: api, session: session, files: files),
                                        feed: feed, session: session, connectivity: connectivity, clock: clock)
         performance = PerformanceViewModel(api: api, session: session, events: events, connectivity: connectivity)
-        profile = ProfileViewModel(session: session, saved: saved, reports: reports, storageError: storageError)
+        profile = ProfileViewModel(session: session, saved: saved, reports: reports, storageError: storageError, pilot: pilot)
         establishments = EstablishmentViewModel(service: accounts, session: session)
         approvals = AdminApprovalsViewModel(service: accounts, session: session)
         roles = AdminRolesViewModel(service: accounts, session: session)
@@ -71,6 +74,19 @@ final class AppStore: ObservableObject {
         session.onChange = { [weak self] in self?.accountChanged() }
         connectivity.onReconnect = { [weak self] in self?.synchronize() }
         feed.onMenusLoaded = { [weak self] menus in self?.prefetchImages(menus) }
+        feed.prepareContext = { [weak pilot, weak events] in
+            guard let events else { return }
+            await pilot?.prepare(sessionID: events.sessionID)
+        }
+        events.metadataProvider = { [weak pilot, weak events, weak feed, weak connectivity] menu in
+            guard let events else { return nil }
+            return pilot?.metadata(menu: menu, sessionID: events.sessionID,
+                live: feed?.isShowingCachedFeed == false && connectivity?.isOffline == false)
+        }
+        pilot.onParticipationChanged = { [weak events, weak feed] in
+            events?.restartSession()
+            Task { await feed?.refresh(force: true) }
+        }
         // A service outage can recover without NWPathMonitor changing its network path.
         feed.onServiceAvailable = { [weak events, weak reports] in
             Task { await events?.flush(); await reports?.flushReports() }
@@ -82,7 +98,7 @@ final class AppStore: ObservableObject {
         imageTask?.cancel()
         synchronization?.cancel(); selectedTab = .today
         connectivity.serverUnreachable = false
-        events.accountChanged(); saved.accountChanged(); reports.accountChanged()
+        events.accountChanged(); pilot.accountChanged(); saved.accountChanged(); reports.accountChanged()
         publication.reset(); performance.reset(); recommendation.reset()
         authentication.password = ""; authentication.errorText = nil; authentication.isSubmitting = false
         roles.users = []; roles.selected = nil; roles.message = nil; roles.workingID = nil; roles.confirming = false
@@ -112,9 +128,9 @@ final class AppStore: ObservableObject {
 
     func makeDetail(_ menu: DailyMenu) -> MenuDetailViewModel {
         MenuDetailViewModel(menu: menu, service: details, session: session, events: events,
-                             saved: saved, connectivity: connectivity, clock: clock)
+                             saved: saved, connectivity: connectivity, clock: clock, pilot: pilot)
     }
-    func makeReport(_ menu: DailyMenu, kind: ReportKind) -> ReportViewModel {
-        ReportViewModel(menu: menu, kind: kind, reports: reports)
+    func makeReport(_ menu: DailyMenu, kind: ReportKind, waitObservation: Bool = false) -> ReportViewModel {
+        ReportViewModel(menu: menu, kind: kind, reports: reports, waitObservation: waitObservation)
     }
 }

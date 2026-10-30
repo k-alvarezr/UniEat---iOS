@@ -150,7 +150,9 @@ private struct MenuDetailScreen: View {
         SurfaceCard {
             VStack(alignment: .leading, spacing: 10) {
                 Label("Información de espera", systemImage: "clock").font(.headline)
-                if menu.hasWaitEvidence(at: date), let wait = menu.waitMinutes {
+                if !store.showsWaitIndicator {
+                    Text("El indicador no se muestra durante esta sesión de evaluación.").font(.subheadline)
+                } else if menu.hasWaitEvidence(at: date), let wait = menu.waitMinutes {
                     Text("~\(wait) minutos").font(.rounded(30, .black))
                     Text("Estimación basada en \(menu.waitSampleCount) reportes recientes. No es un tiempo garantizado.")
                         .font(.caption).foregroundStyle(.secondary)

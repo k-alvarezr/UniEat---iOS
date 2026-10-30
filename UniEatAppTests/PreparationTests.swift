@@ -149,7 +149,7 @@ final class PreparationTests: XCTestCase {
 }
 
 @MainActor
-private final class FakeAuth: SessionAuthenticating {
+final class FakeAuth: SessionAuthenticating {
     let profile = Profile(displayName: "Test", role: "student")
     func signIn(email: String, password: String) async throws -> Profile { profile }
     func signUp(email: String, password: String, name: String) async throws -> Profile? { profile }
@@ -158,11 +158,12 @@ private final class FakeAuth: SessionAuthenticating {
 }
 
 @MainActor
-private final class FakeAPI: APIRequesting {
+final class FakeAPI: APIRequesting {
     let userID: UUID
     var failure: APIFailure?
     var reportBodies: [Data] = []
     var onReport: (() -> Void)?
+    var assignmentData: Data?
     var feed: (() async throws -> Data)?
     init(userID: UUID) { self.userID = userID }
     func get<Response: Decodable>(_ path: String, query: [URLQueryItem]) async throws -> Response {
@@ -177,6 +178,9 @@ private final class FakeAPI: APIRequesting {
     }
     func send<Response: Decodable, Body: Encodable>(_ method: String, _ path: String,
         query: [URLQueryItem], body: Body?) async throws -> Response {
+        if path == "experiments/bq08/assignment", let assignmentData {
+            return try UniEatDates.decoder().decode(Response.self, from: assignmentData)
+        }
         if let body { reportBodies.append(try UniEatDates.encoder().encode(body)) }
         onReport?()
         if let failure { throw failure }
@@ -185,7 +189,7 @@ private final class FakeAPI: APIRequesting {
 }
 
 @MainActor
-private struct Harness {
+struct Harness {
     let auth: FakeAuth
     let api: FakeAPI
     let session: SessionStore
@@ -209,10 +213,10 @@ private struct Harness {
     }
 }
 
-private func makeMenu(title: String, version: Int = 1) -> DailyMenu {
+func makeMenu(title: String, version: Int = 1) -> DailyMenu {
     DailyMenu(title: title, version: version, validUntil: .now.addingTimeInterval(3600), publishedAt: .now.addingTimeInterval(-60),
         establishmentName: "Test", area: "Centro", address: "Test", items: [MenuDish(name: "Dish", priceCop: 10000)], lowestPriceCop: 10000)
 }
-private func feedData(menu: DailyMenu) throws -> Data {
+func feedData(menu: DailyMenu) throws -> Data {
     try UniEatDates.encoder().encode(FeedResponse(fetchedAt: .now, menus: [menu], serverNow: .now))
 }

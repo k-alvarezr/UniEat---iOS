@@ -14,18 +14,22 @@ final class MenuDetailViewModel: FeatureViewModel {
     private let events: EventService
     private let saved: SavedMenusViewModel
     private let connectivity: ConnectivityService
+    private let pilot: WaitIndicatorPilot?
     private var requestID = UUID()
     init(menu: DailyMenu, service: MenuDetailService, session: SessionStore, events: EventService,
-         saved: SavedMenusViewModel, connectivity: ConnectivityService, clock: ServerClock) {
+         saved: SavedMenusViewModel, connectivity: ConnectivityService, clock: ServerClock, pilot: WaitIndicatorPilot? = nil) {
         initialMenu = menu; self.service = service; self.session = session; self.events = events
         self.saved = saved; self.connectivity = connectivity; self.clock = clock
+        self.pilot = pilot
         super.init(); observe(saved); observe(session); observe(connectivity); observe(clock); observe(events)
+        if let pilot { observe(pilot) }
     }
     var menu: DailyMenu { detail?.menu ?? initialMenu }
     var isGone: Bool { ["GONE", "NOT_FOUND"].contains(loadError?.code ?? "") }
     var isAdmin: Bool { session.isAdmin }
     var isRestaurant: Bool { session.isRestaurant }
     var isOffline: Bool { connectivity.isOffline }
+    var showsWaitIndicator: Bool { pilot?.showsWaitIndicator ?? true }
     var fetchedAt: Date { detail?.serverNow ?? menu.publishedAt }
     func isOpen() -> Bool {
         !isGone && (detail?.status(at: clock.now).acceptsActions ?? menu.isActive(at: clock.now))

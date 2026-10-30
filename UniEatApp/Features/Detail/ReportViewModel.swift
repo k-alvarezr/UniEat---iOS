@@ -13,8 +13,10 @@ final class ReportViewModel: ObservableObject {
     private let menu: DailyMenu
     private let reports: ReportingFacade
     private var requestID = UUID()
-    init(menu: DailyMenu, kind: ReportKind, reports: ReportingFacade) {
+    private let waitObservation: Bool
+    init(menu: DailyMenu, kind: ReportKind, reports: ReportingFacade, waitObservation: Bool = false) {
         self.menu = menu; self.kind = kind; self.reports = reports
+        self.waitObservation = waitObservation
     }
     func send() async {
         guard !isSending else { return }
@@ -22,7 +24,7 @@ final class ReportViewModel: ObservableObject {
         defer { isSending = false }
         do {
             let status = try await reports.submitReport(for: menu, kind: kind, note: note,
-                waitMinutes: kind == .longLine ? minutes : nil, requestID: requestID)
+                waitMinutes: waitObservation ? minutes : nil, requestID: requestID)
             confirmationMessage = switch status {
             case "pending": "Gracias. Tu reporte quedó pendiente de revisión."
             case "confirmed": "Gracias. Otros estudiantes reportaron lo mismo: el cambio quedó confirmado."

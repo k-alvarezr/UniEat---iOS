@@ -3,7 +3,7 @@ import UniEatCore
 
 /// hoja para reportar algo raro sobre la version del menu que se esta viendo
 /// el reporte nunca cambia el menu oficial
-/// la fila y la llegada no van aca, estan en el detalle porque son datos normales y no irregularidades
+/// La queja explícita de fila se distingue de observar minutos y confirmar llegada en el detalle.
 struct ReportSheet: View {
     @EnvironmentObject private var app: AppStore
     let menu: DailyMenu
@@ -25,6 +25,7 @@ private struct ReportScreen: View {
         (.unavailable, "Plato agotado o no disponible", "fork.knife"),
         (.price, "Precio distinto al publicado", "tag"),
         (.location, "Ubicación difícil de encontrar", "mappin.slash"),
+        (.longLine, "La fila fue demasiado larga", "person.3"),
         (.accurate, "El menú sigue correcto", "checkmark.seal"),
     ]
 
@@ -96,7 +97,7 @@ struct WaitTimeCard: View {
     @EnvironmentObject private var app: AppStore
     let menu: DailyMenu
     var onSent: () async -> Void = {}
-    var body: some View { WaitTimeScreen(model: app.makeReport(menu, kind: .longLine), onSent: onSent) }
+    var body: some View { WaitTimeScreen(model: app.makeReport(menu, kind: .longLine, waitObservation: true), onSent: onSent) }
 }
 
 private struct WaitTimeScreen: View {
