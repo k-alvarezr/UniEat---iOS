@@ -33,15 +33,15 @@ final class MenuDetailService {
         guard session.matches(userID, generation: expected) else { throw CancellationError() }
         // la hora del server ajusta el reloj de la app
         clock.synchronize(detail.serverNow)
-        let reference = clock.snapshot()
         var warning: String?
         do {
             try await files.save(detail, name: "detail-\(menu.id.uuidString)", folder: .caches,
                                  userId: userID, generation: expected)
-            try await files.save(reference, name: "detail-clock-\(menu.id.uuidString)", folder: .caches,
-                                 userId: userID, generation: expected)
-        } catch is CancellationError { throw CancellationError() }
-        catch { warning = "El detalle se actualizó, pero no se pudo guardar su copia para usarla sin conexión." }
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            warning = "El detalle se actualizó, pero no se pudo guardar su copia para usarla sin conexión."
+        }
         guard session.matches(userID, generation: expected) else { throw CancellationError() }
         return DetailLoadResult(detail: detail, cacheWarning: warning)
     }
@@ -53,13 +53,10 @@ final class MenuDetailService {
         let expected = session.generation
         let files = files
         let id = menu.id
-        let (detail, reference) = await Task.detached(priority: .utility) {
-            let detail = try? await files.load(MenuDetail.self, name: "detail-\(id.uuidString)", folder: .caches, userId: userID)
-            let reference = try? await files.load(ServerTimeReference.self, name: "detail-clock-\(id.uuidString)", folder: .caches, userId: userID)
-            return (detail, reference)
+        let detail = await Task.detached(priority: .utility) {
+            try? await files.load(MenuDetail.self, name: "detail-\(id.uuidString)", folder: .caches, userId: userID)
         }.value
         guard session.matches(userID, generation: expected), !Task.isCancelled else { return nil }
-        if let reference { clock.restore(reference) }
         return detail
     }
 }

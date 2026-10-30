@@ -112,7 +112,7 @@ final class SessionStore: ObservableObject {
         accountError = nil
     }
     /// cierra sesion: generacion nueva para cortar lo que estaba en camino, borra el keychain y limpia todo
-    /// El vencimiento automático conserva pendientes. El cierre manual usa signOutAndForget.
+    /// El vencimiento automatico conserva pendientes. El cierre manual usa signOutAndForget.
     func signOut(message: String? = nil) {
         generation = UUID()
         auth.signOut()
@@ -126,7 +126,7 @@ final class SessionStore: ObservableObject {
         onChange?()
     }
     /// Invalida primero las tareas de la cuenta y espera su limpieza antes de permitir otro login.
-    /// Así una escritura vieja no puede reaparecer después de borrar, ni se limpia otra sesión.
+    /// Asi una escritura vieja no puede reaparecer despues de borrar, ni se limpia otra sesion.
     func signOutAndForget() async {
         guard !isForgetting, let leaving = profile?.id else { return }
         let departingGeneration = generation
@@ -160,7 +160,7 @@ final class SessionStore: ObservableObject {
     static func accountCacheKey(_ userID: UUID) -> String { "unieat.account.v1.\(userID.uuidString)" }
 }
 
-/// Datos de presentación recibidos de /me; no contiene tokens ni se usa como autorización del backend.
+/// Datos de presentacion recibidos de /me; no contiene tokens ni se usa como autorizacion del backend.
 struct CachedAccountSnapshot: Codable {
     let profile: Profile
     let memberships: [RemoteMembership]

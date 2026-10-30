@@ -4,8 +4,8 @@ import Kingfisher
 import UniEatCore
 
 /// Una sola copia procesada por URL: la precarga y las tarjetas comparten Kingfisher.
-/// El grupo mantiene cuatro hijos de I/O; el coordinador limita también las descargas
-/// entre grupos y vistas, comparte pedidos por URL y respeta su cancelación.
+/// El grupo mantiene cuatro hijos de I/O; el coordinador limita tambien las descargas
+/// entre grupos y vistas, comparte pedidos por URL y respeta su cancelacion.
 struct FeedImageStore: Sendable {
     typealias Retrieval = @Sendable (URL) async throws -> Void
     static let lifetime: TimeInterval = 7 * 86_400
@@ -24,27 +24,30 @@ struct FeedImageStore: Sendable {
         self.legacyCache = legacyCache
         let manager = KingfisherManager(downloader: .default, cache: cache)
         requests = FeedImageRequests { url, allowNetwork in
-            if let retrieve { try await retrieve(url); return }
+            if let retrieve {
+                try await retrieve(url)
+                return
+            }
             let cached = await cache.imageCachedTypeAsync(forKey: url.absoluteString,
                 processorIdentifier: ImageLibraryConfiguration.processor.identifier)
             if cached.cached { return }
             try Task.checkCancellation()
-            // El mismo procesador y llave que KFImage. No se guarda además el original.
+            // El mismo procesador y llave que KFImage. No se guarda ademas el original.
             let old = await Self.legacyFile(url, directory: legacyDirectory, cache: legacyCache)
             let source: Source = old.map { .provider(LocalFileImageDataProvider(fileURL: $0, cacheKey: url.absoluteString)) }
-                ?? .network(ImageResource(downloadURL: url))
+                ?? .network(KF.ImageResource(downloadURL: url))
             var options: KingfisherOptionsInfo = [
                 .targetCache(cache), .processor(ImageLibraryConfiguration.processor),
                 .waitForCache, .backgroundDecode, .diskCacheAccessExtendingExpiration(.none)
             ]
             if !allowNetwork && old == nil { options.append(.onlyFromCache) }
             _ = try await manager.retrieveImage(with: source, options: options)
-            // Una actualización sin red conserva las fotos anteriores. Solo después de importarlas
-            // al caché único se retira su archivo viejo, que ya dejó de ser la fuente de la imagen.
+            // Una actualizacion sin red conserva las fotos anteriores. Solo despues de importarlas
+            // al cache unico se retira su archivo viejo, que ya dejo de ser la fuente de la imagen.
             if let old {
                 _ = await Task.detached(priority: .utility) {
                     // Poder mostrar la imagen en memoria no garantiza que el disco se guardara.
-                    // Si falló esa escritura, la copia anterior sigue siendo necesaria al relanzar offline.
+                    // Si fallo esa escritura, la copia anterior sigue siendo necesaria al relanzar offline.
                     guard cache.cacheFileURLIfOnDisk(forKey: url.absoluteString,
                         processorIdentifier: ImageLibraryConfiguration.processor.identifier) != nil else { return }
                     try? FileManager.default.removeItem(at: old)
@@ -87,14 +90,14 @@ struct FeedImageStore: Sendable {
                    max(0, Date.now.timeIntervalSince(date)) < Self.lifetime,
                    (values.fileSize ?? 0) > 0 { return file }
             }
-            // Algunas fotos pudieron existir solo en el Kingfisher anterior; también se migran offline.
+            // Algunas fotos pudieron existir solo en el Kingfisher anterior; tambien se migran offline.
             return cache?.cacheFileURLIfOnDisk(forKey: url.absoluteString,
                 processorIdentifier: ImageLibraryConfiguration.processor.identifier)
                 ?? cache?.cacheFileURLIfOnDisk(forKey: url.absoluteString)
         }.value
     }
 
-    /// Conserva el orden del feed y un grupo de hasta cuatro hijos; no precarga todo el catálogo.
+    /// Conserva el orden del feed y un grupo de hasta cuatro hijos; no precarga todo el catalogo.
     func prefetch(_ menus: [DailyMenu]) async -> Int {
         var seen = Set<URL>()
         let urls = menus.compactMap { $0.photoUrl.flatMap(URL.init(string:)) }
@@ -108,7 +111,10 @@ struct FeedImageStore: Sendable {
             var stored = 0
             for await success in group {
                 if success { stored += 1 }
-                if Task.isCancelled { group.cancelAll(); break }
+                if Task.isCancelled {
+                    group.cancelAll()
+                    break
+                }
                 if let url = waiting.next() {
                     group.addTask(priority: .utility) { await requests.load(url, visible: false) }
                 }
@@ -117,8 +123,8 @@ struct FeedImageStore: Sendable {
         }
     }
 
-    /// La librería limpia su disco una vez al arrancar, no después de cada lote.
-    /// Durante la migración solo se retiran JPEG viejos vencidos: los vigentes aún sirven offline.
+    /// La libreria limpia su disco una vez al arrancar, no despues de cada lote.
+    /// Durante la migracion solo se retiran JPEG viejos vencidos: los vigentes aun sirven offline.
     func clean() async {
         await cache.cleanExpiredDiskCache()
         await legacyCache?.cleanExpiredDiskCache()
@@ -136,7 +142,7 @@ struct FeedImageStore: Sendable {
     }
 }
 
-/// Cada consumidor tiene su espera: cancelar la precarga no cancela una foto todavía visible.
+/// Cada consumidor tiene su espera: cancelar la precarga no cancela una foto todavia visible.
 private actor FeedImageRequests {
     private struct Request {
         let url: URL
@@ -156,7 +162,10 @@ private actor FeedImageRequests {
         let waiterID = UUID()
         return await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
-                guard !Task.isCancelled else { continuation.resume(returning: false); return }
+                guard !Task.isCancelled else {
+                    continuation.resume(returning: false)
+                    return
+                }
                 let id: UUID
                 if let existing = current[url] {
                     id = existing
@@ -187,8 +196,12 @@ private actor FeedImageRequests {
             let retrieve = retrieve, url = request.url
             requests[id]?.task = Task(priority: .utility) {
                 let success: Bool
-                do { try await retrieve(url, request.allowNetwork); success = !Task.isCancelled }
-                catch { success = false }
+                do {
+                    try await retrieve(url, request.allowNetwork)
+                    success = !Task.isCancelled
+                } catch {
+                    success = false
+                }
                 self.complete(id: id, success: success)
             }
         }
@@ -217,7 +230,7 @@ private actor FeedImageRequests {
     }
 }
 
-/// Un único caché y un único formato procesado, compartidos por tareas y vistas.
+/// Un unico cache y un unico formato procesado, compartidos por tareas y vistas.
 enum ImageLibraryConfiguration {
     static let cache = ImageCache(name: "unieat-feed-images")
     static let processor = DownsamplingImageProcessor(size: CGSize(width: 720, height: 480))

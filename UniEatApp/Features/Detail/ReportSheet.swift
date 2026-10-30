@@ -3,7 +3,7 @@ import UniEatCore
 
 /// hoja para reportar algo raro sobre la version del menu que se esta viendo
 /// el reporte nunca cambia el menu oficial
-/// La queja explícita de fila se distingue de observar minutos y confirmar llegada en el detalle.
+/// La queja explicita de fila se distingue de observar minutos y confirmar llegada en el detalle.
 struct ReportSheet: View {
     @EnvironmentObject private var app: AppStore
     let menu: DailyMenu

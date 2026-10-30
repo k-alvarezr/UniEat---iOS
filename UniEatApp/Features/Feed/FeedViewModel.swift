@@ -2,8 +2,8 @@ import Combine
 import Foundation
 import UniEatCore
 
-/// Identidad de una exposición, no de la tarjeta. Copia -> vivo, nueva sesión/versión o
-/// nueva evidencia pueden producir una exposición elegible sin reconstruir la lista.
+/// Identidad de una exposicion, no de la tarjeta. Copia -> vivo, nueva sesion/version o
+/// nueva evidencia pueden producir una exposicion elegible sin reconstruir la lista.
 struct FeedExposureKey: Hashable {
     let generation: UUID
     let sessionID: UUID
@@ -16,8 +16,8 @@ struct FeedExposureKey: Hashable {
     let indicatorShown: Bool
 }
 
-/// Hoy, filtros y recomendación comparten este resultado. Memoria (30 s), snapshots
-/// de SwiftData y catálogo tienen propósitos distintos; refrescar no vuelve a leerlos todos.
+/// Hoy, filtros y recomendacion comparten este resultado. Memoria (30 s), snapshots
+/// de SwiftData y catalogo tienen propositos distintos; refrescar no vuelve a leerlos todos.
 @MainActor
 final class FeedViewModel: FeatureViewModel {
     @Published private(set) var menus: [DailyMenu] = []
@@ -54,10 +54,15 @@ final class FeedViewModel: FeatureViewModel {
     init(api: APIRequesting, session: SessionStore, connectivity: ConnectivityService,
          clock: ServerClock, events: EventService, content: LocalContentService? = nil,
          memory: FeedMemoryCache? = nil) {
-        self.api = api; self.session = session; self.connectivity = connectivity
-        self.clock = clock; self.events = events; self.content = content
+        self.api = api
+        self.session = session
+        self.connectivity = connectivity
+        self.clock = clock
+        self.events = events
+        self.content = content
         self.memory = memory ?? FeedMemoryCache()
-        super.init(); observe(connectivity)
+        super.init()
+        observe(connectivity)
     }
     var visibleMenus: [DailyMenu] { menus.filter { $0.isActive(at: clock.now) } }
     var isOffline: Bool { connectivity.isOffline }
@@ -73,11 +78,25 @@ final class FeedViewModel: FeatureViewModel {
     }
 
     func accountChanged() {
-        refreshTask?.cancel(); catalogTask?.cancel(); catalogTask = nil; catalogRequestID = UUID()
-        requestID = UUID(); memory.clear(); offlineFilters.clear()
-        appliedUserID = nil; appliedFilters = nil; catalog = nil; didReadCatalog = false; catalogInvalidated = false
-        menus = []; locationMenus = []; isLoading = false; loadError = nil; cacheWarning = nil
-        isShowingCachedFeed = false; hasSnapshot = false
+        refreshTask?.cancel()
+        catalogTask?.cancel()
+        catalogTask = nil
+        catalogRequestID = UUID()
+        requestID = UUID()
+        memory.clear()
+        offlineFilters.clear()
+        appliedUserID = nil
+        appliedFilters = nil
+        catalog = nil
+        didReadCatalog = false
+        catalogInvalidated = false
+        menus = []
+        locationMenus = []
+        isLoading = false
+        loadError = nil
+        cacheWarning = nil
+        isShowingCachedFeed = false
+        hasSnapshot = false
         guard session.profile != nil else { return }
         filters = LocalValues.load(FeedFilters.self, key: "unieat.filters") ?? FeedFilters()
         refreshTask = Task { await refresh() }
@@ -89,12 +108,15 @@ final class FeedViewModel: FeatureViewModel {
         refreshTask = Task { await refresh() }
     }
 
-    /// Una publicación/edición/cierre confirmado invalida la memoria y el catálogo, sin
-    /// borrar la copia durable que aún puede servir si se pierde la red durante la recarga.
+    /// Una publicacion/edicion/cierre confirmado invalida la memoria y el catalogo, sin
+    /// borrar la copia durable que aun puede servir si se pierde la red durante la recarga.
     func invalidateAfterPublicationChange() {
         offlineFilters.clear()
-        memory.clear(); catalogInvalidated = true
-        catalogTask?.cancel(); catalogTask = nil; catalogRequestID = UUID()
+        memory.clear()
+        catalogInvalidated = true
+        catalogTask?.cancel()
+        catalogTask = nil
+        catalogRequestID = UUID()
     }
 
     private func hasCompatibleSnapshot(userID: UUID, filters: FeedFilters) -> Bool {
@@ -104,7 +126,10 @@ final class FeedViewModel: FeatureViewModel {
     func refresh(force: Bool = false) async {
         guard let userID = session.profile?.id else { return }
         let generation = session.generation, requested = filters, id = UUID()
-        requestID = id; isLoading = true; loadError = nil; cacheWarning = nil
+        requestID = id
+        isLoading = true
+        loadError = nil
+        cacheWarning = nil
         defer { if requestID == id { isLoading = false } }
         if !force, !connectivity.isOffline, let cached = memory.value(userID: userID, filters: requested) {
             apply(cached, stored: false)
@@ -128,9 +153,8 @@ final class FeedViewModel: FeatureViewModel {
             try Task.checkCancellation()
             guard session.matches(userID, generation: generation), requestID == id, requested == filters else { return }
             clock.synchronize(response.serverNow ?? response.fetchedAt)
-            let snapshot = CachedFeedSnapshot(userId: userID, filters: requested, response: response,
-                timeReference: clock.snapshot())
-            // La respuesta válida aparece antes del I/O. Un error de guardado no la esconde.
+            let snapshot = CachedFeedSnapshot(userId: userID, filters: requested, response: response)
+            // La respuesta valida aparece antes del I/O. Un error de guardado no la esconde.
             apply(snapshot, stored: false)
             memory.insert(snapshot)
             connectivity.serverUnreachable = false
@@ -143,7 +167,7 @@ final class FeedViewModel: FeatureViewModel {
             }
             if let content {
                 do {
-                    // Un feed sin filtros ya es el catálogo: no se duplica su petición ni su JSON en disco.
+                    // Un feed sin filtros ya es el catalogo: no se duplica su peticion ni su JSON en disco.
                     try await content.saveFeed(snapshot, isCatalog: requested.queryItems.isEmpty, generation: generation)
                 } catch {
                     if session.matches(userID, generation: generation), requestID == id {
@@ -165,23 +189,25 @@ final class FeedViewModel: FeatureViewModel {
     }
 
     private func apply(_ snapshot: CachedFeedSnapshot, stored: Bool) {
-        if let reference = snapshot.timeReference { clock.restore(reference) }
         if menus != snapshot.response.menus { menus = snapshot.response.menus }
         if fetchedAt != snapshot.response.fetchedAt { fetchedAt = snapshot.response.fetchedAt }
         if isShowingCachedFeed != stored { isShowingCachedFeed = stored }
         if !hasSnapshot { hasSnapshot = true }
-        appliedUserID = snapshot.userId; appliedFilters = snapshot.filters
+        appliedUserID = snapshot.userId
+        appliedFilters = snapshot.filters
         if locationMenus.isEmpty { locationMenus = menus }
     }
 
     private func rememberCatalog(_ snapshot: CachedFeedSnapshot) {
         offlineFilters.clear()
-        catalog = snapshot; didReadCatalog = true; catalogInvalidated = false
+        catalog = snapshot
+        didReadCatalog = true
+        catalogInvalidated = false
         if locationMenus != snapshot.response.menus { locationMenus = snapshot.response.menus }
     }
 
     /// La primera apertura recupera disco; las siguientes conservan el resultado compatible.
-    /// El catálogo se lee una vez por cuenta y se reutiliza al cambiar filtros sin red.
+    /// El catalogo se lee una vez por cuenta y se reutiliza al cambiar filtros sin red.
     private func loadCachedFeed(userID: UUID, generation: UUID, request: UUID, requested: FeedFilters) async {
         var snapshot: CachedFeedSnapshot?
         do {
@@ -189,7 +215,7 @@ final class FeedViewModel: FeatureViewModel {
                 if requested.queryItems.isEmpty {
                     if let catalog { snapshot = catalog }
                     else { snapshot = try await content.feed(userID: userID, filters: requested, catalog: true) }
-                    // La versión anterior guardaba también el feed sin filtros bajo su llave exacta.
+                    // La version anterior guardaba tambien el feed sin filtros bajo su llave exacta.
                     if snapshot == nil { snapshot = try await content.feed(userID: userID, filters: requested) }
                 } else {
                     snapshot = try await content.feed(userID: userID, filters: requested)
@@ -201,7 +227,9 @@ final class FeedViewModel: FeatureViewModel {
                     if requested.queryItems.isEmpty { storedCatalog = snapshot }
                     else { storedCatalog = try await content.feed(userID: userID, filters: requested, catalog: true) }
                     guard session.matches(userID, generation: generation), requestID == request, requested == filters else { return }
-                    catalog = storedCatalog; didReadCatalog = true; offlineFilters.clear()
+                    catalog = storedCatalog
+                    didReadCatalog = true
+                    offlineFilters.clear()
                 }
             }
         } catch {
@@ -209,11 +237,8 @@ final class FeedViewModel: FeatureViewModel {
                 cacheWarning = "No se pudo leer la copia local del feed."
             }
         }
-        if snapshot == nil, let old = LocalValues.load(CachedFeedSnapshot.self, key: Self.cacheKey),
-           old.userId == userID, old.filters == requested { snapshot = old }
         guard session.matches(userID, generation: generation), requestID == request, requested == filters else { return }
         if let catalog {
-            if let reference = catalog.timeReference { clock.restore(reference) }
             if locationMenus != catalog.response.menus { locationMenus = catalog.response.menus }
             if snapshot == nil {
                 let now = clock.now
@@ -226,14 +251,16 @@ final class FeedViewModel: FeatureViewModel {
                 }
                 snapshot = CachedFeedSnapshot(userId: userID, filters: requested,
                     response: FeedResponse(fetchedAt: catalog.response.fetchedAt,
-                        menus: filtered),
-                    timeReference: catalog.timeReference)
+                        menus: filtered))
             }
         }
         if let snapshot { apply(snapshot, stored: true) }
         else {
-            menus = []; hasSnapshot = false; isShowingCachedFeed = false
-            appliedUserID = nil; appliedFilters = nil
+            menus = []
+            hasSnapshot = false
+            isShowingCachedFeed = false
+            appliedUserID = nil
+            appliedFilters = nil
         }
     }
 
@@ -249,7 +276,9 @@ final class FeedViewModel: FeatureViewModel {
                 if !didReadCatalog {
                     let stored = try await content.feed(userID: userID, filters: Self.allFilters, catalog: true)
                     guard session.matches(userID, generation: generation), catalogRequestID == catalogID, !Task.isCancelled else { return }
-                    catalog = stored; didReadCatalog = true; offlineFilters.clear()
+                    catalog = stored
+                    didReadCatalog = true
+                    offlineFilters.clear()
                     if let stored, locationMenus != stored.response.menus { locationMenus = stored.response.menus }
                 }
                 if let catalog, !catalogInvalidated {
@@ -258,14 +287,13 @@ final class FeedViewModel: FeatureViewModel {
                 }
                 let response: FeedResponse = try await api.get("feed", query: [.init(name: "refresh", value: "auto")])
                 guard session.matches(userID, generation: generation), catalogRequestID == catalogID, !Task.isCancelled else { return }
-                let snapshot = CachedFeedSnapshot(userId: userID, filters: Self.allFilters, response: response,
-                    timeReference: clock.snapshot())
+                let snapshot = CachedFeedSnapshot(userId: userID, filters: Self.allFilters, response: response)
                 try await content.saveFeed(snapshot, isCatalog: true, generation: generation)
                 guard session.matches(userID, generation: generation), catalogRequestID == catalogID, !Task.isCancelled else { return }
                 rememberCatalog(snapshot)
-                // Solo se precargan fotos del resultado mostrado, nunca de este calentamiento de catálogo.
+                // Solo se precargan fotos del resultado mostrado, nunca de este calentamiento de catalogo.
             } catch {
-                // El calentamiento opcional no oculta una respuesta válida del feed.
+                // El calentamiento opcional no oculta una respuesta valida del feed.
             }
         }
     }
@@ -273,5 +301,6 @@ final class FeedViewModel: FeatureViewModel {
         FeedFilters(budgetCop: nil, availableMinutes: nil, diet: nil, area: nil, paymentMethod: nil)
     }
     func track(_ kind: String, menu: DailyMenu) { events.track(kind, menu: menu) }
+    /// llave de la copia vieja del feed en UserDefaults (antes del #45), ya no se lee, solo se borra al cerrar sesion
     static let cacheKey = "unieat.remote.feed-cache.v1"
 }

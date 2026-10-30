@@ -7,10 +7,11 @@ import UniEatCore
 /// todas las pantallas usan el mismo actor y el mismo ModelContainer que los reportes de #33
 struct LocalContentService: Sendable {
     private let worker: Task<LocalContentStore, Never>   // el actor, se espera con .value la primera vez
-    private let sessions = ContentSessionGate()
+    private let sessions = SessionGate()   // misma puerta que FileStore: copias del feed solo de la sesion vigente
     init(container: ModelContainer) {
         worker = Task.detached(priority: .utility) { LocalContentStore(modelContainer: container) }
     }
+    /// AppStore abre la puerta con la sesion nueva
     func setSession(userID: UUID?, generation: UUID) {
         sessions.setSession(userID: userID, generation: generation)
     }
@@ -32,8 +33,8 @@ struct LocalContentService: Sendable {
         try permit.check()
         try await worker.value.saveFeed(snapshot, isCatalog: isCatalog, permit: permit)
     }
-    /// La purga pasa por el mismo actor que guarda: primero termina lo que ya escribía,
-    /// después borra, y los permisos revocados impiden que reaparezcan copias antiguas.
+    /// cerrar sesion: el borrado pasa por el mismo actor que guarda, primero termina lo que ya escribia
+    /// y despues borra, la generacion cerrada impide que una copia tardia vuelva a aparecer
     func forget(userID: UUID, generation: UUID) async throws {
         sessions.revoke(generation)
         try await worker.value.forget(userID: userID)

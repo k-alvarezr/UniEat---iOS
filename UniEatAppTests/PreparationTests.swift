@@ -8,17 +8,17 @@ final class PreparationTests: XCTestCase {
     func testServerClockUsesServerTimeEvenIfThePhoneClockIsWrong() {
         // el celular dice una hora muy distinta a la del server
         var wall = Date(timeIntervalSince1970: 5_000_000)
-        var uptime: TimeInterval = 100
-        let clock = ServerClock(uptime: { uptime }, wallTime: { wall })
+        let clock = ServerClock(wallTime: { wall })
         let server = Date(timeIntervalSince1970: 1_000)
         clock.synchronize(server)
         XCTAssertEqual(clock.now, server)
         // pasa un minuto en el celular, la hora sigue la del server
         wall = wall.addingTimeInterval(60)
-        uptime += 60
         XCTAssertEqual(clock.now, server.addingTimeInterval(60))
+        // la siguiente respuesta del server vuelve a corregir la diferencia
         wall = wall.addingTimeInterval(-86_400)
-        XCTAssertEqual(clock.now, server.addingTimeInterval(60), "Cambiar la hora local no altera la hora observada")
+        clock.synchronize(server.addingTimeInterval(120))
+        XCTAssertEqual(clock.now, server.addingTimeInterval(120))
     }
 
     func testExpiredSessionKeepsLocalDataButManualSignOutForgetsIt() async throws {
@@ -41,7 +41,8 @@ final class PreparationTests: XCTestCase {
         let all = FeedFilters(budgetCop: nil, availableMinutes: nil, diet: nil, area: nil, paymentMethod: nil)
         try await content.saveFeed(CachedFeedSnapshot(userId: userID, filters: all,
             response: FeedResponse(fetchedAt: .now, menus: [h.menu])), isCatalog: true)
-        try h.database.deleteAll(userId: userID)
+        // el borrado de cerrar sesion pasa por el actor de contenido (reportes y copias del feed)
+        try await content.forget(userID: userID, generation: h.session.generation)
         XCTAssertEqual(try h.database.pending(userID: userID).count, 0)
         let catalog = try await content.feed(userID: userID, filters: all, catalog: true)
         XCTAssertNil(catalog)

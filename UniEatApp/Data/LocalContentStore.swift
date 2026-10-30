@@ -66,13 +66,13 @@ actor LocalContentStore {
 
     /// guarda o reemplaza la copia del feed de esos filtros, o el catalogo
     /// se quedan maximo 24 copias por usuario (sin contar el catalogo), las mas viejas se borran
-    func saveFeed(_ snapshot: CachedFeedSnapshot, isCatalog: Bool = false, permit: ContentWritePermit) throws {
+    func saveFeed(_ snapshot: CachedFeedSnapshot, isCatalog: Bool = false, permit: WritePermit) throws {
         try permit.check()
         let key = isCatalog ? "\(snapshot.userId):catalog" : FeedCacheKey.make(userID: snapshot.userId, filters: snapshot.filters)
         let data = try UniEatDates.encoder().encode(snapshot)
         do {
             if let row = try modelContext.fetch(FetchDescriptor<FeedCacheRecord>(predicate: #Predicate { $0.key == key })).first {
-                // Una persistencia tardía del mismo contexto no pisa una respuesta más reciente.
+                // Una persistencia tardia del mismo contexto no pisa una respuesta mas reciente.
                 guard row.fetchedAt <= snapshot.response.fetchedAt else { return }
                 row.payload = data
                 row.fetchedAt = snapshot.response.fetchedAt
@@ -94,8 +94,8 @@ actor LocalContentStore {
         }
     }
 
-    /// Reportes y copias se borran en una sola transacción. Los guardados se conservan,
-    /// como decidió Juan; el cierre automático nunca llama esta operación.
+    /// Reportes y copias se borran en una sola transaccion. Los guardados se conservan,
+    /// como decidio Juan; el cierre automatico nunca llama esta operacion.
     func forget(userID: UUID) throws {
         do {
             let reports = try modelContext.fetch(FetchDescriptor<MenuSnapshot>(predicate: #Predicate { $0.userId == userID }))

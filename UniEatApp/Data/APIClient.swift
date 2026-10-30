@@ -67,7 +67,7 @@ final class APIClient: APIRequesting {
 
     /// sesion sin cache http: las respuestas llevan datos del usuario con su token
     /// y una cache que solo mira la url podria devolverle a otra cuenta lo que pidio la anterior
-    private static let uncachedSession: URLSession = {
+    private nonisolated static let uncachedSession: URLSession = {   // URLSession es Sendable, no necesita el hilo principal
         let configuration = URLSessionConfiguration.ephemeral
         configuration.urlCache = nil
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
@@ -89,7 +89,7 @@ final class APIClient: APIRequesting {
         try await send("GET", path, query: query, body: NoBody?.none)
     }
 
-    /// /health es público: no necesita renovar un token ni abrir una sesión para reintentar.
+    /// /health es publico: no necesita renovar un token ni abrir una sesion para reintentar.
     func checkHealth() async throws {
         guard let base = configuration.apiBaseURL else { throw AuthFailure.unconfigured }
         var request = URLRequest(url: base.appending(path: "health"), timeoutInterval: 10)
@@ -179,7 +179,7 @@ final class APIClient: APIRequesting {
         let response: URLResponse
         do { (data, response) = try await transport.data(for: request) }
         catch {
-            // Una petición cancelada o de otra cuenta no cambia el aviso de conexión actual.
+            // Una peticion cancelada o de otra cuenta no cambia el aviso de conexion actual.
             guard identity == sessionIdentity(), !Task.isCancelled,
                   (error as? URLError)?.code != .cancelled else { throw CancellationError() }
             onServiceAvailability?(false)

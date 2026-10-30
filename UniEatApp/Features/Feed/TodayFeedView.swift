@@ -65,8 +65,8 @@ struct TodayFeedContent: View {
                                 MenuCard(menu: menu, at: store.clock.now)
                             }
                             .buttonStyle(.plain)
-                            // La fila mantiene su identidad. Solo cambia la tarea de exposición cuando
-                            // cambia la sesión, versión o elegibilidad del piloto (incluye copia -> vivo).
+                            // La fila mantiene su identidad. Solo cambia la tarea de exposicion cuando
+                            // cambia la sesion, version o elegibilidad del piloto (incluye copia -> vivo).
                             .task(id: store.exposureKey(for: menu)) {
                                 guard !Task.isCancelled else { return }
                                 store.track("feed_impression", menu: menu)
@@ -217,8 +217,8 @@ struct FoodArtwork: View {
     }
 }
 
-/// Solo este fragmento observa la conexión. La vista de Kingfisher nunca inicia otra descarga:
-/// su tarea pide la imagen al coordinador compartido y después muestra el mismo caché procesado.
+/// Solo este fragmento observa la conexion. La vista de Kingfisher nunca inicia otra descarga:
+/// su tarea pide la imagen al coordinador compartido y despues muestra el mismo cache procesado.
 private struct CachedFoodPhoto: View {
     let url: URL
     let images: FeedImageStore

@@ -33,44 +33,22 @@ enum LocalValues {
     }
 }
 
-/// Referencia que acompaña las copias. Tras relanzar sin red se estima el tiempo transcurrido;
-/// durante el proceso se usa uptime y cambiar la hora del teléfono no altera la vigencia.
-struct ServerTimeReference: Codable, Sendable {
-    let serverNow: Date
-    let receivedAt: Date
-}
-
-/// Reloj sin publicaciones ni redibujos: conserva la simplicidad de Juan, pero avanza
-/// con tiempo monotónico después de recibir una hora del servidor.
+/// reloj de la app con la hora del server y no la del celular
+/// cuando llega una respuesta se guarda cuanto va adelantado o atrasado el server respecto al celular
+/// y desde ahi la hora es la del celular mas esa diferencia, si no ha llegado nada se usa la del celular
+/// asi un celular con la hora mal puesta no daña la vigencia ni la hora de los reportes
+/// no avisa a las pantallas: se redibujan con los datos que llegan en la misma respuesta
 @MainActor
 final class ServerClock {
-    private var reference: ServerTimeReference?
-    private var uptimeAtReceipt: TimeInterval = 0
-    private let uptime: () -> TimeInterval
-    private let wallTime: () -> Date
-    init(uptime: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
-         wallTime: @escaping () -> Date = { .now }) {
-        self.uptime = uptime
+    private var offset: TimeInterval = 0   // segundos que el server va adelante (o atras si es negativo) del celular
+    private let wallTime: () -> Date       // hora del celular, se inyecta para poder probarlo
+    init(wallTime: @escaping () -> Date = { .now }) {
         self.wallTime = wallTime
     }
     /// hora actual segun el server
-    var now: Date {
-        guard let reference else { return wallTime() }
-        return reference.serverNow.addingTimeInterval(max(0, uptime() - uptimeAtReceipt))
-    }
+    var now: Date { wallTime().addingTimeInterval(offset) }
     /// se llama con cada respuesta que trae la hora del server
-    /// no avisa a las pantallas, ellas se redibujan con los datos que llegaron en esa misma respuesta
     func synchronize(_ serverNow: Date) {
-        reference = ServerTimeReference(serverNow: serverNow, receivedAt: wallTime())
-        uptimeAtReceipt = uptime()
-    }
-    /// Una respuesta en vivo siempre gana sobre una copia. Sin red tras reiniciar,
-    /// la estimación depende del reloj local: la UI sigue identificando los datos como copia.
-    func restore(_ saved: ServerTimeReference) {
-        guard reference == nil else { return }
-        synchronize(saved.serverNow.addingTimeInterval(max(0, wallTime().timeIntervalSince(saved.receivedAt))))
-    }
-    func snapshot() -> ServerTimeReference {
-        ServerTimeReference(serverNow: now, receivedAt: wallTime())
+        offset = serverNow.timeIntervalSince(wallTime())
     }
 }
