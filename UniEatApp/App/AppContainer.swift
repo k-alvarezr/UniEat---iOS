@@ -160,6 +160,7 @@ final class AppContainer: ObservableObject {
         synchronization?.cancel()
         content?.setSession(userID: session.profile?.id, generation: session.generation)
         files.setSession(userID: session.profile?.id, generation: session.generation)
+        details.clearMemory()  // se cambia de cuenta, la memoria se limpia
         selectedTab = .today
         connectivity.serverUnreachable = false
         // cada pieza limpia lo suyo, AppContainer no toca el interior de las pantallas
