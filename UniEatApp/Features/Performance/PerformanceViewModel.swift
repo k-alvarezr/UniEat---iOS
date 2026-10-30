@@ -8,10 +8,13 @@ import UniEatCore
 final class PerformanceViewModel: FeatureViewModel {
     // periodo elegido, 7 o 28 dias
     @Published var days = 7
-    // panel de admin por periodo
-    @Published private(set) var adminDashboard: [Int: AdminDashboardSnapshot] = [:]
-    // metricas del restaurante por periodo
-    @Published private(set) var restaurantPerformance: [Int: PerformanceSummary] = [:]
+    // ultimos paneles por periodo en NSCache, se liberan solos si falta memoria
+    private let adminPanels = PanelMemoryCache<AdminDashboardSnapshot>()
+    private let restaurantPanels = PanelMemoryCache<PerformanceSummary>()
+    /// panel de admin por periodo para dibujar
+    var adminDashboard: [Int: AdminDashboardSnapshot] { panels(adminPanels) }
+    /// metricas del restaurante por periodo para dibujar
+    var restaurantPerformance: [Int: PerformanceSummary] { panels(restaurantPanels) }
     @Published private(set) var performanceError: String?
     @Published private(set) var isLoading = false
     private let api: APIRequesting
@@ -38,8 +41,10 @@ final class PerformanceViewModel: FeatureViewModel {
     func reset() {
         accountCheckedAt = nil
         requestID = UUID()
-        adminDashboard = [:]
-        restaurantPerformance = [:]
+        // la cache no es @Published, por eso se avisa a mano que la pantalla cambia
+        objectWillChange.send()
+        adminPanels.clear()
+        restaurantPanels.clear()
         performanceError = nil
         isLoading = false
         days = 7
@@ -73,17 +78,29 @@ final class PerformanceViewModel: FeatureViewModel {
                 let value: AdminDashboardSnapshot = try await api.get("admin/dashboard", query: query)
                 guard session.matches(userID, generation: expected), requestID == id,
                       connectivity.isConnected, !Task.isCancelled else { return }
-                adminDashboard[days] = value
+                objectWillChange.send()
+                adminPanels.insert(value, days: days)
             } else if isRestaurant {
                 let value: PerformanceSummary = try await api.get("restaurant/performance", query: query)
                 guard session.matches(userID, generation: expected), requestID == id,
                       connectivity.isConnected, !Task.isCancelled else { return }
-                restaurantPerformance[days] = value
+                objectWillChange.send()
+                restaurantPanels.insert(value, days: days)
             }
         } catch is CancellationError { }
         catch {
             guard session.matches(userID, generation: expected), requestID == id else { return }
             performanceError = error.localizedDescription
         }
+    }
+    // arma el diccionario que usa la vista con lo que siga en la cache
+    private func panels<Panel>(_ cache: PanelMemoryCache<Panel>) -> [Int: Panel] {
+        var result: [Int: Panel] = [:]                  // diccionario vacio
+        for days in [7, 28] {                           // las dos pestañas del selector
+            if let panel = cache.value(days: days) {    // ¿hay panel guardado de ese periodo?
+                result[days] = panel                    // si hay, se pone en el diccionario
+            }
+        }
+        return result                           // tira algo como [7: panel7] o [7: panel7, 28: panel28]
     }
 }

@@ -14,6 +14,7 @@ final class MenuDetailService {
     private let session: SessionStore
     private let files: FileStore
     private let clock: ServerClock
+    private let memory = DetailMemoryCache()   // detalles recientes en memoria, se miran antes que el disco
     init(api: APIRequesting, session: SessionStore, files: FileStore, clock: ServerClock) {
         self.api = api
         self.session = session
@@ -31,8 +32,8 @@ final class MenuDetailService {
         let detail: MenuDetail = try await api.get("menus/\(menu.id.uuidString)", query: query)
         try Task.checkCancellation()
         guard session.matches(userID, generation: expected) else { throw CancellationError() }
-        // la hora del server ajusta el reloj de la app
-        clock.synchronize(detail.serverNow)
+        clock.synchronize(detail.serverNow)   // la hora del server ajusta el reloj de la app
+        memory.insert(detail, userID: userID) // guarda la version del detalle a cache
         var warning: String?
         do {
             try await files.save(detail, name: "detail-\(menu.id.uuidString)", folder: .caches,
@@ -51,12 +52,18 @@ final class MenuDetailService {
         guard let userID = session.profile?.id else { return nil }
         if let generation, generation != session.generation { return nil }
         let expected = session.generation
+        // primero la memoria: si esta fresca no hace falta leer el disco
+        if let hit = memory.value(userID: userID, menuID: menu.id) { return hit }
         let files = files
         let id = menu.id
         let detail = await Task.detached(priority: .utility) {
             try? await files.load(MenuDetail.self, name: "detail-\(id.uuidString)", folder: .caches, userId: userID)
         }.value
         guard session.matches(userID, generation: expected), !Task.isCancelled else { return nil }
+        // lo que se leyo del disco queda en memoria para la proxima vez
+        if let detail { memory.insert(detail, userID: userID) }
         return detail
     }
+    /// al cambiar de cuenta se vacia la memoria, nadie ve detalles de otro
+    func clearMemory() { memory.clear() }
 }
