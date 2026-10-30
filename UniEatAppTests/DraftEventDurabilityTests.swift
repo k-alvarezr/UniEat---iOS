@@ -95,7 +95,7 @@ final class DraftEventDurabilityTests: XCTestCase {
 
     func testAnOldPublicationSessionCannotClearTheNextSessionsDraft() async throws {
         let h = try await Harness.make(), files = makeFiles()
-        let service = PublishingService(api: h.api, session: h.session, files: files)
+        let service = PublishService(api: h.api, session: h.session, files: files)
         let owner = h.auth.profile.id, old = h.session.generation
         h.session.signOut()
         try await h.session.signIn(email: "test@example.invalid", password: "test")
@@ -114,14 +114,14 @@ final class DraftEventDurabilityTests: XCTestCase {
         let h = try await Harness.make(), api = DurabilityEventAPI(), user = h.auth.profile.id
         let rows = (0..<3).map { _ in event(menu: h.menu) }
         let key = EventService.pendingKey(user), rejectedKey = EventService.rejectedKey(user)
-        defer { LocalValues.remove(key: key); LocalValues.remove(key: rejectedKey) }
-        LocalValues.save(rows, key: key)
+        defer { UserDefaultsStore.remove(key: key); UserDefaultsStore.remove(key: rejectedKey) }
+        UserDefaultsStore.save(rows, key: key)
         api.reply = { _ in try JSONSerialization.data(withJSONObject: ["accepted": 1, "duplicates": 1,
             "rejected": [["eventId": rows[2].eventId.uuidString, "reason": "UNKNOWN_VERSION"]]]) }
         let events = EventService(api: api, session: h.session, connectivity: h.connectivity, clock: h.clock)
-        events.accountChanged(); await events.flush(); await events.flush()
+        events.accountChanged(); await events.sendPending(); await events.sendPending()
         XCTAssertEqual(api.calls, 1)
-        XCTAssertTrue((LocalValues.load([RemoteEvent].self, key: key) ?? []).isEmpty)
+        XCTAssertTrue((UserDefaultsStore.load([RemoteEvent].self, key: key) ?? []).isEmpty)
         XCTAssertEqual(events.rejectedEvents.map(\.event.eventId), [rows[2].eventId])
         XCTAssertEqual(events.rejectedEvents.first?.reason, "UNKNOWN_VERSION")
     }
@@ -129,31 +129,31 @@ final class DraftEventDurabilityTests: XCTestCase {
     func testNetworkAndUnknownEventRejectionsKeepRetryableEventsWithoutALoop() async throws {
         let h = try await Harness.make(), api = DurabilityEventAPI(), user = h.auth.profile.id
         let rows = (0..<2).map { _ in event(menu: h.menu) }, key = EventService.pendingKey(user)
-        defer { LocalValues.remove(key: key); LocalValues.remove(key: EventService.rejectedKey(user)) }
-        LocalValues.save(rows, key: key)
+        defer { UserDefaultsStore.remove(key: key); UserDefaultsStore.remove(key: EventService.rejectedKey(user)) }
+        UserDefaultsStore.save(rows, key: key)
         let events = EventService(api: api, session: h.session, connectivity: h.connectivity, clock: h.clock)
         events.accountChanged()
         api.failure = .offline
-        await events.flush()
-        XCTAssertEqual(LocalValues.load([RemoteEvent].self, key: key)?.count, 2)
+        await events.sendPending()
+        XCTAssertEqual(UserDefaultsStore.load([RemoteEvent].self, key: key)?.count, 2)
         api.failure = nil
         api.reply = { _ in try JSONSerialization.data(withJSONObject: ["accepted": 1, "duplicates": 0,
             "rejected": [["eventId": rows[1].eventId.uuidString, "reason": "TEMPORARY_FUTURE_REASON"]]]) }
-        await events.flush()
+        await events.sendPending()
         XCTAssertEqual(api.calls, 2)
-        XCTAssertEqual(LocalValues.load([RemoteEvent].self, key: key)?.map(\.eventId), [rows[1].eventId])
+        XCTAssertEqual(UserDefaultsStore.load([RemoteEvent].self, key: key)?.map(\.eventId), [rows[1].eventId])
         XCTAssertTrue(events.rejectedEvents.isEmpty)
         // Una respuesta incoherente tampoco confirma datos que no sabemos si se registraron.
         api.reply = { _ in Data("{\"accepted\":99,\"duplicates\":0,\"rejected\":[]}".utf8) }
-        await events.flush()
-        XCTAssertEqual(LocalValues.load([RemoteEvent].self, key: key)?.count, 1)
+        await events.sendPending()
+        XCTAssertEqual(UserDefaultsStore.load([RemoteEvent].self, key: key)?.count, 1)
     }
 
     func testPermanentEventDiagnosticsAreBoundedAcrossBatches() async throws {
         let h = try await Harness.make(), api = DurabilityEventAPI(), user = h.auth.profile.id
         let rows = (0..<120).map { _ in event(menu: h.menu) }, key = EventService.pendingKey(user)
-        defer { LocalValues.remove(key: key); LocalValues.remove(key: EventService.rejectedKey(user)) }
-        LocalValues.save(rows, key: key)
+        defer { UserDefaultsStore.remove(key: key); UserDefaultsStore.remove(key: EventService.rejectedKey(user)) }
+        UserDefaultsStore.save(rows, key: key)
         api.reply = { data in
             let body = try JSONSerialization.jsonObject(with: data) as! [String: Any]
             let sent = body["events"] as! [[String: Any]]
@@ -161,15 +161,15 @@ final class DraftEventDurabilityTests: XCTestCase {
                 "rejected": sent.map { ["eventId": $0["eventId"]!, "reason": "UNKNOWN_VERSION"] }])
         }
         let events = EventService(api: api, session: h.session, connectivity: h.connectivity, clock: h.clock)
-        events.accountChanged(); await events.flush()
+        events.accountChanged(); await events.sendPending()
         XCTAssertEqual(api.calls, 2)
         XCTAssertEqual(events.rejectedEvents.count, 100)
         XCTAssertEqual(events.rejectedEvents.map(\.event.eventId), Array(rows.suffix(100)).map(\.eventId))
-        XCTAssertTrue((LocalValues.load([RemoteEvent].self, key: key) ?? []).isEmpty)
+        XCTAssertTrue((UserDefaultsStore.load([RemoteEvent].self, key: key) ?? []).isEmpty)
     }
 
     private func makePublication(_ h: Harness, files: FileStore, delay: Duration = .seconds(60)) -> PublishViewModel {
-        PublishViewModel(service: PublishingService(api: h.api, session: h.session, files: files), feed: h.feed,
+        PublishViewModel(service: PublishService(api: h.api, session: h.session, files: files), feed: h.feed,
             session: h.session, connectivity: h.connectivity, clock: h.clock, draftSaveDelay: delay)
     }
     private func event(menu: DailyMenu) -> RemoteEvent {

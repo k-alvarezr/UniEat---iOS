@@ -36,7 +36,7 @@ final class SavedMenusViewModel: ObservableObject {
         let legacy = UserDefaults.standard.data(forKey: legacyKey)
         // si la base no abrio se muestra lo que habia en UserDefaults
         guard let content else {
-            savedMenus = LocalValues.load([SavedMenuEntry].self, key: legacyKey) ?? []
+            savedMenus = UserDefaultsStore.load([SavedMenuEntry].self, key: legacyKey) ?? []
             errorMessage = "No se pudo abrir el almacenamiento local. Se conserva la copia anterior."
             return
         }

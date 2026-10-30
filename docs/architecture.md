@@ -9,13 +9,13 @@ de sesión y sincronización. El backend sigue siendo la autoridad de permisos, 
 
 ```mermaid
 flowchart TD
-    Root[AppStore: composición y pestaña] --> VM[ViewModels por funcionalidad]
+    Root[AppContainer: composición y pestaña] --> VM[ViewModels por funcionalidad]
     V[Views SwiftUI] --> VM
     VM --> Session[SessionStore: identidad y permisos]
     VM --> Feed[FeedViewModel: resultado y filtros compartidos]
     VM --> Domain[UniEatCore: entidades y decisiones]
     VM --> Services[Servicios de detalle, publicación, cuenta y eventos]
-    VM --> Facade[ReportingFacade]
+    VM --> Facade[ReportFacade]
     Services --> API[APIRequesting / APIClient]
     Services --> Files[FileStore]
     VM --> Content[LocalContentService / ModelActor]
@@ -37,8 +37,8 @@ el feed aplicado, la cola y el contenedor tienen un único propietario para impe
 | Filtros | `FiltersViewModel` | Feed compartido; el servicio de ubicación sigue leyendo GPS |
 | Elige por mí | `RecommendationViewModel` | Mismo feed y filtros; conserva el orden del servidor |
 | Detalle | `MenuDetailViewModel`, creado por publicación | `MenuDetailService`, guardados, eventos, reloj |
-| Reporte / observación de fila | `ReportViewModel`, creado por formulario | `ReportingFacade` |
-| Publicar / editar / cerrar | `PublishViewModel` | `PublishingService`, sesión, feed y reloj |
+| Reporte / observación de fila | `ReportViewModel`, creado por formulario | `ReportFacade` |
+| Publicar / editar / cerrar | `PublishViewModel` | `PublishService`, sesión, feed y reloj |
 | Rendimiento / mis métricas | `PerformanceViewModel` | API, sesión, eventos |
 | Perfil | `ProfileViewModel` | Sesión, guardados y estado de la cola |
 | Solicitud de establecimiento | `EstablishmentViewModel` | `AccountService`, sesión y geocodificación |
@@ -46,7 +46,7 @@ el feed aplicado, la cola y el contenedor tienen un único propietario para impe
 | Guardados | `SavedMenusViewModel` | `LocalContentService`, SwiftData y eventos; migración del formato anterior |
 | Piloto BQ-08 | `WaitIndicatorPilot` | Sesión, API de asignación y metadata de eventos |
 
-`AppStore` es el punto de composición e inyección y conserva la pestaña seleccionada.
+`AppContainer` es el punto de composición e inyección y conserva la pestaña seleccionada.
 No es el ViewModel de todas las pantallas. `UniEatApp` inyecta los objetos compartidos;
 los formularios de reporte y el detalle crean instancias de presentación propias mediante fábricas.
 Una tarjeta o una etiqueta que solo renderiza información no necesita ViewModel propio.
@@ -73,7 +73,7 @@ actores. `FeedMemoryCache` y `FeedImageStore` tienen políticas explícitas desc
 
 - **MVVM, arquitectónico:** las vistas dibujan y envían acciones. Los ViewModels exponen estado
   observable y acciones de presentación. `UniEatCore` y los servicios contienen decisiones/datos.
-- **Facade, diseño:** `ReportingFacade` ofrece `submitReport` y `flushReports`, coordinando sesión,
+- **Facade, diseño:** `ReportFacade` ofrece `submitReport` y `sendPendingReports`, coordinando sesión,
   almacenamiento, API y confirmación sin exponer ese protocolo a los formularios. Su ámbito son reportes.
 - **Observer, diseño:** `ObservableObject`, `@Published` y las suscripciones de `FeatureViewModel`
   propagan cambios de las fuentes compartidas sin duplicar sus datos.
@@ -91,25 +91,25 @@ pruebas y documentación. La funcionalidad pendiente de cada integrante sigue en
 
 | Carpeta | Qué hay |
 |---|---|
-| `App/` | Arranque, `AppStore`, `SessionStore`, tema, textos y reloj |
+| `App/` | Arranque, `AppContainer` (composition root), `SessionStore`, `FeatureViewModel` (papa de los viewmodels), `ServerClock`, tema y textos |
 | `Network/` | `APIClient` y sus modelos, autenticación, configuración y conectividad |
-| `Storage/` | Base SwiftData (`LocalDatabase`, `LocalContent*`), archivos (`FileStore`) y `SessionGate` |
+| `Storage/` | Base SwiftData (`LocalDatabase`, `LocalContent*`), archivos (`FileStore`), `UserDefaultsStore` y `SessionGate` |
 | `Cache/` | Caché del feed en memoria, LRU de filtros sin red y fotos |
 | `Services/` | Lógica de datos que usan los ViewModels: detalle, publicar, cuenta, eventos, reportes (fachada), piloto y ubicación |
 | `Features/<pantalla>/` | Vista y ViewModel de cada pantalla (MVVM): Feed, Detail, Publish, Recommend, Performance, Auth, Profile, Admin, Establishment |
 | `Features/Shared/` | Lo que comparten varias pantallas: pestañas y aviso de conexión |
 
-## Cableado de AppStore
+## Cableado de AppContainer
 
-`AppStore` conecta las piezas con closures en su `init`. Esta es la lista completa:
+`AppContainer` conecta las piezas con closures en su `init`. Esta es la lista completa:
 
-| Quién avisa | Closure | Qué hace AppStore |
+| Quién avisa | Closure | Qué hace AppContainer |
 |---|---|---|
 | `APIClient` | `onUnauthorized` | Cierra la sesión sin borrar datos (vencida) |
 | `APIClient` | `onServiceAvailability` | Marca el servicio disponible o caído en `ConnectivityService` |
 | `SessionStore` | `onChange` | `accountChanged()`: cada pieza limpia lo suyo y se abre la `SessionGate` nueva |
-| `SessionStore` | `onForget` | `forget()`: borra reportes, copias, archivos y eventos de la cuenta |
-| `ConnectivityService` | `onReconnect` | `synchronize()`: eventos, reportes y feed, en ese orden |
+| `SessionStore` | `onForget` | `deleteLocalData()`: borra reportes, copias, archivos y eventos de la cuenta |
+| `ConnectivityService` | `onReconnect` | `sendQueuesAndRefresh()`: eventos, reportes y feed, en ese orden |
 | `FeedViewModel` | `onMenusLoaded` | Precarga las fotos del feed |
 | `FeedViewModel` | `onServiceAvailable` | Envía las colas cuando el servidor vuelve |
 | `FeedViewModel` | `prepareContext` | Pide la variante del piloto BQ-08 antes del feed |
@@ -124,9 +124,9 @@ pruebas y documentación. La funcionalidad pendiente de cada integrante sigue en
   Devuelve valores `Sendable`; el reloj y la presentación se actualizan en `MainActor`.
 - `MenuDetailViewModel.load` inicia copia y red con `async let`. La copia puede mostrarse mientras
   llega la respuesta. Las tareas pertenecen al `task` de la vista; la cancelación no se presenta como desconexión.
-- `PublishingService.loadDraft` conserva la lectura `detached` de Juan; el ViewModel comprueba
+- `PublishService.loadDraft` conserva la lectura `detached` de Juan; el ViewModel comprueba
   que el formulario no se haya editado mientras se leía, antes de restaurarlo.
-- `ReportingFacade.flushReports` toma snapshots de valor y usa `withTaskGroup` con prioridad
+- `ReportFacade.sendPendingReports` toma snapshots de valor y usa `withTaskGroup` con prioridad
   utility y hasta cuatro solicitudes simultáneas. Los objetos SwiftData y sus eliminaciones permanecen
   en `MainActor`. Un error temporal detiene la incorporación de más solicitudes al grupo.
 

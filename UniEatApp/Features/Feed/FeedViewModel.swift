@@ -98,12 +98,12 @@ final class FeedViewModel: FeatureViewModel {
         isShowingCachedFeed = false
         hasSnapshot = false
         guard session.profile != nil else { return }
-        filters = LocalValues.load(FeedFilters.self, key: "unieat.filters") ?? FeedFilters()
+        filters = UserDefaultsStore.load(FeedFilters.self, key: "unieat.filters") ?? FeedFilters()
         refreshTask = Task { await refresh() }
     }
     func updateFilters(_ newFilters: FeedFilters) {
         filters = newFilters
-        LocalValues.save(newFilters, key: "unieat.filters")
+        UserDefaultsStore.save(newFilters, key: "unieat.filters")
         refreshTask?.cancel()
         refreshTask = Task { await refresh() }
     }
@@ -132,7 +132,7 @@ final class FeedViewModel: FeatureViewModel {
         cacheWarning = nil
         defer { if requestID == id { isLoading = false } }
         if !force, !connectivity.isOffline, let cached = memory.value(userID: userID, filters: requested) {
-            apply(cached, stored: false)
+            show(cached, stored: false)
             return
         }
         var readCache = false
@@ -155,7 +155,7 @@ final class FeedViewModel: FeatureViewModel {
             clock.synchronize(response.serverNow ?? response.fetchedAt)
             let snapshot = CachedFeedSnapshot(userId: userID, filters: requested, response: response)
             // La respuesta valida aparece antes del I/O. Un error de guardado no la esconde.
-            apply(snapshot, stored: false)
+            show(snapshot, stored: false)
             memory.insert(snapshot)
             connectivity.serverUnreachable = false
             onServiceAvailable?()
@@ -188,7 +188,7 @@ final class FeedViewModel: FeatureViewModel {
         }
     }
 
-    private func apply(_ snapshot: CachedFeedSnapshot, stored: Bool) {
+    private func show(_ snapshot: CachedFeedSnapshot, stored: Bool) {
         if menus != snapshot.response.menus { menus = snapshot.response.menus }
         if fetchedAt != snapshot.response.fetchedAt { fetchedAt = snapshot.response.fetchedAt }
         if isShowingCachedFeed != stored { isShowingCachedFeed = stored }
@@ -221,7 +221,7 @@ final class FeedViewModel: FeatureViewModel {
                     snapshot = try await content.feed(userID: userID, filters: requested)
                 }
                 guard session.matches(userID, generation: generation), requestID == request, requested == filters else { return }
-                if let snapshot { apply(snapshot, stored: true) }
+                if let snapshot { show(snapshot, stored: true) }
                 if !didReadCatalog {
                     let storedCatalog: CachedFeedSnapshot?
                     if requested.queryItems.isEmpty { storedCatalog = snapshot }
@@ -254,7 +254,7 @@ final class FeedViewModel: FeatureViewModel {
                         menus: filtered))
             }
         }
-        if let snapshot { apply(snapshot, stored: true) }
+        if let snapshot { show(snapshot, stored: true) }
         else {
             menus = []
             hasSnapshot = false

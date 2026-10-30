@@ -10,7 +10,7 @@ final class SessionGate: @unchecked Sendable {
     private var current: [UUID: UUID] = [:] // usuario -> generacion vigente
     private var revoked: Set<UUID> = []     // generaciones cerradas al cerrar sesion
 
-    /// AppStore la llama al entrar o salir alguien
+    /// AppContainer la llama al entrar o salir alguien
     /// userID nil (la sesion vencio sola) no toca a nadie, asi lo pendiente del usuario se conserva
     func setSession(userID: UUID?, generation: UUID) {
         lock.lock()

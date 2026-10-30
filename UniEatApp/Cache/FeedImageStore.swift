@@ -15,7 +15,7 @@ struct FeedImageStore: Sendable {
     private let legacyCache: ImageCache?
     private let requests: FeedImageRequests
 
-    init(cache: ImageCache = ImageLibraryConfiguration.cache,
+    init(cache: ImageCache = KingfisherSetup.cache,
          legacyDirectory: URL? = URL.cachesDirectory.appending(path: "unieat-feed-images", directoryHint: .isDirectory),
          legacyCache: ImageCache? = .default,
          retrieve: Retrieval? = nil) {
@@ -29,7 +29,7 @@ struct FeedImageStore: Sendable {
                 return
             }
             let cached = await cache.imageCachedTypeAsync(forKey: url.absoluteString,
-                processorIdentifier: ImageLibraryConfiguration.processor.identifier)
+                processorIdentifier: KingfisherSetup.processor.identifier)
             if cached.cached { return }
             try Task.checkCancellation()
             // El mismo procesador y llave que KFImage. No se guarda ademas el original.
@@ -37,7 +37,7 @@ struct FeedImageStore: Sendable {
             let source: Source = old.map { .provider(LocalFileImageDataProvider(fileURL: $0, cacheKey: url.absoluteString)) }
                 ?? .network(KF.ImageResource(downloadURL: url))
             var options: KingfisherOptionsInfo = [
-                .targetCache(cache), .processor(ImageLibraryConfiguration.processor),
+                .targetCache(cache), .processor(KingfisherSetup.processor),
                 .waitForCache, .backgroundDecode, .diskCacheAccessExtendingExpiration(.none)
             ]
             if !allowNetwork && old == nil { options.append(.onlyFromCache) }
@@ -49,7 +49,7 @@ struct FeedImageStore: Sendable {
                     // Poder mostrar la imagen en memoria no garantiza que el disco se guardara.
                     // Si fallo esa escritura, la copia anterior sigue siendo necesaria al relanzar offline.
                     guard cache.cacheFileURLIfOnDisk(forKey: url.absoluteString,
-                        processorIdentifier: ImageLibraryConfiguration.processor.identifier) != nil else { return }
+                        processorIdentifier: KingfisherSetup.processor.identifier) != nil else { return }
                     try? FileManager.default.removeItem(at: old)
                 }.value
             }
@@ -69,13 +69,13 @@ struct FeedImageStore: Sendable {
         let cache = cache
         return await Task.detached(priority: .utility) { () -> URL? in
             cache.cacheFileURLIfOnDisk(forKey: url.absoluteString,
-                processorIdentifier: ImageLibraryConfiguration.processor.identifier)
+                processorIdentifier: KingfisherSetup.processor.identifier)
         }.value
     }
 
     private func isCached(_ url: URL) async -> Bool {
         let type = await cache.imageCachedTypeAsync(forKey: url.absoluteString,
-            processorIdentifier: ImageLibraryConfiguration.processor.identifier)
+            processorIdentifier: KingfisherSetup.processor.identifier)
         return type.cached
     }
 
@@ -92,7 +92,7 @@ struct FeedImageStore: Sendable {
             }
             // Algunas fotos pudieron existir solo en el Kingfisher anterior; tambien se migran offline.
             return cache?.cacheFileURLIfOnDisk(forKey: url.absoluteString,
-                processorIdentifier: ImageLibraryConfiguration.processor.identifier)
+                processorIdentifier: KingfisherSetup.processor.identifier)
                 ?? cache?.cacheFileURLIfOnDisk(forKey: url.absoluteString)
         }.value
     }
@@ -231,7 +231,7 @@ private actor FeedImageRequests {
 }
 
 /// Un unico cache y un unico formato procesado, compartidos por tareas y vistas.
-enum ImageLibraryConfiguration {
+enum KingfisherSetup {
     static let cache = ImageCache(name: "unieat-feed-images")
     static let processor = DownsamplingImageProcessor(size: CGSize(width: 720, height: 480))
     static func configure() {

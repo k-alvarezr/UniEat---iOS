@@ -91,3 +91,20 @@ struct InsufficientQueueEvidenceView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 }
+
+/// aviso corto de fila sin datos suficientes, va dentro del detalle
+struct InsufficientEvidenceView: View {
+    let count: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Label("Información insuficiente", systemImage: "hourglass").font(.rounded(17))
+            Text("Hay \(count) reporte(s) en los últimos 30 minutos. Se necesitan al menos tres para mostrar una estimación.")
+                .font(.subheadline)
+            Text("Puedes informar el tiempo de fila después de visitar el local.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .padding(10)
+        .background(Palette.cream, in: RoundedRectangle(cornerRadius: 10))
+    }
+}

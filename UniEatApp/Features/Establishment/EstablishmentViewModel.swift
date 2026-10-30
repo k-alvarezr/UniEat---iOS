@@ -4,7 +4,7 @@ import MapKit
 import SwiftUI
 import Foundation
 
-/// estado del formulario para pedir un local que antes estaba en EstablishmentManagementView
+/// estado del formulario para pedir un local que antes estaba en EstablishmentView
 /// incluye el pin del mapa, la direccion y la foto publica https
 @MainActor
 final class EstablishmentViewModel: FeatureViewModel {

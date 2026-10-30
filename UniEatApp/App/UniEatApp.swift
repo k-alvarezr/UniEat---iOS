@@ -2,28 +2,28 @@ import SwiftUI
 
 @main
 struct UniEatApp: App {
-    @StateObject private var store = AppStore()
+    @StateObject private var container = AppContainer()
 
     var body: some Scene {
         WindowGroup {
-            // se inyecta el store y cada viewmodel por separado
+            // se inyecta el container y cada viewmodel por separado
             // asi cada pantalla pide con @EnvironmentObject solo el que usa
             RootView()
-                .environmentObject(store)
-                .environmentObject(store.session)
-                .environmentObject(store.connectivity)
-                .environmentObject(store.feed)
-                .environmentObject(store.saved)
-                .environmentObject(store.authentication)
-                .environmentObject(store.filters)
-                .environmentObject(store.recommendation)
-                .environmentObject(store.publication)
-                .environmentObject(store.performance)
-                .environmentObject(store.profile)
-                .environmentObject(store.establishments)
-                .environmentObject(store.approvals)
-                .environmentObject(store.roles)
-                .environmentObject(store.pilot)
+                .environmentObject(container)
+                .environmentObject(container.session)
+                .environmentObject(container.connectivity)
+                .environmentObject(container.feed)
+                .environmentObject(container.saved)
+                .environmentObject(container.authentication)
+                .environmentObject(container.filters)
+                .environmentObject(container.recommendation)
+                .environmentObject(container.publication)
+                .environmentObject(container.performance)
+                .environmentObject(container.profile)
+                .environmentObject(container.establishments)
+                .environmentObject(container.approvals)
+                .environmentObject(container.roles)
+                .environmentObject(container.pilot)
                 .environment(\.locale, SpanishPresentation.locale)
                 .preferredColorScheme(.light)
         }

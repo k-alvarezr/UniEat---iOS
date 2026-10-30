@@ -2,14 +2,14 @@ import SwiftUI
 import Kingfisher
 import UniEatCore
 
-struct TodayFeedView: View {
+struct FeedView: View {
     var body: some View {
-        NavigationStack { TodayFeedContent(hidesNavigationBar: true) }
+        NavigationStack { FeedContent(hidesNavigationBar: true) }
     }
 }
 
 /// pestaña hoy BQ-03, menus vigentes en el orden del server con su motivo
-struct TodayFeedContent: View {
+struct FeedContent: View {
     @EnvironmentObject private var store: FeedViewModel
     var hidesNavigationBar = false
 
@@ -174,7 +174,7 @@ struct MenuCard: View {
 
 /// foto del local si tiene url https, si no un dibujo con el nombre
 struct FoodArtwork: View {
-    @EnvironmentObject private var app: AppStore
+    @EnvironmentObject private var app: AppContainer
     let name: String
     var photoUrl: String?
 
@@ -231,7 +231,7 @@ private struct CachedFoodPhoto: View {
             if readyURL == url {
                 KFImage(url)
                     .targetCache(images.cache)
-                    .setProcessor(ImageLibraryConfiguration.processor)
+                    .setProcessor(KingfisherSetup.processor)
                     .onlyFromCache()
                     .cancelOnDisappear(true)
                     .resizable().scaledToFill()

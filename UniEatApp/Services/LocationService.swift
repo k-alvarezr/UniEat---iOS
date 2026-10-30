@@ -3,7 +3,7 @@ import CoreLocation
 import Foundation
 
 /// lee el gps una sola vez, la coordenada no se guarda ni se manda a la api
-final class LocationContextService: NSObject, ObservableObject, CLLocationManagerDelegate {
+final class LocationService: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published private(set) var location: CLLocation?
     @Published private(set) var message: String?
 

@@ -5,11 +5,12 @@ import UniEatCore
 /// pestañas de la app, para poder cambiar de pestaña desde cualquier pantalla
 enum AppTab { case today, second, metrics, profile }
 
-/// antes AppStore era el viewmodel de toda la app, ahora solo arma las piezas y maneja la pestaña
-/// crea los servicios y los viewmodels de cada pantalla, les pasa lo que necesitan y los conecta entre si
-/// cada pantalla tiene su propio viewmodel con su estado, aca no queda estado de pantallas
+/// contenedor de la app (composition root): crea los servicios y los viewmodels de cada pantalla,
+/// les pasa lo que necesitan, los conecta entre si y maneja la pestaña elegida
+/// antes se llamaba AppStore y era el viewmodel de toda la app, ahora cada pantalla tiene el suyo (MVVM)
+/// y aca no queda estado de pantallas
 @MainActor
-final class AppStore: ObservableObject {
+final class AppContainer: ObservableObject {
     @Published var selectedTab: AppTab = .today   // pestaña visible
 
     // piezas compartidas, una sola instancia para toda la app
@@ -34,7 +35,7 @@ final class AppStore: ObservableObject {
     let establishments: EstablishmentViewModel
     let approvals: AdminApprovalsViewModel
     let roles: AdminRolesViewModel
-    let reports: ReportingFacade                  // envio y cola de reportes
+    let reports: ReportFacade                  // envio y cola de reportes
     private let events: EventService              // cola de eventos de analitica
     private let details: MenuDetailService        // pide y guarda detalles, se usa al crear cada detalle
     private let files: FileStore                  // archivos de detalle y borrador, se borran al cerrar sesion
@@ -73,7 +74,7 @@ final class AppStore: ObservableObject {
         // fotos del feed en disco, al abrir se borran las viejas
         let images = FeedImageStore()
         self.images = images
-        ImageLibraryConfiguration.configure()
+        KingfisherSetup.configure()
         Task { await images.clean() }
 
         // 3. servicios y viewmodels, cada uno recibe solo lo que usa
@@ -82,7 +83,7 @@ final class AppStore: ObservableObject {
         self.pilot = pilot
         let saved = SavedMenusViewModel(session: session, events: events, clock: clock, content: content)
         let feed = FeedViewModel(api: api, session: session, connectivity: connectivity, clock: clock, events: events, content: content)
-        let reports = ReportingFacade(api: api, outbox: database, session: session, connectivity: connectivity, clock: clock)
+        let reports = ReportFacade(api: api, outbox: database, session: session, connectivity: connectivity, clock: clock)
         let accounts = AccountService(api: api, session: session, connectivity: connectivity)
         self.session = session
         self.connectivity = connectivity
@@ -96,7 +97,7 @@ final class AppStore: ObservableObject {
         authentication = AuthViewModel(session: session, connectivity: connectivity)
         filters = FiltersViewModel(feed: feed)
         recommendation = RecommendationViewModel(feed: feed)
-        publication = PublishViewModel(service: PublishingService(api: api, session: session, files: files),
+        publication = PublishViewModel(service: PublishService(api: api, session: session, files: files),
                                        feed: feed, session: session, connectivity: connectivity, clock: clock)
         performance = PerformanceViewModel(api: api, session: session, events: events, connectivity: connectivity)
         profile = ProfileViewModel(session: session, saved: saved, reports: reports, storageError: storageError, pilot: pilot)
@@ -110,14 +111,14 @@ final class AppStore: ObservableObject {
         connectivity.checkService = { [weak api, weak self] in
             guard let api else { throw CancellationError() }
             try await api.checkHealth()
-            self?.synchronize(refreshAccount: true)
+            self?.sendQueuesAndRefresh(refreshAccount: true)
         }
         session.onChange = { [weak self] in self?.accountChanged() }
         session.onForget = { [weak self] userID, generation in
             guard let self else { return }
-            try await self.forget(userID, generation: generation)
+            try await self.deleteLocalData(userID, generation: generation)
         }
-        connectivity.onReconnect = { [weak self] in self?.synchronize(refreshAccount: true) }
+        connectivity.onReconnect = { [weak self] in self?.sendQueuesAndRefresh(refreshAccount: true) }
         // cuando llega el feed se bajan sus fotos
         feed.onMenusLoaded = { [weak self] menus in self?.prefetchImages(menus) }
         // piloto de la BQ-08: antes de pedir el feed se asigna la variante de esta sesion
@@ -140,8 +141,8 @@ final class AppStore: ObservableObject {
         // cuando el feed vuelve a cargar bien
         feed.onServiceAvailable = { [weak events, weak reports] in
             Task {
-                await events?.flush()
-                await reports?.flushReports()
+                await events?.sendPending()
+                await reports?.sendPendingReports()
             }
         }
 
@@ -161,7 +162,7 @@ final class AppStore: ObservableObject {
         files.setSession(userID: session.profile?.id, generation: session.generation)
         selectedTab = .today
         connectivity.serverUnreachable = false
-        // cada pieza limpia lo suyo, AppStore no toca el interior de las pantallas
+        // cada pieza limpia lo suyo, AppContainer no toca el interior de las pantallas
         events.accountChanged()
         pilot.accountChanged()
         saved.accountChanged()
@@ -174,7 +175,7 @@ final class AppStore: ObservableObject {
         approvals.reset()
         establishments.reset()
         feed.accountChanged()
-        synchronize(refreshFeed: false)   // el feed ya lo pide feed.accountChanged, aca solo las colas
+        sendQueuesAndRefresh(refreshFeed: false)   // el feed ya lo pide feed.accountChanged, aca solo las colas
     }
 
     /// baja las fotos del feed en segundo plano para tenerlas sin red, cancela la descarga anterior
@@ -198,7 +199,7 @@ final class AppStore: ObservableObject {
     /// al cerrar sesion a mano se borra lo que la cuenta dejo en el celular:
     /// reportes sin mandar, copias del feed, copias de detalles, borrador y eventos sin mandar
     /// los menus guardados se quedan, son marcadores que el usuario eligio y no estan en el server
-    private func forget(_ userID: UUID, generation: UUID) async throws {
+    private func deleteLocalData(_ userID: UUID, generation: UUID) async throws {
         files.invalidate(userID: userID)
         var failed = false
         do {
@@ -208,25 +209,25 @@ final class AppStore: ObservableObject {
         // Se intenta limpiar tambien los archivos si fallo la base, y viceversa.
         do { try await files.removeAll(userId: userID, invalidating: generation) }
         catch { failed = true }
-        LocalValues.remove(key: FeedViewModel.cacheKey)
-        LocalValues.remove(key: EventService.pendingKey(userID))
-        LocalValues.remove(key: EventService.rejectedKey(userID))
-        LocalValues.remove(key: "unieat.report-failures.\(userID.uuidString)")   // motivos de la version anterior de la fachada
+        UserDefaultsStore.remove(key: FeedViewModel.cacheKey)
+        UserDefaultsStore.remove(key: EventService.pendingKey(userID))
+        UserDefaultsStore.remove(key: EventService.rejectedKey(userID))
+        UserDefaultsStore.remove(key: "unieat.report-failures.\(userID.uuidString)")   // motivos de la version anterior de la fachada
         if failed { throw APIFailure(code: "LOCAL_STORAGE_ERROR", message: "La limpieza local no se pudo completar.") }
     }
 
     /// manda la cola de eventos, luego la de reportes y luego refresca el feed, en ese orden
     /// si llega otra sincronizacion se cancela la anterior para no mandar dos veces lo mismo
-    private func synchronize(refreshFeed: Bool = true, refreshAccount: Bool = false) {
+    private func sendQueuesAndRefresh(refreshFeed: Bool = true, refreshAccount: Bool = false) {
         synchronization?.cancel()
         synchronization = Task { [weak self] in
             guard let self, let userID = session.profile?.id else { return }
             let generation = session.generation
             if refreshAccount { try? await session.refreshAccount() }
             guard session.matches(userID, generation: generation), !Task.isCancelled else { return }
-            await events.flush()
+            await events.sendPending()
             guard session.matches(userID, generation: generation), !Task.isCancelled else { return }
-            await reports.flushReports()
+            await reports.sendPendingReports()
             guard session.matches(userID, generation: generation), !Task.isCancelled else { return }
             if refreshFeed { await feed.refresh() }
             guard session.matches(userID, generation: generation), !Task.isCancelled else { return }

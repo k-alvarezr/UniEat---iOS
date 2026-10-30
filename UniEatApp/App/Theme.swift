@@ -44,7 +44,7 @@ extension Int {
 
 /// cabecera de cada pantalla: logo, titulo y boton para ir a perfil
 struct BrandHeader: View {
-    @EnvironmentObject private var store: AppStore
+    @EnvironmentObject private var store: AppContainer
     let title: String
     var subtitle = "Uniandes · En campus"
     // en perfil y en las hojas (como reportar) no tiene sentido el boton de perfil

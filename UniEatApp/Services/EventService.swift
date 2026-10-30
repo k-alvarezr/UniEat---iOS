@@ -22,7 +22,7 @@ final class EventService: ObservableObject {
     private var counted: Set<String> = []
     private var pending: [RemoteEvent] = []
     private(set) var rejectedEvents: [RejectedAnalyticsEvent] = []
-    private var flushingGeneration: UUID?
+    private var sendingGeneration: UUID?
     var metadataProvider: ((DailyMenu) -> ExperimentEventMetadata?)?
     init(api: APIRequesting, session: SessionStore, connectivity: ConnectivityService, clock: ServerClock) {
         self.api = api
@@ -32,7 +32,7 @@ final class EventService: ObservableObject {
     }
     /// llave de la cola por usuario, asi los eventos de una cuenta no se mandan con otra
     private var key: String { Self.pendingKey(session.profile?.id) }
-    /// llave de la cola de un usuario, AppStore la usa para borrarla al cerrar sesion
+    /// llave de la cola de un usuario, AppContainer la usa para borrarla al cerrar sesion
     static func pendingKey(_ userID: UUID?) -> String { "unieat.remote.pending-events.\(userID?.uuidString ?? "signed-out")" }
     static func rejectedKey(_ userID: UUID) -> String { "unieat.remote.rejected-events.\(userID.uuidString)" }
     /// al cambiar de cuenta: sesion nueva, nada contado y se carga la cola de ese usuario
@@ -40,8 +40,8 @@ final class EventService: ObservableObject {
         objectWillChange.send()
         sessionID = UUID()
         counted = []
-        pending = session.profile == nil ? [] : LocalValues.load([RemoteEvent].self, key: key) ?? []
-        rejectedEvents = session.profile.map { LocalValues.load([RejectedAnalyticsEvent].self, key: Self.rejectedKey($0.id)) ?? [] } ?? []
+        pending = session.profile == nil ? [] : UserDefaultsStore.load([RemoteEvent].self, key: key) ?? []
+        rejectedEvents = session.profile.map { UserDefaultsStore.load([RejectedAnalyticsEvent].self, key: Self.rejectedKey($0.id)) ?? [] } ?? []
     }
     // llave de una accion sobre un menu, con la version para que un menu editado cuente aparte
     private func eventKey(_ kind: String, _ menu: DailyMenu) -> String { "\(kind):\(menu.id):\(menu.version)" }
@@ -74,16 +74,16 @@ final class EventService: ObservableObject {
         pending.append(RemoteEvent(eventId: UUID(), sessionId: sessionID, publicationId: menu.id,
                                     version: menu.version, kind: kind, occurredAt: clock.now, metadata: metadata))
         if pending.count > 500 { pending.removeFirst(pending.count - 500) }
-        LocalValues.save(pending, key: key)
-        if !connectivity.isOffline { Task { await flush() } }
+        UserDefaultsStore.save(pending, key: key)
+        if !connectivity.isOffline { Task { await sendPending() } }
     }
     /// manda la cola de a 100, si falla se queda para la proxima
     /// si cambia la sesion en medio se para, para no borrar eventos de otra cuenta
-    func flush() async {
-        guard let userID = session.profile?.id, !connectivity.isOffline, flushingGeneration != session.generation else { return }
+    func sendPending() async {
+        guard let userID = session.profile?.id, !connectivity.isOffline, sendingGeneration != session.generation else { return }
         let expected = session.generation
-        flushingGeneration = expected
-        defer { if flushingGeneration == expected { flushingGeneration = nil } }
+        sendingGeneration = expected
+        defer { if sendingGeneration == expected { sendingGeneration = nil } }
         while !pending.isEmpty && !connectivity.isOffline && session.matches(userID, generation: expected) {
             let batch = Array(pending.prefix(100))
             do {
@@ -104,12 +104,12 @@ final class EventService: ObservableObject {
                     }
                 }
                 if rejectedEvents.count > 100 { rejectedEvents.removeFirst(rejectedEvents.count - 100) }
-                LocalValues.save(rejectedEvents, key: Self.rejectedKey(userID))
+                UserDefaultsStore.save(rejectedEvents, key: Self.rejectedKey(userID))
                 // Lo aceptado/duplicado se confirma. Un rechazo permanente queda diagnosticado;
                 // uno desconocido conserva el evento para no perder datos con contratos futuros.
                 let acknowledged = batchIDs.subtracting(rejectedIDs).union(permanentIDs)
                 pending.removeAll { acknowledged.contains($0.eventId) }
-                LocalValues.save(pending, key: key)
+                UserDefaultsStore.save(pending, key: key)
                 if permanent.count != response.rejected.count { return }
             } catch { return }
         }

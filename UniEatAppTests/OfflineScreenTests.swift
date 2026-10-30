@@ -135,7 +135,7 @@ final class OfflineScreenTests: XCTestCase {
         let files = FileStore()
         let events = EventService(api: h.api, session: h.session, connectivity: h.network, clock: clock)
         let feed = FeedViewModel(api: h.api, session: h.session, connectivity: h.network, clock: clock, events: events)
-        let model = PublishViewModel(service: PublishingService(api: h.api, session: h.session, files: files),
+        let model = PublishViewModel(service: PublishService(api: h.api, session: h.session, files: files),
             feed: feed, session: h.session, connectivity: h.network, clock: clock)
         h.network.update(isConnected: false)
         h.api.paths = []
@@ -152,7 +152,7 @@ final class OfflineScreenTests: XCTestCase {
 
     func testColdAccountCopyPreservesNavigationButCannotAuthorizeAdminActions() async throws {
         let h = try await roleHarness()
-        defer { LocalValues.remove(key: SessionStore.accountCacheKey(h.api.userID)) }
+        defer { UserDefaultsStore.remove(key: SessionStore.accountCacheKey(h.api.userID)) }
         let auth = FakeAuth()
         // Supabase Auth siempre devuelve student; /me es quien certifica el rol real.
         auth.profile = Profile(id: h.api.userID, displayName: "Auth metadata", role: "student")
@@ -173,8 +173,8 @@ final class OfflineScreenTests: XCTestCase {
     func testCachedAccountCannotBeReadByAnotherIdentityAndManualLogoutRemovesIt() async throws {
         let h = try await roleHarness()
         let other = UUID(), key = SessionStore.accountCacheKey(other)
-        defer { LocalValues.remove(key: key) }
-        LocalValues.save(CachedAccountSnapshot(profile: h.session.profile!, memberships: [],
+        defer { UserDefaultsStore.remove(key: key) }
+        UserDefaultsStore.save(CachedAccountSnapshot(profile: h.session.profile!, memberships: [],
             establishments: [], savedAt: .now), key: key)
         let auth = FakeAuth()
         auth.profile = Profile(id: other, displayName: "Other", role: "student")
@@ -183,9 +183,9 @@ final class OfflineScreenTests: XCTestCase {
         try await otherSession.signIn(email: "other@example.invalid", password: "fixture")
         XCTAssertFalse(otherSession.isAdmin)
         XCTAssertNil(otherSession.cachedAccountDate)
-        XCTAssertNotNil(LocalValues.load(CachedAccountSnapshot.self, key: SessionStore.accountCacheKey(h.api.userID)))
+        XCTAssertNotNil(UserDefaultsStore.load(CachedAccountSnapshot.self, key: SessionStore.accountCacheKey(h.api.userID)))
         await h.session.signOutAndForget()
-        XCTAssertNil(LocalValues.load(CachedAccountSnapshot.self, key: SessionStore.accountCacheKey(h.api.userID)))
+        XCTAssertNil(UserDefaultsStore.load(CachedAccountSnapshot.self, key: SessionStore.accountCacheKey(h.api.userID)))
     }
 
     func testMetricsKeepTheLastPeriodAndCanRetryWhenOnlyTheServiceWasUnreachable() async throws {

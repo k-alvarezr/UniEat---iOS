@@ -54,18 +54,18 @@ Every account is real: the feed, publications, reports, and performance metrics 
 
 ```mermaid
 flowchart LR
-    Root[AppStore / composition and navigation] --> VM[Feature ViewModels]
+    Root[AppContainer / composition and navigation] --> VM[Feature ViewModels]
     UI[SwiftUI views] --> VM
     VM --> Core[UniEatCore / models and decisions]
-    VM --> Services[Feature services / ReportingFacade]
+    VM --> Services[Feature services / ReportFacade]
     VM --> Session[SessionStore / shared identity]
     Services --> Auth[SupabaseAuthService / Keychain]
     Services --> API[APIClient / shared API v1]
     Services --> Local[LocalDatabase / SwiftData and FileStore]
 ```
 
-- **MVVM:** screens observe feature ViewModels; `AppStore` creates their dependencies and owns tab navigation. Session and feed state have a single shared owner.
-- **Facade:** `ReportingFacade` coordinates durable queuing, authenticated submission, bounded parallel retries and acknowledgement through a small reporting interface.
+- **MVVM:** screens observe feature ViewModels; `AppContainer` creates their dependencies and owns tab navigation. Session and feed state have a single shared owner.
+- **Facade:** `ReportFacade` coordinates durable queuing, authenticated submission, bounded parallel retries and acknowledgement through a small reporting interface.
 - **Observer:** `ObservableObject` and `@Published` update the feed, reports, and performance view when state changes.
 - **Server-side ranking:** the backend filters and ranks the feed with `rank-v1`; iOS keeps that order and shows its explanation.
 - **DTOs and models:** `DailyMenu`, `MenuDish`, `FeedFilters`, `Profile`, and performance types have separate files in `UniEatCore`, shared by all relevant screens. They retain their public names and serialized fields.

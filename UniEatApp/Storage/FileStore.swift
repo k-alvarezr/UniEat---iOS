@@ -27,7 +27,7 @@ actor FileStore {
         directory(folder, userId: userId).appending(path: name + ".json")
     }
     
-    /// AppStore abre la puerta con la sesion nueva antes de arrancar los servicios
+    /// AppContainer abre la puerta con la sesion nueva antes de arrancar los servicios
     /// nil (la sesion vencio sola) conserva lo pendiente
     nonisolated func setSession(userID: UUID?, generation: UUID) {
         sessionGate.setSession(userID: userID, generation: generation)
