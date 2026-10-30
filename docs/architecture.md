@@ -59,9 +59,9 @@ Una tarjeta o una etiqueta que solo renderiza información no necesita ViewModel
 Se conserva el API público y el formato Codable que consumen las pantallas y las pruebas existentes.
 `MenuDetail` representa la respuesta de vigencia/versiones/reportes y sirve a todo el flujo de detalle.
 
-Los DTO del transporte permanecen en `Data/APIClient.swift`. `PublishDraft` y `DishDraft`
+Los DTO del transporte permanecen en `Network/APIClient.swift`. `PublishDraft` y `DishDraft`
 están junto a su ViewModel, porque representan el formulario. `MenuSnapshot` y `PendingReport`
-permanecen en `Data/LocalDatabase.swift` como modelos de persistencia de Juan. La base local es
+permanecen en `Storage/LocalDatabase.swift` como modelos de persistencia de Juan. La base local es
 relacional y usa el mismo `ModelContainer`; la separación de entidades del dominio no crea nuevas bases.
 
 Sprint 3 añade `SavedMenu`, `SavedDish` y `FeedCacheRecord` en `LocalContentModels.swift`.
@@ -86,6 +86,18 @@ actores. `FeedMemoryCache` y `FeedImageStore` tienen políticas explícitas desc
 Juan conserva la autoría de la base de almacenamiento y de las estrategias de concurrencia.
 La preparación de Kevin reorganiza esas implementaciones y añade límites, políticas de reintento,
 pruebas y documentación. La funcionalidad pendiente de cada integrante sigue en sus issues originales.
+
+## Carpetas
+
+| Carpeta | Qué hay |
+|---|---|
+| `App/` | Arranque, `AppStore`, `SessionStore`, tema, textos y reloj |
+| `Network/` | `APIClient` y sus modelos, autenticación, configuración y conectividad |
+| `Storage/` | Base SwiftData (`LocalDatabase`, `LocalContent*`), archivos (`FileStore`) y `SessionGate` |
+| `Cache/` | Caché del feed en memoria, LRU de filtros sin red y fotos |
+| `Services/` | Lógica de datos que usan los ViewModels: detalle, publicar, cuenta, eventos, reportes (fachada), piloto y ubicación |
+| `Features/<pantalla>/` | Vista y ViewModel de cada pantalla (MVVM): Feed, Detail, Publish, Recommend, Performance, Auth, Profile, Admin, Establishment |
+| `Features/Shared/` | Lo que comparten varias pantallas: pestañas y aviso de conexión |
 
 ## Cableado de AppStore
 
