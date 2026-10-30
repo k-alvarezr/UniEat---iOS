@@ -22,6 +22,10 @@ enum LocalValues {
         guard let data = try? UniEatDates.encoder().encode(value) else { return }
         UserDefaults.standard.set(data, forKey: key)
     }
+    /// borra lo guardado con esa llave
+    static func remove(key: String) {
+        UserDefaults.standard.removeObject(forKey: key)
+    }
     /// nil si no hay nada con esa llave o si no se puede leer
     static func load<T: Decodable>(_ type: T.Type, key: String) -> T? {
         guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
@@ -29,44 +33,22 @@ enum LocalValues {
     }
 }
 
-/// hora del server y hora del celular cuando llego, se guarda junto a las copias
-/// asi al abrir sin red se puede estimar que hora es en el server
-struct ServerTimeReference: Codable, Sendable {
-    let serverNow: Date    // hora que dijo el server
-    let receivedAt: Date   // hora del celular cuando llego la respuesta
-}
-
-/// reloj de la app basado en la hora del server y no en la del celular
-/// si el usuario cambia la hora del celular la vigencia no se daña, porque se cuenta con el uptime
-/// (segundos desde que prendio el celular, eso no se puede cambiar a mano)
+/// reloj de la app con la hora del server y no la del celular
+/// cuando llega una respuesta se guarda cuanto va adelantado o atrasado el server respecto al celular
+/// y desde ahi la hora es la del celular mas esa diferencia, si no ha llegado nada se usa la del celular
+/// asi un celular con la hora mal puesta no daña la vigencia ni la hora de los reportes
 @MainActor
-final class ServerClock: ObservableObject {
-    private var reference: ServerTimeReference?    // ultima hora del server, nil si todavia no llega
-    private var uptimeAtReceipt: TimeInterval = 0  // uptime cuando llego esa hora
-    private let uptime: () -> TimeInterval         // se inyecta para poder probarlo
-    private let wallTime: () -> Date               // hora del celular, tambien inyectada
-    init(uptime: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
-         wallTime: @escaping () -> Date = { .now }) {
-        self.uptime = uptime
+final class ServerClock {
+    private var offset: TimeInterval = 0   // segundos que el server va adelante (o atras si es negativo) del celular
+    private let wallTime: () -> Date       // hora del celular, se inyecta para poder probarlo
+    init(wallTime: @escaping () -> Date = { .now }) {
         self.wallTime = wallTime
     }
-    /// hora actual: la del server mas lo que ha pasado desde que llego, si no hay server la del celular
-    var now: Date {
-        guard let reference else { return wallTime() }
-        return reference.serverNow.addingTimeInterval(max(0, uptime() - uptimeAtReceipt))
-    }
+    /// hora actual segun el server
+    var now: Date { wallTime().addingTimeInterval(offset) }
     /// se llama con cada respuesta que trae la hora del server
+    /// no avisa a las pantallas, ellas se redibujan con los datos que llegaron en esa misma respuesta
     func synchronize(_ serverNow: Date) {
-        objectWillChange.send()
-        reference = ServerTimeReference(serverNow: serverNow, receivedAt: wallTime())
-        uptimeAtReceipt = uptime()
+        offset = serverNow.timeIntervalSince(wallTime())
     }
-    /// al abrir sin red se usa la hora guardada con la copia mas el tiempo que paso en el celular
-    /// solo si en esta apertura no ha llegado una hora real del server
-    func restore(_ saved: ServerTimeReference) {
-        guard reference == nil else { return }
-        synchronize(saved.serverNow.addingTimeInterval(max(0, wallTime().timeIntervalSince(saved.receivedAt))))
-    }
-    /// la hora actual lista para guardarla junto a una copia
-    func snapshot() -> ServerTimeReference { ServerTimeReference(serverNow: now, receivedAt: wallTime()) }
 }

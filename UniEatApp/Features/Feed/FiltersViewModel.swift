@@ -3,20 +3,29 @@ import CoreLocation
 import Foundation
 import UniEatCore
 
-@MainActor
 /// estado de la pantalla de filtros, se edita un borrador y solo al aplicar cambia el feed
+@MainActor
 final class FiltersViewModel: FeatureViewModel {
     // filtros que la persona esta editando, todavia sin aplicar
     @Published var draft = FeedFilters()
     // texto de la zona sugerida por gps o de que no hay locales cerca
     @Published var locationMessage: String?
     private let feed: FeedViewModel
-    init(feed: FeedViewModel) { self.feed = feed; super.init(); observe(feed) }
+    init(feed: FeedViewModel) {
+        self.feed = feed
+        super.init()
+        observe(feed)
+    }
     var filters: FeedFilters { feed.filters }
+    /// sin red o mostrando copia, los filtros se aplican sobre el catalogo guardado en el celular
     var usesCachedCatalog: Bool { feed.isOffline || feed.isShowingCachedFeed }
-    var hasSnapshot: Bool { feed.hasSnapshot }
+    var hasSnapshot: Bool { feed.hasSnapshot }   // si hay alguna copia descargada para mostrar su fecha
     var fetchedAt: Date { feed.fetchedAt }
-    func reset() { draft = feed.filters; locationMessage = nil }
+    /// al abrir la pantalla el borrador arranca con los filtros aplicados
+    func reset() {
+        draft = feed.filters
+        locationMessage = nil
+    }
     /// aplica el borrador, el feed los guarda y vuelve a pedir
     func apply() { feed.updateFilters(draft) }
     /// sugiere zona por cercania a los locales publicados, la persona puede cambiarla

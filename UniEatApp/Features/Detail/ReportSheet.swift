@@ -17,9 +17,10 @@ private struct ReportScreen: View {
     @Environment(\.dismiss) private var dismiss
     let menu: DailyMenu
 
-    init(menu: DailyMenu, model: ReportViewModel) {
+    // el viewmodel se crea una sola vez, igual que en el detalle
+    init(menu: DailyMenu, model: @autoclosure @escaping () -> ReportViewModel) {
         self.menu = menu
-        _model = StateObject(wrappedValue: model)
+        _model = StateObject(wrappedValue: model())
     }
 
     private let choices: [(kind: ReportKind, title: String, icon: String)] = [
@@ -105,6 +106,12 @@ private struct WaitTimeScreen: View {
     @StateObject var model: ReportViewModel
     // para que la pantalla que la usa recargue y muestre la estimacion nueva
     var onSent: () async -> Void = {}
+
+    // el viewmodel se crea una sola vez, igual que en el detalle
+    init(model: @autoclosure @escaping () -> ReportViewModel, onSent: @escaping () async -> Void = {}) {
+        _model = StateObject(wrappedValue: model())
+        self.onSent = onSent
+    }
 
     var body: some View {
         SurfaceCard {

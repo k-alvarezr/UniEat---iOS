@@ -2,20 +2,25 @@ import Combine
 import Foundation
 import UniEatCore
 
-@MainActor
 /// estado de perfil, lee la sesion, los guardados y la cola de reportes
+@MainActor
 final class ProfileViewModel: FeatureViewModel {
     private let session: SessionStore
     private let saved: SavedMenusViewModel
     let reports: ReportingFacade
     // aviso si la base local no abrio
     let storageError: String?
-    private let pilot: WaitIndicatorPilot?
+    private let pilot: WaitIndicatorPilot?   // piloto de la BQ-08, perfil tiene el interruptor para participar
     init(session: SessionStore, saved: SavedMenusViewModel, reports: ReportingFacade, storageError: String? = nil, pilot: WaitIndicatorPilot? = nil) {
-        self.session = session; self.saved = saved; self.reports = reports
+        self.session = session
+        self.saved = saved
+        self.reports = reports
         self.storageError = storageError
         self.pilot = pilot
-        super.init(); observe(session); observe(saved); observe(reports)
+        super.init()
+        observe(session)
+        observe(saved)
+        observe(reports)
         if let pilot { observe(pilot) }
     }
     var profile: Profile? { session.profile }
@@ -23,7 +28,14 @@ final class ProfileViewModel: FeatureViewModel {
     var isRestaurant: Bool { session.isRestaurant }
     var savedMenus: [SavedMenuEntry] { saved.savedMenus }
     var accountError: String? { session.accountError }
-    func signOut() { session.signOut() }
+    /// reportes que se borrarian al cerrar sesion, perfil avisa antes
+    var unsentReports: Int { reports.pendingReportCount + reports.needsReviewCount }
+    /// cierra sesion a mano: primero intenta mandar los reportes pendientes (si no hay red no hace nada)
+    /// y despues borra del celular todo lo de la cuenta
+    func signOut() async {
+        await reports.flushReports()
+        session.signOut(forgetData: true)
+    }
     func refreshAccount() async { try? await session.refreshAccount() }
     /// reintenta tambien los reportes que el server rechazo
     func retryReports() async { await reports.flushReports(retryRejected: true) }

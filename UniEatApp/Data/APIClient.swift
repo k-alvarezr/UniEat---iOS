@@ -20,6 +20,12 @@ struct APIFailure: LocalizedError, Decodable {
     static func from(_ data: Data) -> APIFailure {
         (try? JSONDecoder().decode(Envelope.self, from: data))?.error ?? .unexpected
     }
+
+    /// errores que no se arreglan reintentando: datos invalidos, sin permiso, no existe, version vieja o vencido
+    /// lo demas (sin red, 429, 500) puede salir bien despues
+    var isPermanent: Bool {
+        ["VALIDATION_ERROR", "FORBIDDEN", "NOT_FOUND", "VERSION_CONFLICT", "GONE"].contains(code)
+    }
 }
 
 // cuerpo vacio para los get, que no mandan nada
@@ -58,7 +64,8 @@ final class APIClient: APIRequesting {
     private let transport: URLSession            // URLSession inyectable para las pruebas
     var onUnauthorized: (() -> Void)?            // lo pone AppStore, cierra sesion si el server dice 401
 
-    /// Authenticated JSON must never be replayed from a URL-only shared HTTP cache.
+    /// sesion sin cache http: las respuestas llevan datos del usuario con su token
+    /// y una cache que solo mira la url podria devolverle a otra cuenta lo que pidio la anterior
     private static let uncachedSession: URLSession = {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.urlCache = nil
@@ -106,7 +113,11 @@ final class APIClient: APIRequesting {
         // cabeceras que pide el server en todas las llamadas
         let token: String
         do { token = try await accessToken() }
-        catch AuthFailure.expired { onUnauthorized?(); throw AuthFailure.expired }   // token muerto -> cerrar sesion
+        catch AuthFailure.expired {
+            // token muerto -> cerrar sesion
+            onUnauthorized?()
+            throw AuthFailure.expired
+        }
         guard identity == sessionIdentity() else { throw CancellationError() }
         request.setValue(configuration.publishableKey, forHTTPHeaderField: "apikey")  // clave publica del proyecto supabase
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")      // quien es el usuario

@@ -56,9 +56,9 @@ struct PublishDraft: Codable, Sendable, Equatable {
     var dishes: [Dish]
 }
 
-@MainActor
 /// todo el estado del formulario de publicar que antes eran @State en PublishView
 /// la vista solo dibuja, publicar cerrar y el borrador pasan por PublishingService
+@MainActor
 final class PublishViewModel: FeatureViewModel {
     @Published var selectedEstablishmentID: UUID?
     @Published var restaurantName = ""
@@ -83,9 +83,14 @@ final class PublishViewModel: FeatureViewModel {
     let clock: ServerClock
     init(service: PublishingService, feed: FeedViewModel, session: SessionStore,
          connectivity: ConnectivityService, clock: ServerClock) {
-        self.service = service; self.feed = feed; self.session = session
-        self.connectivity = connectivity; self.clock = clock
-        super.init(); observe(session); observe(connectivity)
+        self.service = service
+        self.feed = feed
+        self.session = session
+        self.connectivity = connectivity
+        self.clock = clock
+        super.init()
+        observe(session)
+        observe(connectivity)
     }
     var approvedEstablishments: [RemoteEstablishment] { session.approvedEstablishments }
     var isOffline: Bool { connectivity.isOffline }
@@ -99,12 +104,21 @@ final class PublishViewModel: FeatureViewModel {
     }
     /// al cambiar de cuenta se limpia el formulario para que el siguiente no vea nada
     func reset() {
-        ownMenus = []; selectedEstablishmentID = nil; restaurantName = ""; area = "Centro"
-        address = ""; entranceDescription = ""; title = "Almuerzo completo"
-        paymentMethods = ["Nequi", "Efectivo"]; dishes = [DishDraft()]; editingMenu = nil
-        message = nil; isSaving = false; validUntil = clock.now.addingTimeInterval(4 * 3600)
+        ownMenus = []
+        selectedEstablishmentID = nil
+        restaurantName = ""
+        area = "Centro"
+        address = ""
+        entranceDescription = ""
+        title = "Almuerzo completo"
+        paymentMethods = ["Nequi", "Efectivo"]
+        dishes = [DishDraft()]
+        editingMenu = nil
+        message = nil
+        isSaving = false
+        validUntil = clock.now.addingTimeInterval(4 * 3600)
     }
-    /// pide los menus propios y despues refresca el feed para ver el cambio
+    /// pide los menus propios del restaurante
     /// si cambio la sesion mientras tanto se bota la respuesta
     func refresh() async {
         guard let userID = session.profile?.id else { return }
@@ -117,7 +131,11 @@ final class PublishViewModel: FeatureViewModel {
             guard session.matches(userID, generation: generation) else { return }
             message = error.localizedDescription
         }
-        guard session.matches(userID, generation: generation) else { return }
+    }
+    /// despues de publicar, editar o cerrar: los menus del local y el feed, para ver el cambio de una
+    /// al solo entrar a la pestaña no se pide el feed, ya lo tiene la pestaña hoy
+    private func refreshAfterChange() async {
+        await refresh()
         await feed.refresh()
     }
     /// nombre, titulo, vigencia de maximo 24 horas, local aprobado, pago y platos completos
@@ -211,7 +229,7 @@ final class PublishViewModel: FeatureViewModel {
         let generation = session.generation
         do {
             try await service.close(menu)
-            await refresh()
+            await refreshAfterChange()
             guard session.matches(userID, generation: generation) else { return }
             if editingMenu?.id == menu.id { editingMenu = nil }
             message = "Publicación cerrada. El historial se conserva."
@@ -240,7 +258,7 @@ final class PublishViewModel: FeatureViewModel {
         do {
             try await service.publish(body, replacing: editingMenu)
             service.clearDraft()
-            await refresh()
+            await refreshAfterChange()
             guard session.matches(userID, generation: generation) else { return }
             dishes = [DishDraft()]
             editingMenu = nil
@@ -249,7 +267,7 @@ final class PublishViewModel: FeatureViewModel {
             guard session.matches(userID, generation: generation) else { return }
             // alguien mas edito primero, se recarga para editar la version actual
             editingMenu = nil
-            await refresh()
+            await refreshAfterChange()
             guard session.matches(userID, generation: generation) else { return }
             message = "Otra persona editó este menú. Recargamos la versión actual; vuelve a aplicar tus cambios."
         } catch is CancellationError { }

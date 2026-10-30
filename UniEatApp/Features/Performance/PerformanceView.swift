@@ -88,6 +88,8 @@ private extension View {
     }
 }
 
+/// seccion BQ-08 del tablero (piloto de Kevin): compara con y sin indicador de fila
+/// cuantas selecciones terminaron en queja de fila o en cambiar de local en los 10 minutos siguientes
 private struct BQ08Section: View {
     let metrics: BQ08Metrics
     var body: some View {

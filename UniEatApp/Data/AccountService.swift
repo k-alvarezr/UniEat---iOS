@@ -1,12 +1,15 @@
 import Foundation
 
-@MainActor
 /// llamadas de locales y roles que antes estaban en el AppStore viejo
 /// pedir un local, aprobar solicitudes y dar o quitar admin, las de admin revisan el rol antes de llamar
+@MainActor
 final class AccountService {
     let session: SessionStore
     private let api: APIRequesting
-    init(api: APIRequesting, session: SessionStore) { self.api = api; self.session = session }
+    init(api: APIRequesting, session: SessionStore) {
+        self.api = api
+        self.session = session
+    }
     /// pide un local nuevo, queda pendiente hasta que un admin lo apruebe
     /// si falla recargar la cuenta no importa, la solicitud ya se creo
     func requestEstablishment(_ body: EstablishmentRequestBody) async throws {

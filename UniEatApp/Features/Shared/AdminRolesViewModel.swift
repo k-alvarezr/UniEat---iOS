@@ -1,8 +1,8 @@
 import Combine
 import Foundation
 
-@MainActor
 /// estado de la pantalla de roles que antes estaba en AdminRolesView
+@MainActor
 final class AdminRolesViewModel: FeatureViewModel {
     @Published var users: [AdminUser] = []
     // usuario al que se le va a cambiar el rol
@@ -14,13 +14,27 @@ final class AdminRolesViewModel: FeatureViewModel {
     private let service: AccountService
     private let session: SessionStore
     init(service: AccountService, session: SessionStore) {
-        self.service = service; self.session = session; super.init(); observe(session)
+        self.service = service
+        self.session = session
+        super.init()
+        observe(session)
+    }
+    /// al cambiar de cuenta no queda la lista de usuarios ni la confirmacion abierta
+    func reset() {
+        users = []
+        selected = nil
+        message = nil
+        workingID = nil
+        confirming = false
     }
     /// id propio, para no dejar que el admin se quite el rol a si mismo desde la lista
     var profileID: UUID? { session.profile?.id }
     /// lista de usuarios, solo si es admin
     func load() async {
-        guard session.isAdmin else { users = []; return }
+        guard session.isAdmin else {
+            users = []
+            return
+        }
         do {
             users = try await service.adminUsers()
             message = nil
@@ -31,7 +45,10 @@ final class AdminRolesViewModel: FeatureViewModel {
     /// da o quita admin y recarga la lista
     func change(_ user: AdminUser) async {
         workingID = user.id
-        defer { workingID = nil; selected = nil }
+        defer {
+            workingID = nil
+            selected = nil
+        }
         do {
             try await service.setAdminRole(for: user, enabled: user.role != "admin")
             await load()

@@ -46,7 +46,10 @@ struct EstablishmentManagementView: View {
                             .textFieldStyle(.roundedBorder)
                             .onChange(of: model.address) { _, _ in
                                 // si cambia la direccion el pin de la direccion ya no sirve, el del gps si se queda
-                                if model.pinFromAddress { model.pin = nil; model.pinMessage = nil }
+                                if model.pinFromAddress {
+                                    model.pin = nil
+                                    model.pinMessage = nil
+                                }
                             }
                         pinPicker
                         TextField("Cómo encontrar la entrada (opcional)", text: $model.entranceDescription)
@@ -135,10 +138,6 @@ struct EstablishmentManagementView: View {
             model.pinMessage = "Pin tomado de tu ubicación actual (±\(Int(position.horizontalAccuracy)) m). Úsalo estando en el local."
         }
     }
-
-    /// pasa la direccion a coordenadas con el geocodificador de apple, en el celular y sin clave
-    /// se le pone la ciudad porque las direcciones tipo Calle 19 #1-21 no la traen
-
 }
 
 private extension String {

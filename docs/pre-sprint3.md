@@ -50,7 +50,7 @@ No se cambian automáticamente los responsables, el alcance o el estado de las i
 | Observación de fila enviada horas después | Se conserva como reporte, pero no cuenta entre las muestras de los últimos 30 minutos |
 | Cierre de sesión con una carga en curso | La respuesta anterior no restaura datos ni credenciales |
 | Dos cargas con filtros idénticos | Se aplica únicamente el resultado de la solicitud más reciente |
-| Reloj del teléfono incorrecto | Con una referencia recibida en el proceso, la vigencia avanza usando uptime |
+| Reloj del teléfono incorrecto | Tras la primera respuesta del servidor, la vigencia usa la hora del servidor (diferencia guardada) |
 | Publicar con otra sesión / versión | Los permisos y `expectedVersion` continúan validándose en backend |
 | Recuperar borrador mientras se escribe | La lectura tardía no sobrescribe un formulario que ya cambió |
 | SwiftData no puede abrir/guardar | Se conserva el archivo existente y se informa que el nuevo reporte no está guardado |

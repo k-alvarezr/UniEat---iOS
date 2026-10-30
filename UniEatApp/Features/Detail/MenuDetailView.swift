@@ -18,7 +18,9 @@ private struct MenuDetailScreen: View {
     // gps para decir que tan lejos queda el local, se lee una vez y no se guarda ni se manda
     @StateObject private var location = LocationContextService()
 
-    init(model: MenuDetailViewModel) { _store = StateObject(wrappedValue: model) }
+    // el viewmodel se crea una sola vez: StateObject guarda el primero y no vuelve a llamar model()
+    // antes se creaba uno nuevo en cada redibujado de la vista de afuera y se botaba
+    init(model: @autoclosure @escaping () -> MenuDetailViewModel) { _store = StateObject(wrappedValue: model()) }
     private var initialMenu: DailyMenu { store.initialMenu }
     private var detail: MenuDetail? { store.detail }
     private var loadError: APIFailure? { store.loadError }

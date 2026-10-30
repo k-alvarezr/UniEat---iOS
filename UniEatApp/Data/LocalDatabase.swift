@@ -42,6 +42,9 @@ final class PendingReport{
     var waitMinutes: Int?
     var createdAt: Date
     var snapshot: MenuSnapshot?
+    // motivo si el server lo rechazo, nil si sigue esperando para mandarse
+    // es opcional para que swiftdata migre solo la base que ya existe
+    var rejectedReason: String?
     
     init(kind: String, note: String, waitMinutes: Int?) {
         id = UUID()
@@ -71,12 +74,14 @@ final class LocalDatabase {
     let container: ModelContainer // esta es perse la BD local, archivo con esquemas y modelos
     private var context: ModelContext {container.mainContext} // contexto asociado al hilo principal
     
+    /// lanza el error si la base no abre, inMemory y storeURL son para las pruebas
     init(inMemory: Bool = false, storeURL: URL? = nil) throws {
-        // todos los modelos de la app van en esta lista
+        // todos los modelos de la app van en esta lista: reportes (#33), guardados y copias del feed (#34)
         let schema = Schema([MenuSnapshot.self, PendingReport.self, SavedMenu.self, SavedDish.self, FeedCacheRecord.self])
         let config = storeURL.map { ModelConfiguration(schema: schema, url: $0) }
             ?? ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory)
-        // Never remove an existing store after a migration/open failure: it contains user work.
+        // si no abre no se borra el archivo, puede tener reportes del usuario
+        // AppStore sigue sin base y Perfil avisa del problema
         container = try ModelContainer(for: schema, configurations: config)
     }
     
@@ -95,7 +100,12 @@ final class LocalDatabase {
         context.insert(report)
         report.snapshot = snapshot
         // si no se pudo guardar se deshace lo que se metio al contexto
-        do { try context.save() } catch { context.rollback(); throw error }
+        do {
+            try context.save()
+        } catch {
+            context.rollback()
+            throw error
+        }
     }
     
     /// reportes sin mandar de este usuario, del mas viejo al mas nuevo
@@ -114,20 +124,61 @@ final class LocalDatabase {
         if let snapshot, snapshot.reports.allSatisfy({ $0.id == report.id }) {
             context.delete(snapshot)
         }
-        do { try context.save() } catch { context.rollback(); throw error }
+        do {
+            try context.save()
+        } catch {
+            context.rollback()
+            throw error
+        }
     }
 
-    /// borra por id, para cuando el reporte se mando desde otro hilo y solo se tiene su id
-    func remove(id:UUID) throws {
-        let found = try context.fetch(FetchDescriptor<PendingReport>(predicate: #Predicate { $0.id == id }))
-        if let report = found.first { try remove(report) }
+    /// borra lo del usuario al cerrar sesion: reportes (el cascade se los lleva con su snapshot) y copias del feed
+    func deleteAll(userId: UUID) throws {
+        let snapshots = try context.fetch(FetchDescriptor<MenuSnapshot>(predicate: #Predicate { $0.userId == userId }))
+        for snapshot in snapshots {
+            context.delete(snapshot)
+        }
+        // tambien las copias del feed y el catalogo de esa cuenta (#34), los menus guardados se quedan
+        let feeds = try context.fetch(FetchDescriptor<FeedCacheRecord>(predicate: #Predicate { $0.userID == userId }))
+        for feed in feeds {
+            context.delete(feed)
+        }
+        do {
+            try context.save()
+        } catch {
+            context.rollback()
+            throw error
+        }
     }
-    
-    /// borra todo lo del usuario, el cascade se lleva los reportes
-    /// ya no se usa al cerrar sesion, los reportes se quedan guardados para cuando el dueño vuelva
-    func deleteAll(userId: UUID) {
-        let snapshots = (try? context.fetch(FetchDescriptor<MenuSnapshot>(predicate: #Predicate { $0.userId == userId }))) ?? []
-        for snapshot in snapshots { context.delete(snapshot) }
-        try? context.save()
+
+    /// busca un reporte por id sin cargar toda la cola, solo si es de ese usuario
+    /// el dueño se revisa por la relacion con el snapshot, otra cuenta no puede tocarlo
+    func report(id: UUID, userId: UUID) throws -> PendingReport? {
+        let found = try context.fetch(FetchDescriptor<PendingReport>(predicate: #Predicate { $0.id == id }))
+        return found.first { $0.snapshot?.userId == userId }
+    }
+
+    /// marca el reporte como rechazado por el server con su motivo, no se borra
+    func reject(_ report: PendingReport, reason: String) throws {
+        report.rejectedReason = reason
+        do {
+            try context.save()
+        } catch {
+            context.rollback()
+            throw error
+        }
+    }
+
+    /// quita la marca de rechazado a todos los reportes del usuario para volver a intentarlos
+    func clearRejections(userId: UUID) throws {
+        for report in try pendingReports(userId: userId) {
+            report.rejectedReason = nil
+        }
+        do {
+            try context.save()
+        } catch {
+            context.rollback()
+            throw error
+        }
     }
 }

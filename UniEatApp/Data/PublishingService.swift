@@ -1,18 +1,23 @@
 import Foundation
 import UniEatCore
 
-@MainActor
 /// publicar, cerrar y el borrador salen del AppStore viejo a este servicio
 /// el borrador sigue siendo el archivo en Application Support de #33
+@MainActor
 final class PublishingService {
     private let api: APIRequesting
     let session: SessionStore
     private let files: FileStore
     init(api: APIRequesting, session: SessionStore, files: FileStore) {
-        self.api = api; self.session = session; self.files = files
+        self.api = api
+        self.session = session
+        self.files = files
     }
     /// menus del restaurante, para editarlos o cerrarlos
-    func mine() async throws -> [DailyMenu] { let response: MenusResponse = try await api.get("menus/mine"); return response.menus }
+    func mine() async throws -> [DailyMenu] {
+        let response: MenusResponse = try await api.get("menus/mine")
+        return response.menus
+    }
     /// crea un menu o una version nueva de old, al editar va la version que vio el dueño
     /// si alguien mas lo edito el server responde VERSION_CONFLICT y no se pisan los cambios
     func publish(_ body: MenuBody, replacing old: DailyMenu?) async throws {

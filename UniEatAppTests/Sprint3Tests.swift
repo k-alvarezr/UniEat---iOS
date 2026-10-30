@@ -86,7 +86,7 @@ final class Sprint3Tests: XCTestCase {
             establishmentName: "Test", area: "Centro", address: "Test", items: [MenuDish(name: "Dish", priceCop: 30000)], lowestPriceCop: 30000)
         let all = FeedFilters(budgetCop: nil, availableMinutes: nil, diet: nil, area: nil)
         try await content.saveFeed(CachedFeedSnapshot(userId: h.auth.profile.id, filters: all,
-            response: FeedResponse(fetchedAt: .now, menus: [cheap, expensive]), timeReference: h.clock.snapshot()), isCatalog: true)
+            response: FeedResponse(fetchedAt: .now, menus: [cheap, expensive])), isCatalog: true)
         h.connectivity.update(isConnected: false)
         h.api.feed = { XCTFail("Offline catalog must not call the network"); return Data() }
         let events = EventService(api: h.api, session: h.session, connectivity: h.connectivity, clock: h.clock)

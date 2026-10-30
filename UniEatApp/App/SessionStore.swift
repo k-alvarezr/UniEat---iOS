@@ -17,9 +17,13 @@ final class SessionStore: ObservableObject {
     /// asi una respuesta vieja nunca le llega al usuario siguiente
     private(set) var generation = UUID()
     var onChange: (() -> Void)?            // lo pone AppStore, se llama cuando entra o sale alguien
+    var onForget: ((UUID) -> Void)?        // lo pone AppStore, borra del celular lo que dejo esa cuenta
     private let auth: SessionAuthenticating
     private let api: APIRequesting
-    init(auth: SessionAuthenticating, api: APIRequesting) { self.auth = auth; self.api = api }
+    init(auth: SessionAuthenticating, api: APIRequesting) {
+        self.auth = auth
+        self.api = api
+    }
     var isRestaurant: Bool { profile?.role == "restaurant" }
     var isAdmin: Bool { profile?.role == "admin" }
     /// solo los locales que un admin ya aprobo, con esos se puede publicar
@@ -56,7 +60,10 @@ final class SessionStore: ObservableObject {
     private func start(_ signedIn: Profile) async {
         generation = UUID()
         profile = signedIn
-        memberships = []; establishments = []; authMessage = nil; accountError = nil
+        memberships = []
+        establishments = []
+        authMessage = nil
+        accountError = nil
         onChange?()
         do { try await refreshAccount() }
         catch is CancellationError { }
@@ -73,18 +80,29 @@ final class SessionStore: ObservableObject {
         // si mientras tanto cambio la sesion se bota la respuesta
         guard matches(userID, generation: expected) else { throw CancellationError() }
         // si el server dice que es otro usuario se cierra la sesion por seguridad
-        guard me.id == userID else { signOut(); throw AuthFailure.expired }
-        profile = me.profile; memberships = me.establishments; establishments = mine.establishments
+        guard me.id == userID else {
+            signOut()
+            throw AuthFailure.expired
+        }
+        profile = me.profile
+        memberships = me.establishments
+        establishments = mine.establishments
         accountError = nil
     }
     /// cierra sesion: generacion nueva para cortar lo que estaba en camino, borra el keychain y limpia todo
-    /// ya no borra reportes, detalles ni borrador, quedan guardados por usuario para cuando vuelva
-    func signOut(message: String? = nil) {
+    /// forgetData en true (el usuario cerro sesion a mano) borra tambien lo que la cuenta dejo en el celular
+    /// si la sesion se vencio sola no se borra, asi al volver a entrar sigue lo que no se alcanzo a mandar
+    func signOut(message: String? = nil, forgetData: Bool = false) {
+        let leaving = profile?.id
         generation = UUID()
         auth.signOut()
-        profile = nil; memberships = []; establishments = []; accountError = nil
+        profile = nil
+        memberships = []
+        establishments = []
+        accountError = nil
         authMessage = message
         onChange?()
+        if forgetData, let leaving { onForget?(leaving) }
     }
     /// corta antes de llamar si no es admin, igual el server lo vuelve a revisar
     func requireAdmin() throws {

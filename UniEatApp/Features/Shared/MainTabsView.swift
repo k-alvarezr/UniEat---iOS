@@ -43,6 +43,7 @@ struct MainTabsView: View {
 struct ProfileView: View {
     // perfil lee sesion, guardados y cola de reportes por ProfileViewModel
     @EnvironmentObject private var store: ProfileViewModel
+    @State private var confirmingSignOut = false   // aviso si hay reportes sin mandar antes de cerrar sesion
 
     private var roleName: String {
         if store.profile?.role == "admin" { return "Administrador" }
@@ -85,8 +86,14 @@ struct ProfileView: View {
                         Button("Actualizar cuenta") { Task { await store.refreshAccount() } }
                     }
                     if let error = store.storageError { Text(error).font(.footnote).foregroundStyle(Palette.coral) }
-                    if store.reports.pendingReportCount > 0 {
-                        Text("Reportes guardados: \(store.reports.pendingReportCount)").font(.footnote)
+                    // reportes guardados en el celular: los que esperan red y los que el server rechazo
+                    if store.reports.pendingReportCount + store.reports.needsReviewCount > 0 {
+                        if store.reports.pendingReportCount > 0 {
+                            Text("Reportes por enviar: \(store.reports.pendingReportCount)").font(.footnote)
+                        }
+                        if store.reports.needsReviewCount > 0 {
+                            Text("Reportes por revisar: \(store.reports.needsReviewCount)").font(.footnote)
+                        }
                         if let message = store.reports.syncMessage { Text(message).font(.footnote) }
                         Button("Reintentar reportes pendientes") { Task { await store.retryReports() } }
                     }
@@ -100,8 +107,18 @@ struct ProfileView: View {
                     NavigationLink(destination: SavedMenusView()) {
                         profileButton("Menús guardados (\(store.savedMenus.count))", icon: "bookmark.fill", color: Palette.paper)
                     }
+                    // si hay reportes sin mandar se pregunta antes, al cerrar sesion se borran del celular
                     SolidButton(title: "Cerrar sesión", icon: "rectangle.portrait.and.arrow.right", color: Palette.yellow) {
-                        store.signOut()
+                        if store.unsentReports > 0 {
+                            confirmingSignOut = true
+                        } else {
+                            Task { await store.signOut() }
+                        }
+                    }
+                    .confirmationDialog("Tienes \(store.unsentReports) reporte(s) sin enviar. Se intentarán enviar ahora; si no hay conexión se borrarán del celular.",
+                                        isPresented: $confirmingSignOut, titleVisibility: .visible) {
+                        Button("Cerrar sesión", role: .destructive) { Task { await store.signOut() } }
+                        Button("Cancelar", role: .cancel) {}
                     }
                 }
                 .padding(16)

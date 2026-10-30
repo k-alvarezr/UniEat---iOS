@@ -2,9 +2,9 @@ import Combine
 import Foundation
 import UniEatCore
 
-@MainActor
 /// estado del detalle BQ-04 que antes estaba en MenuDetailView con @State
 /// uno por pantalla de detalle, lo crea AppStore.makeDetail
+@MainActor
 final class MenuDetailViewModel: FeatureViewModel {
     @Published private(set) var detail: MenuDetail?
     @Published private(set) var loadError: APIFailure?
@@ -22,11 +22,21 @@ final class MenuDetailViewModel: FeatureViewModel {
     init(menu: DailyMenu, service: MenuDetailService, session: SessionStore, events: EventService,
          saved: SavedMenusViewModel, connectivity: ConnectivityService, clock: ServerClock, pilot: WaitIndicatorPilot? = nil,
          initialFetchedAt: Date? = nil) {
-        initialMenu = menu; self.service = service; self.session = session; self.events = events
-        self.saved = saved; self.connectivity = connectivity; self.clock = clock
+        initialMenu = menu
+        self.service = service
+        self.session = session
+        self.events = events
+        self.saved = saved
+        self.connectivity = connectivity
+        self.clock = clock
         self.pilot = pilot
         self.initialFetchedAt = initialFetchedAt
-        super.init(); observe(saved); observe(session); observe(connectivity); observe(clock); observe(events)
+        super.init()
+        observe(saved)
+        observe(session)
+        observe(connectivity)
+        observe(events)
+        // el piloto de la BQ-08 cambia si se muestra el indicador de fila
         if let pilot { observe(pilot) }
     }
     /// la version del server si ya llego, si no la de la tarjeta
@@ -65,7 +75,8 @@ final class MenuDetailViewModel: FeatureViewModel {
     func load(automatic: Bool = false) async {
         guard let userID = session.profile?.id else { return }
         let expected = session.generation, id = UUID()
-        requestID = id; isLoading = true
+        requestID = id
+        isLoading = true
         defer { if requestID == id { isLoading = false } }
         // copia del disco y server en paralelo con async let (#31), la copia se muestra mientras llega el server
         async let cached = service.cached(initialMenu, generation: expected)
@@ -76,7 +87,8 @@ final class MenuDetailViewModel: FeatureViewModel {
         do {
             let value = try await fresh
             guard session.matches(userID, generation: expected), requestID == id else { return }
-            detail = value; loadError = nil
+            detail = value
+            loadError = nil
         } catch is CancellationError { }
         catch {
             guard session.matches(userID, generation: expected), requestID == id else { return }
