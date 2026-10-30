@@ -22,6 +22,10 @@ struct FeedImageStore: Sendable {
         let manager = KingfisherManager(downloader: .default, cache: cache)
         requests = FeedImageRequests { url, allowNetwork in
             if let retrieve { try await retrieve(url); return }
+            let cached = await cache.imageCachedTypeAsync(forKey: url.absoluteString,
+                processorIdentifier: ImageLibraryConfiguration.processor.identifier)
+            if cached.cached { return }
+            try Task.checkCancellation()
             // El mismo procesador y llave que KFImage. No se guarda además el original.
             let old = await Self.legacyFile(url, directory: legacyDirectory)
             let source: Source = old.map { .provider(LocalFileImageDataProvider(fileURL: $0, cacheKey: url.absoluteString)) }

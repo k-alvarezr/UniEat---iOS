@@ -67,7 +67,10 @@ struct TodayFeedContent: View {
                             .buttonStyle(.plain)
                             // La fila mantiene su identidad. Solo cambia la tarea de exposición cuando
                             // cambia la sesión, versión o elegibilidad del piloto (incluye copia -> vivo).
-                            .task(id: store.exposureKey(for: menu)) { store.track("feed_impression", menu: menu) }
+                            .task(id: store.exposureKey(for: menu)) {
+                                guard !Task.isCancelled else { return }
+                                store.track("feed_impression", menu: menu)
+                            }
                         }
                     }
                 }
