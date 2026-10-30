@@ -41,6 +41,8 @@ final class AppStore: ObservableObject {
     private let content: LocalContentService?
     private var synchronization: Task<Void, Never>?   // tarea que manda colas y refresca, una a la vez
     private var imageTask: Task<Void, Never>?         // descarga de fotos del feed en segundo plano
+    private var imageRequestID = UUID()
+    private var imageURLs: Set<String> = []
 
     /// arma toda la app en orden: auth -> api -> sesion -> servicios -> viewmodels -> conexiones entre ellos
     init() {
@@ -145,6 +147,7 @@ final class AppStore: ObservableObject {
     /// para que el siguiente usuario no vea nada del anterior, y se vuelven a cargar sus cosas
     private func accountChanged() {
         imageTask?.cancel()
+        imageTask = nil; imageRequestID = UUID(); imageURLs = []
         synchronization?.cancel()
         content?.setSession(userID: session.profile?.id, generation: session.generation)
         files.setSession(userID: session.profile?.id, generation: session.generation)
@@ -169,8 +172,17 @@ final class AppStore: ObservableObject {
     /// baja las fotos del feed en segundo plano para tenerlas sin red, cancela la descarga anterior
     private func prefetchImages(_ menus: [DailyMenu]) {
         guard !connectivity.isOffline else { return }
+        let urls = Set(menus.compactMap(\.photoUrl))
+        // Un refresco de los mismos menús no cancela y vuelve a iniciar su lote pendiente.
+        guard imageTask == nil || urls != imageURLs else { return }
         imageTask?.cancel()
-        imageTask = Task(priority: .utility) { [images] in _ = await images.prefetch(menus) }
+        let id = UUID()
+        imageRequestID = id; imageURLs = urls
+        imageTask = Task(priority: .utility) { [weak self, images] in
+            _ = await images.prefetch(menus)
+            guard let self, imageRequestID == id else { return }
+            imageTask = nil; imageURLs = []
+        }
     }
 
     /// al cerrar sesion a mano se borra lo que la cuenta dejo en el celular:

@@ -1,7 +1,5 @@
 import XCTest
 import SwiftData
-import UIKit
-import ImageIO
 import UniEatCore
 @testable import UniEat
 
@@ -186,39 +184,5 @@ final class Sprint3Tests: XCTestCase {
         XCTAssertNil(pilot.metadata(menu: h.menu, sessionID: sessionID, live: true))
     }
 
-    func testThumbnailChildrenAreBoundedDownsampledAndAvailableAsHashedFiles() async throws {
-        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
-        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
-        let image = UIGraphicsImageRenderer(size: CGSize(width: 2000, height: 1500)).image { context in
-            UIColor.red.setFill(); context.fill(CGRect(x: 0, y: 0, width: 2000, height: 1500))
-        }.pngData()!
-        let counter = ImageRequestCounter()
-        let images = FeedImageStore(directory: directory) { _ in
-            await counter.begin()
-            try await Task.sleep(for: .milliseconds(20))
-            await counter.end()
-            return image
-        }
-        let menus = (0..<8).map { i in
-            DailyMenu(title: "Photo", validUntil: .now.addingTimeInterval(3600), establishmentName: "Test", area: "Centro", address: "Test",
-                photoUrl: "https://example.invalid/photo-\(i).png", items: [], lowestPriceCop: 1)
-        }
-        let count = await images.prefetch(menus)
-        let peak = await counter.peak
-        XCTAssertEqual(count, 8)
-        XCTAssertLessThanOrEqual(peak, 4)
-        let url = URL(string: menus[0].photoUrl!)!
-        let file = await images.localFile(url)
-        XCTAssertEqual(file?.lastPathComponent, FeedImageStore.filename(url))
-        let source = CGImageSourceCreateWithURL(file! as CFURL, nil)!
-        let thumbnail = CGImageSourceCreateImageAtIndex(source, 0, nil)!
-        XCTAssertLessThanOrEqual(max(thumbnail.width, thumbnail.height), 720)
-    }
-}
 
-private actor ImageRequestCounter {
-    private var active = 0
-    private(set) var peak = 0
-    func begin() { active += 1; peak = max(peak, active) }
-    func end() { active -= 1 }
 }

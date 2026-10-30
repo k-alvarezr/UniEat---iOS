@@ -52,8 +52,9 @@ confirmar. Sus métricas y su endpoint siguen pendientes en las issues iOS #43 y
 
 ## Concurrencia y persistencia de Kevin
 
-- `FeedImageStore.prefetch`: `withTaskGroup`, hasta cuatro descargas hijas simultáneas; cancelación al cambiar
-  cuenta o resultado. ImageIO reduce a un máximo de 720 px fuera de MainActor antes de guardar JPEG.
+- `FeedImageStore.prefetch`: `withTaskGroup`, hasta cuatro hijos de I/O. Precarga y tarjetas pasan por un
+  coordinador común de solicitudes por URL y el mismo manager/procesador de Kingfisher. Se conservan
+  downsampling (720 × 480), cancelación por consumidor y trabajo de imagen fuera del actor de UI.
 - `LocalContentStore`: `@ModelActor` construido en tarea utility mediante `LocalContentService`, con contexto
   propio sobre el **mismo ModelContainer** de reportes. Solo salen valores `Sendable`; UI en MainActor.
 - `SavedMenu` → `SavedDish` usa relación inversa y borrado en cascada. Metadatos del menú y platos relacionados
@@ -65,8 +66,11 @@ confirmar. Sus métricas y su endpoint siguen pendientes en las issues iOS #43 y
   de la BQ-08 (antes de eso, el `refresh=auto` del feed sí se cuenta). Cerrar sesión desde Perfil borra estas
   filas de la cuenta; los `SavedMenu` se conservan. La copia incluye referencia de hora del servidor;
   el reloj avanza con uptime durante el proceso y restaura una estimación tras relanzar sin red.
-- Miniaturas públicas en `Caches/unieat-feed-images/<SHA256(URL)>.jpg`: escritura atómica, siete días,
-  limpieza de archivos más antiguos por encima de 50 MiB. Es caché recuperable, no persistencia garantizada.
+- Imágenes públicas: una caché activa de Kingfisher con archivos SHA-256 de URL/procesador, límite de
+  disco 50 MiB y vencimiento configurado de siete días. Las versiones anteriores tenían JPEG propios y
+  caché Kingfisher por separado: se importan al usarlos, incluso offline, y se retira la copia antigua
+  solo después de comprobar la nueva copia en disco. Los archivos antiguos aún no usados pueden
+  ocupar espacio temporalmente hasta migrarse o vencer. Es caché recuperable, no persistencia garantizada.
 
 La base no se borra si falla una apertura/migración. Las pruebas incluyen abrir un archivo con el esquema
 original de reportes y agregar guardados sin perder esos reportes ni sus relaciones.
@@ -87,7 +91,7 @@ de Maps dependen de su propia disponibilidad. Un cierre remoto desconocido no pu
 | Caché | Política | Motivo |
 |---|---|---|
 | Feed `NSCache` | Usuario + filtros; TTL 30 s; 12 entradas; costo objetivo 4 MiB del JSON | Evita repetir solicitudes al navegar; refresco explícito ignora la caché; cierre/cambio de cuenta la limpia |
-| Kingfisher 8.14.0 | Memoria 50 MiB / 100 imágenes; disco 100 MiB / 7 días; downsampling y cancelación al desaparecer | Reduce red/decodificación y permite reutilizar imágenes ya vistas; offline consulta caché/miniatura local |
+| Kingfisher 8.14.0 | Caché activa única: memoria 50 MiB / 100 imágenes; disco 50 MiB / 7 días; mismo procesador para UI y precarga | Solicitudes compartidas por URL y máximo cuatro trabajos simultáneos; UI lee solo caché; migración offline de ambas cachés anteriores |
 | SwiftData | Copia durable sin TTL de eliminación; vigencia comprobada con reloj del servidor | Recuperar datos al relanzar; siempre avisar antigüedad y limitación de actualización |
 
 `NSCache` puede expulsar entradas antes del límite; no garantiza persistencia. Las fotos públicas pueden
@@ -107,6 +111,13 @@ Las correcciones posteriores conservan la fachada y comentarios de Juan. Añaden
 modificado, cierre de una sesión mientras entra otra, limpieza con escrituras pendientes, autoguardado
 de borradores y confirmación parcial de eventos. La política y sus límites están en
 [Arquitectura · sesión, vigencia y sincronización](architecture.md#sesión-vigencia-y-sincronización).
+
+La optimización del feed conserva identidad por publicación; cambia solo la tarea que registra la exposición
+si cambian sesión, versión o elegibilidad del piloto. Un refresco compatible mantiene su resultado en pantalla
+y no vuelve a leer/aplicar disco. La respuesta de red se muestra antes de esperar su persistencia. Un resultado
+vacío válido también es un snapshot compatible. El catálogo usa su fecha persistida, un feed sin filtros puede
+servir de catálogo y el calentamiento no inicia descargas de fotos de toda la base. Publicar/editar/cerrar
+invalida memoria y frescura de catálogo antes de forzar red.
 
 | Evidencia real a adjuntar en #44 / wiki | Responsable | Estado |
 |---|---|---|

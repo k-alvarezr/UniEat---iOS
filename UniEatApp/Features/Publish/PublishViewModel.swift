@@ -196,6 +196,7 @@ final class PublishViewModel: FeatureViewModel {
         guard session.matches(userID, generation: generation) else { return }
         await refresh()
         guard session.matches(userID, generation: generation) else { return }
+        feed.invalidateAfterPublicationChange()
         await feed.refresh(force: true)
     }
     /// nombre, titulo, vigencia de maximo 24 horas, local aprobado, pago y platos completos
