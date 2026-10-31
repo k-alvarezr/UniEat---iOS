@@ -21,7 +21,8 @@ struct PublishView: View {
                     .font(.subheadline).foregroundStyle(.secondary)
                 establishmentSection
                 menuSection
-                ForEach($model.dishes) { $dish in dishCard($dish) }
+                // por id y no por posicion, asi borrar un plato no deja una tarjeta leyendo una posicion que ya no existe
+                ForEach(model.dishes) { dish in dishCard(model.binding(for: dish.id)) }
                 if model.dishes.count < 12 {
                     Button { model.dishes.append(DishDraft()) } label: {
                         Label("Agregar otro plato", systemImage: "plus.circle").frame(maxWidth: .infinity, minHeight: 48)
@@ -133,7 +134,7 @@ struct PublishView: View {
                     Spacer()
                     if model.dishes.count > 1 {
                         Button(role: .destructive) {
-                            model.dishes.removeAll { $0.id == dish.wrappedValue.id }
+                            model.removeDish(dish.wrappedValue.id)
                         } label: {
                             Image(systemName: "trash")
                         }

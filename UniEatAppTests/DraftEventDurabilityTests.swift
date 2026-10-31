@@ -168,6 +168,25 @@ final class DraftEventDurabilityTests: XCTestCase {
         XCTAssertTrue((UserDefaultsStore.load([RemoteEvent].self, key: key) ?? []).isEmpty)
     }
 
+    // borrar un plato con varios en el formulario no puede cerrar la app
+    // la tarjeta del plato borrado todavia lee y escribe su enlace una vez mas
+    func testRemovingADishKeepsTheOtherBindingsSafe() async throws {
+        let h = try await Harness.make(), model = makePublication(h, files: makeFiles())
+        model.dishes = [DishDraft(), DishDraft(), DishDraft()]
+        let removed = model.dishes[1].id, kept = model.dishes[2].id
+        let stale = model.binding(for: removed)
+        model.removeDish(removed)
+        XCTAssertEqual(model.dishes.count, 2)
+        stale.wrappedValue.name = "No debe aparecer"   // escribir en el plato borrado no hace nada
+        XCTAssertEqual(stale.wrappedValue.name, "")     // y leerlo devuelve uno vacio en vez de salirse del arreglo
+        model.binding(for: kept).wrappedValue.name = "Sopa"
+        XCTAssertEqual(model.dishes.last?.name, "Sopa")
+        XCTAssertFalse(model.dishes.contains { $0.name == "No debe aparecer" })
+        model.removeDish(model.dishes[0].id)
+        model.removeDish(model.dishes[0].id)
+        XCTAssertEqual(model.dishes.count, 1, "siempre queda un plato")
+    }
+
     private func makePublication(_ h: Harness, files: FileStore, delay: Duration = .seconds(60)) -> PublishViewModel {
         PublishViewModel(service: PublishService(api: h.api, session: h.session, files: files), feed: h.feed,
             session: h.session, connectivity: h.connectivity, clock: h.clock, draftSaveDelay: delay)
