@@ -23,7 +23,7 @@ public struct DailyMenu: Codable, Hashable, Identifiable, Sendable {
     public let waitMinutes: Int?
     public let waitSampleCount: Int
     public let waitNewestReportAt: Date?
-    // BQ-07: lo habitual del local a esta hora, el server lo manda solo si no hay 3 reportes recientes
+    // lo habitual del local a esta hora, el server lo manda solo si no hay 3 reportes recientes
     public let waitHistoricalMinutes: Int?
     public let waitHistoricalSampleCount: Int?
     public let pendingReports: Int

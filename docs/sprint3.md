@@ -10,7 +10,7 @@ Se conservan sus modelos de reportes, archivos de detalle/borrador y estrategias
 | Integrante | Issues | Entrega |
 |---|---|---|
 | Kevin | #30, #32, #34, #36, #38 | BQ-08; miniaturas concurrentes; guardados y feed en SwiftData; Hoy/Filtros/Guardados/Elige por mí offline; Kingfisher y NSCache |
-| Juan | #29, #31, #35, #37, #43 | Claridad BQ-04; concurrencia propia; detalle/reportar/publicar offline; caché de detalle/panel; BQ-07 (fila habitual por local) |
+| Juan | #29, #31, #35, #37, #43 | Claridad BQ-04; concurrencia propia; detalle/reportar/publicar offline; caché de detalle/panel; BQ-12 (búsquedas por filtros); fila habitual (mejora BQ-06) |
 | Ambos | #39, #44 | Wiki, evidencias reales, prueba en iPhone, video ético y entrega |
 
 La implementación de Kevin [iOS #45](https://github.com/k-alvarezr/UniEat---iOS/pull/45) está integrada,
@@ -46,10 +46,10 @@ las quejas son autorreportadas. Participación voluntaria, repeticiones del mism
 no observadas y cambio entre variantes en distintas sesiones limitan una conclusión causal. No hay resultados
 reales hasta ejecutar el piloto; las fixtures de pruebas no se insertan en producción.
 
-BQ-07 de Juan (tipo 2): ¿qué tiempo de espera puede mostrar UniEat para el local elegido en este momento, con
-reportes recientes, reportes históricos comparables, su antigüedad y cantidad? El server usa la mediana de los
-últimos 30 min (mínimo 3 estudiantes) o, si no alcanza, lo habitual del mismo local, día y hora en 4 semanas;
-el detalle muestra "Normalmente ~X min a esta hora" y el tablero web lista la estimación por local.
+BQ-12 de Juan (tipo 4): ¿qué combinaciones de zona, franja, presupuesto y dieta buscan más los estudiantes y en
+cuáles se quedan sin resultados? Sale de las búsquedas que ya registra el server (`feed_queries`) y se ve en el
+tablero web. Aparte, Juan agregó a la estimación de fila (BQ-06) lo habitual del mismo local, día y hora cuando
+no hay 3 reportes recientes; el detalle lo muestra como "Normalmente ~X min a esta hora".
 
 ## Concurrencia y persistencia de Kevin
 
