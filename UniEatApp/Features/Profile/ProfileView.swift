@@ -16,7 +16,7 @@ struct ProfileView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    BrandHeader(title: "Mi perfil", showsProfileButton: false)
+                    BrandHeader(title: "Mi perfil")
                     SurfaceCard {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(store.profile?.displayName ?? "").font(.rounded(23))

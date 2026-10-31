@@ -1,7 +1,7 @@
 import SwiftUI
 import UniEatCore
 
-/// pestaña rendimiento solo admin, BQ-03 BQ-04 y actividad de ios en el mismo panel
+/// pestaña rendimiento solo admin, cada pregunta en el mismo formato de tarjeta
 struct PerformanceView: View {
     // las metricas viven en PerformanceViewModel, antes en el AppStore viejo
     @EnvironmentObject private var store: PerformanceViewModel
@@ -11,8 +11,8 @@ struct PerformanceView: View {
             if store.isAdmin {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        BrandHeader(title: "UniEat · Rendimiento")
-                        Text("Panel global de iOS · BQ-03, BQ-04 y actividad en el mismo período.")
+                        BrandHeader(title: "UniEat · Rendimiento", showsProfileButton: true)
+                        Text("Resumen de iOS para el período elegido. El detalle completo está en el tablero web.")
                             .font(.subheadline).foregroundStyle(.secondary)
                         PeriodPicker(days: $store.days)
                         if let error = store.performanceError {
@@ -24,7 +24,7 @@ struct PerformanceView: View {
                             BQ03Section(metrics: snapshot.bq03)
                             BQ04Section(metrics: snapshot.bq04)
                             if let metrics = snapshot.bq08 { BQ08Section(metrics: metrics) }
-                            EngagementSection(summary: snapshot.engagement)
+                            // la actividad general queda solo para restaurantes y en el tablero web, aca solo preguntas
                         } else if store.isLoading && !store.isOffline {
                             ProgressView("Cargando métricas del servidor…")
                         } else if store.isOffline {
@@ -56,7 +56,7 @@ struct RestaurantPerformanceView: View {
             if store.isRestaurant {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        BrandHeader(title: "Actividad de mis menús")
+                        BrandHeader(title: "Actividad de mis menús", showsProfileButton: true)
                         Text("Solo publicaciones de tus establecimientos aprobados. Las cifras son actividad iOS, no ventas ni visitas verificadas.")
                             .font(.subheadline).foregroundStyle(.secondary)
                         PeriodPicker(days: $store.days)
@@ -115,45 +115,6 @@ private struct OfflinePerformanceEmptyView: View {
     }
 }
 
-/// seccion BQ-08 del tablero (piloto de Kevin): compara con y sin indicador de fila
-/// cuantas selecciones terminaron en queja de fila o en cambiar de local en los 10 minutos siguientes
-private struct BQ08Section: View {
-    let metrics: BQ08Metrics
-    var body: some View {
-        SurfaceCard {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("BQ-08 · ¿Ayuda mostrar la fila?").font(.rounded(21))
-                Text("Comparamos selecciones seguidas por una queja de fila o por elegir otro local en los siguientes diez minutos.")
-                    .font(.subheadline)
-                group("Sin indicador", metrics.groups.control, color: Palette.cyan)
-                group("Con indicador", metrics.groups.treatment, color: Palette.green)
-                if let difference = metrics.rateDifference {
-                    Text("Diferencia observada con − sin indicador: \(String(format: "%+.1f", difference * 100)) puntos porcentuales.")
-                } else {
-                    Text("Muestra insuficiente: se necesitan al menos \(metrics.minimumSampleSize) selecciones con ventana completa en cada variante.")
-                }
-                Text("Cada sesión aporta una selección inicial con exposición registrada. Las ventanas en curso se excluyen de las tasas. Reportar minutos de espera no equivale a una queja. Una diferencia observada no demuestra causalidad por sí sola.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-    private func group(_ title: String, _ group: BQ08Metrics.Group, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(title).font(.headline)
-            Text("Expuestas: \(group.exposedSessions) · completas: \(group.completeSelections) · en curso: \(group.incompleteSelections)")
-                .font(.caption)
-            Text("Resultado combinado: \(group.combinedOutcomes). Quejas: \(group.longLineOutcomes); cambios de local: \(group.switchOutcomes).")
-                .font(.caption)
-            if let rate = group.outcomeRate {
-                ProgressView(value: rate).tint(color)
-                Text("\(Int((rate * 100).rounded())) % de selecciones elegibles").font(.caption.weight(.bold))
-            } else { Text("Tasa pendiente de muestra suficiente").font(.caption) }
-        }
-        .padding(10).background(color.opacity(0.18), in: RoundedRectangle(cornerRadius: 10))
-    }
-}
-
 private struct PeriodPicker: View {
     @Binding var days: Int
     var body: some View {
@@ -181,124 +142,184 @@ private struct PerformanceErrorCard: View {
     }
 }
 
-private struct BQ03Section: View {
-    let metrics: BQ03Metrics
+// MARK: - formato comun
+
+/// todas las preguntas del panel se ven igual: titulo con la pregunta, una frase con la respuesta,
+/// una sola grafica y una nota corta, el detalle completo esta en el tablero html
+private struct QuestionCard<Chart: View>: View {
+    let title: String
+    let answer: String
+    var note: String? = nil
+    @ViewBuilder let chart: Chart
     var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            Text("BQ-03 · Búsqueda contextual").font(.title3.bold())
-            Text("Consultas del feed iOS; la copia sin conexión no genera consultas nuevas.")
-                .font(.caption).foregroundStyle(.secondary)
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 9) {
-                MetricTile(number: "\(metrics.feedRequests)", title: "Consultas", detail: "Solicitudes al feed", color: Palette.yellow)
-                MetricTile(number: "\(metrics.contextualRequests)", title: "Con filtros", detail: "Presupuesto, dieta, zona, tiempo o pago", color: Palette.cyan)
-                MetricTile(number: "\(metrics.successfulRequests)", title: "Exitosas", detail: "Consultas respondidas", color: Palette.green)
-                MetricTile(number: "\(metrics.failedRequests)", title: "Fallidas", detail: "Errores registrados", color: Palette.coral)
-                MetricTile(number: "\(metrics.zeroResultRequests)", title: "Sin resultados", detail: "Consultas exitosas sin menú compatible", color: Palette.yellow)
-                MetricTile(number: String(format: "%.1f", metrics.averageResults), title: "Promedio", detail: "Menús válidos por consulta exitosa", color: Palette.cyan)
+        SurfaceCard {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(title).font(.headline)
+                Text(answer).font(.subheadline)
+                chart
+                if let note { Text(note).font(.caption).foregroundStyle(.secondary) }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+/// una parte de una barra: cuanto vale, como se llama y de que color va
+private struct BarPart: Identifiable {
+    let label: String
+    let value: Int
+    let color: Color
+    var id: String { label }
+}
+
+/// barra apilada con su leyenda abajo, las partes suman el total
+private struct StackedBar: View {
+    let parts: [BarPart]
+    var body: some View {
+        let total = CGFloat(max(parts.reduce(0) { $0 + $1.value }, 1))
+        VStack(alignment: .leading, spacing: 6) {
+            GeometryReader { proxy in
+                HStack(spacing: 0) {
+                    ForEach(parts) { part in
+                        part.color.frame(width: proxy.size.width * CGFloat(part.value) / total)
+                    }
+                }
+            }
+            .frame(height: 14)
+            .background(Palette.cream)
+            .clipShape(Capsule())
+            Legend(parts: parts)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// barras horizontales comparadas contra el valor mas grande, para embudos y comparaciones
+private struct BarList: View {
+    let parts: [BarPart]
+    var body: some View {
+        let top = CGFloat(max(parts.map(\.value).max() ?? 1, 1))
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(parts) { part in
+                HStack(spacing: 8) {
+                    Text(part.label).font(.caption).frame(width: 96, alignment: .leading)
+                    GeometryReader { proxy in
+                        part.color.frame(width: max(proxy.size.width * CGFloat(part.value) / top, 2))
+                            .clipShape(Capsule())
+                    }
+                    .frame(height: 10)
+                    Text("\(part.value)").font(.caption.monospacedDigit()).frame(minWidth: 32, alignment: .trailing)
+                }
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// puntos de color con su nombre y cifra, debajo de una barra apilada
+private struct Legend: View {
+    let parts: [BarPart]
+    var body: some View {
+        HStack(spacing: 12) {
+            ForEach(parts) { part in
+                HStack(spacing: 4) {
+                    Circle().fill(part.color).frame(width: 8, height: 8)
+                    Text("\(part.label) \(part.value)").font(.caption)
+                }
             }
         }
     }
 }
 
-/// resumen de BQ-04 para que el admin se de una idea, el detalle completo esta en el tablero html
+/// de 0 a 1 a "12 %"
+private func percent(_ share: Double) -> String { "\(Int((share * 100).rounded())) %" }
+
+// MARK: - preguntas
+
+/// BQ-03: si las busquedas del feed encuentran menus
+private struct BQ03Section: View {
+    let metrics: BQ03Metrics
+    // exitosas con al menos un menu
+    private var withResults: Int { max(metrics.successfulRequests - metrics.zeroResultRequests, 0) }
+    var body: some View {
+        QuestionCard(title: "BQ-03 · ¿Las búsquedas encuentran menús?",
+                     answer: "\(metrics.feedRequests) búsquedas, \(metrics.contextualRequests) con filtros. En promedio \(String(format: "%.1f", metrics.averageResults)) menús por búsqueda.",
+                     note: "La copia sin conexión no cuenta como búsqueda.") {
+            if metrics.feedRequests > 0 {
+                StackedBar(parts: [
+                    BarPart(label: "Con menús", value: withResults, color: Palette.green),
+                    BarPart(label: "Sin menús", value: metrics.zeroResultRequests, color: Palette.yellow),
+                    BarPart(label: "Fallidas", value: metrics.failedRequests, color: Palette.coral),
+                ])
+            }
+        }
+    }
+}
+
+/// BQ-04: en que estado estan los menus que se abren
 private struct BQ04Section: View {
     let metrics: BQ04Metrics
     // vencidos + cerrados, si el back aun no lo manda se suma aca
     private var unavailable: Int { metrics.unavailableShown ?? metrics.expiredShown + metrics.closedShown }
     var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            Text("BQ-04 · ¿Los menús que se abren están vigentes?").font(.title3.bold())
-            Text(summary).font(.subheadline)
-            if metrics.detailRequests > 0 { ValidityBar(active: metrics.activeShown, expiring: metrics.expiringShown, unavailable: unavailable) }
-            if let rates = metrics.rates {
-                Text("\(percent(rates.pendingNotice)) con cambio sin revisar · \(percent(rates.confirmedNotice)) con cambio confirmado")
-                    .font(.caption).foregroundStyle(.secondary)
-            } else if metrics.detailRequests > 0 {
-                Text("Muestra insuficiente para porcentajes, se necesitan 20 consultas.")
-                    .font(.caption).foregroundStyle(.secondary)
+        QuestionCard(title: "BQ-04 · ¿En qué estado están los menús que se abren?", answer: answer,
+                     note: metrics.rates == nil && metrics.detailRequests > 0 ? "Porcentajes desde 20 consultas." : nil) {
+            if metrics.detailRequests > 0 {
+                StackedBar(parts: [
+                    BarPart(label: "Vigente", value: metrics.activeShown, color: Palette.green),
+                    BarPart(label: "Por vencer", value: metrics.expiringShown, color: Palette.yellow),
+                    BarPart(label: "No disponible", value: unavailable, color: Palette.coral),
+                ])
             }
         }
     }
     // la respuesta en una frase, con porcentajes solo si el server los mando
-    private var summary: String {
+    private var answer: String {
         let menus = metrics.distinctMenus.map { " de \($0) menús" } ?? ""
-        guard let rates = metrics.rates else {
-            return "\(metrics.detailRequests) consultas\(menus): \(metrics.activeShown) vigentes, \(metrics.expiringShown) por vencer, \(unavailable) no disponibles."
-        }
+        guard let rates = metrics.rates else { return "\(metrics.detailRequests) consultas\(menus)." }
         return "\(metrics.detailRequests) consultas\(menus): \(percent(rates.active)) vigente, \(percent(rates.expiring)) por vencer, \(percent(rates.unavailable)) no disponible."
     }
-    private func percent(_ share: Double) -> String { "\(Int((share * 100).rounded())) %" }
 }
 
-/// barra apilada vigente / por vencer / no disponible sobre el total de consultas
-private struct ValidityBar: View {
-    let active: Int
-    let expiring: Int
-    let unavailable: Int
+/// BQ-08 (Kevin): si mostrar la fila cambia cuantas selecciones terminan en queja o en cambiar de local
+private struct BQ08Section: View {
+    let metrics: BQ08Metrics
     var body: some View {
-        let total = CGFloat(max(active + expiring + unavailable, 1))
-        GeometryReader { proxy in
-            HStack(spacing: 0) {
-                Palette.green.frame(width: proxy.size.width * CGFloat(active) / total)
-                Palette.yellow.frame(width: proxy.size.width * CGFloat(expiring) / total)
-                Palette.coral.frame(width: proxy.size.width * CGFloat(unavailable) / total)
-            }
+        QuestionCard(title: "BQ-08 · ¿Ayuda mostrar la fila?", answer: answer,
+                     note: "Selecciones con \(metrics.followUpMinutes) min de seguimiento completo. Una diferencia no prueba causalidad.") {
+            BarList(parts: [
+                BarPart(label: "Sin indicador", value: metrics.groups.control.completeSelections, color: Palette.cyan),
+                BarPart(label: "Con indicador", value: metrics.groups.treatment.completeSelections, color: Palette.green),
+            ])
         }
-        .frame(height: 14)
-        .clipShape(Capsule())
-        .accessibilityElement()
-        .accessibilityLabel("\(active) vigentes, \(expiring) por vencer, \(unavailable) no disponibles")
+    }
+    // tasa de queja o cambio por grupo, o por que todavia no hay
+    private var answer: String {
+        guard let difference = metrics.rateDifference,
+              let without = metrics.groups.control.outcomeRate, let with = metrics.groups.treatment.outcomeRate else {
+            return "Muestra insuficiente: se necesitan \(metrics.minimumSampleSize) selecciones completas por grupo."
+        }
+        return "Queja o cambio de local: \(percent(without)) sin indicador vs \(percent(with)) con indicador (\(String(format: "%+.1f", difference * 100)) pts)."
     }
 }
 
+/// actividad de los menus del restaurante: que hacen los estudiantes despues de ver un menu, como embudo
 private struct EngagementSection: View {
     let summary: PerformanceSummary
     var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            Text("Actividad de menús").font(.title3.bold())
-            Text("Todas las métricas corresponden a los últimos \(summary.periodDays) días.")
-                .font(.caption).foregroundStyle(.secondary)
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 9) {
-                MetricTile(number: "\(summary.detailOpens)", title: "Aperturas", detail: "Detalle abierto", color: Palette.cyan)
-                MetricTile(number: "\(summary.savedMenus)", title: "Guardados", detail: "Personas que guardaron una versión", color: Palette.yellow)
-                MetricTile(number: "\(summary.locationOpens)", title: "Indicaciones", detail: "Aperturas de ruta desde el detalle", color: Palette.green)
-                MetricTile(number: "\(summary.reports)", title: "Reportes", detail: "Disponibilidad, precio, fila o ubicación", color: Palette.coral)
-                MetricTile(number: "\(summary.impressions)", title: "Impresiones", detail: "Tarjetas vistas por sesión y versión", color: Palette.yellow)
-                MetricTile(number: "\(summary.selections)", title: "Selecciones", detail: "Elecciones explícitas, no compras", color: Palette.green)
-                MetricTile(number: "\(summary.reportedArrivals)", title: "Llegadas", detail: "Autorreportadas, no verificadas", color: Palette.coral)
-            }
-            SurfaceCard {
-                VStack(alignment: .leading, spacing: 6) {
-                    if let count = summary.sampleSize { Text("Muestra: \(count) sesiones con interacción.") }
-                    if let rates = summary.rates {
-                        Text("Aperturas por impresión: \(Int((rates.detailOpenRate * 100).rounded())) %")
-                        Text("Selecciones por impresión: \(Int((rates.selectionRate * 100).rounded())) %")
-                    } else if summary.insufficientData == true {
-                        Text("Muestra insuficiente para mostrar tasas fiables.")
-                    }
-                    Text("Guardados cuenta personas que tocaron Guardar durante el período, aunque luego quiten el menú de su lista.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
+        QuestionCard(title: "Actividad · ¿Qué hacen después de ver un menú?", answer: answer,
+                     note: "Guardados \(summary.savedMenus) · indicaciones \(summary.locationOpens) · reportes \(summary.reports). Llegadas autorreportadas, no compras.") {
+            BarList(parts: [
+                BarPart(label: "Vieron", value: summary.impressions, color: Palette.yellow),
+                BarPart(label: "Abrieron", value: summary.detailOpens, color: Palette.cyan),
+                BarPart(label: "Eligieron", value: summary.selections, color: Palette.green),
+                BarPart(label: "Llegaron", value: summary.reportedArrivals, color: Palette.coral),
+            ])
         }
     }
-}
-
-private struct MetricTile: View {
-    let number: String
-    let title: String
-    let detail: String
-    let color: Color
-    var body: some View {
-        SurfaceCard {
-            VStack(alignment: .leading, spacing: 5) {
-                Text(number).font(.rounded(28, .black))
-                Text(title).font(.headline)
-                Text(detail).font(.caption).foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .background(color, in: RoundedRectangle(cornerRadius: 16))
+    private var answer: String {
+        let sample = summary.sampleSize.map { " en \($0) sesiones" } ?? ""
+        guard let rates = summary.rates else { return "\(summary.impressions) tarjetas vistas\(sample). Muestra insuficiente para porcentajes." }
+        return "\(summary.impressions) tarjetas vistas\(sample): \(percent(rates.detailOpenRate)) abren el detalle y \(percent(rates.selectionRate)) eligen."
     }
 }

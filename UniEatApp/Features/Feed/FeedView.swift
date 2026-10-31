@@ -18,20 +18,14 @@ struct FeedContent: View {
         TimelineView(.periodic(from: .now, by: 60)) { timeline in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 16) {
-                    BrandHeader(title: "UniEat · Hoy")
+                    BrandHeader(title: "UniEat · Hoy", showsProfileButton: true)
                     header(date: timeline.date)
-                    // al abrir se muestra la copia mientras llega el server, eso no es estar sin conexion
-                    // el aviso sale solo si no hay red o si la carga ya termino y no se pudo actualizar
-                    // y solo si hay una copia descargada, si no hay ninguna se dice que no hay copia todavia
-                    if (store.isOffline || (store.isShowingCachedFeed && !store.isLoading)) && store.hasSnapshot {
-                        NavigationLink(destination: OfflineFeedView()) {
-                            OfflineNotice(fetchedAt: store.fetchedAt)
-                        }
-                        .buttonStyle(.plain)
-                    } else if store.isOffline && !store.hasSnapshot {
+                    // sin red y sin copia se dice que no hay nada descargado
+                    // con red, mientras llega el server, se avisa que se esta actualizando la copia
+                    if store.isOffline && !store.hasSnapshot {
                         Text("Sin conexión. Descarga los menús cuando vuelva la red para tener una copia disponible.")
                             .font(.footnote)
-                    } else if store.isShowingCachedFeed {
+                    } else if store.isShowingCachedFeed && store.isLoading {
                         HStack(spacing: 8) {
                             ProgressView()
                             Text("Actualizando menús…").font(.footnote.weight(.semibold))

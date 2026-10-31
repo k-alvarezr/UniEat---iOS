@@ -15,7 +15,7 @@ struct PublishView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 15) {
-                BrandHeader(title: "UniEat · Publicar")
+                BrandHeader(title: "UniEat · Publicar", showsProfileButton: true)
                 Text(model.editingMenu == nil ? "Publicar menú del día" : "Editar menú del día").font(.rounded(27))
                 Text("Completa los campos estructurados para que estudiantes puedan comparar y filtrar tu oferta.")
                     .font(.subheadline).foregroundStyle(.secondary)

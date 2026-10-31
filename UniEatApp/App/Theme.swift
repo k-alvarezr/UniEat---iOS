@@ -47,8 +47,8 @@ struct BrandHeader: View {
     @EnvironmentObject private var store: AppContainer
     let title: String
     var subtitle = "Uniandes · En campus"
-    // en perfil y en las hojas (como reportar) no tiene sentido el boton de perfil
-    var showsProfileButton = true
+    // el boton de perfil solo va en las pestañas principales, en detalle, hojas o pantallas internas no
+    var showsProfileButton = false
 
     var body: some View {
         HStack(spacing: 9) {
