@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import SwiftUI
 import UniEatCore
 
 /// borrador de un plato del formulario
@@ -69,6 +70,21 @@ final class PublishViewModel: FeatureViewModel {
     @Published var validUntil = Date.now.addingTimeInterval(4 * 60 * 60)
     @Published var paymentMethods: Set<String> = ["Nequi", "Efectivo"]
     @Published var dishes = [DishDraft()]
+    /// enlace a un plato buscandolo por id, si ya se borro lee un plato vacio y no escribe nada
+    /// con el enlace por posicion la tarjeta del plato borrado se redibuja una vez mas y la app se cerraba
+    func binding(for id: UUID) -> Binding<DishDraft> {
+        Binding(
+            get: { [weak self] in self?.dishes.first { $0.id == id } ?? DishDraft() },
+            set: { [weak self] value in
+                guard let self, let index = self.dishes.firstIndex(where: { $0.id == id }) else { return }
+                self.dishes[index] = value
+            })
+    }
+    /// quita un plato, siempre queda al menos uno en el formulario
+    func removeDish(_ id: UUID) {
+        guard dishes.count > 1 else { return }
+        dishes.removeAll { $0.id == id }
+    }
     // menu que se esta editando, nil si es uno nuevo
     @Published var editingMenu: DailyMenu?
     @Published var message: String?
