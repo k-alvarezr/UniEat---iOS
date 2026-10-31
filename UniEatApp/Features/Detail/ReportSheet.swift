@@ -28,14 +28,13 @@ private struct ReportScreen: View {
         (.price, "Precio distinto al publicado", "tag"),
         (.location, "Ubicación difícil de encontrar", "mappin.slash"),
         (.longLine, "La fila fue demasiado larga", "person.3"),
-        (.accurate, "El menú sigue correcto", "checkmark.seal"),
     ]
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 13) {
-                    BrandHeader(title: "Reportar un cambio", showsProfileButton: false)
+                    BrandHeader(title: "Reportar un cambio")
                     Text("\(menu.establishmentName) · versión \(menu.version) del menú").font(.subheadline)
                     if let confirmationMessage = model.confirmationMessage {
                         SurfaceCard {

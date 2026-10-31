@@ -32,6 +32,7 @@ public extension DailyMenu {
             longitude: longitude, photoUrl: photoUrl, paymentMethods: paymentMethods, isVerified: isVerified,
             items: items ?? self.items, lowestPriceCop: lowestPriceCop, waitMinutes: waitMinutes,
             waitSampleCount: waitSampleCount, waitNewestReportAt: waitNewestReportAt,
+            waitHistoricalMinutes: waitHistoricalMinutes, waitHistoricalSampleCount: waitHistoricalSampleCount,
             pendingReports: pendingReports, explanation: explanation ?? self.explanation)
     }
 }

@@ -15,7 +15,7 @@ struct RecommendationView: View {
     private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                BrandHeader(title: "UniEat · Elige por mí")
+                BrandHeader(title: "UniEat · Elige por mí", showsProfileButton: true)
                 Sticker(text: "MODO RÁPIDO", color: Palette.yellow, icon: "sparkles")
                 Text("Elige por mí ⚡").font(.rounded(28, .black))
                 Text("Las opciones se ordenan según tus filtros y la información disponible.")

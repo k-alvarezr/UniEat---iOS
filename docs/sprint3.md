@@ -10,7 +10,7 @@ Se conservan sus modelos de reportes, archivos de detalle/borrador y estrategias
 | Integrante | Issues | Entrega |
 |---|---|---|
 | Kevin | #30, #32, #34, #36, #38 | BQ-08; miniaturas concurrentes; guardados y feed en SwiftData; Hoy/Filtros/Guardados/Elige por mí offline; Kingfisher y NSCache |
-| Juan | #29, #31, #35, #37, #43 | Claridad BQ-04; concurrencia propia; detalle/reportar/publicar offline; caché de detalle/panel; nueva BQ-07 |
+| Juan | #29, #31, #35, #37, #43 | Claridad BQ-04; concurrencia propia; detalle/reportar/publicar offline; caché de detalle/panel; BQ-07 (fila habitual por local) |
 | Ambos | #39, #44 | Wiki, evidencias reales, prueba en iPhone, video ético y entrega |
 
 La implementación de Kevin [iOS #45](https://github.com/k-alvarezr/UniEat---iOS/pull/45) está integrada,
@@ -46,9 +46,10 @@ las quejas son autorreportadas. Participación voluntaria, repeticiones del mism
 no observadas y cambio entre variantes en distintas sesiones limitan una conclusión causal. No hay resultados
 reales hasta ejecutar el piloto; las fixtures de pruebas no se insertan en producción.
 
-La infraestructura reserva una clave independiente para BQ-07. Juan debe implementar su intervención y una
-evaluación posterior común a ambos grupos: comparar solo confirmaciones sería favorecer el grupo que puede
-confirmar. Sus métricas y su endpoint siguen pendientes en las issues iOS #43 y backend #15.
+BQ-07 de Juan (tipo 2): ¿qué tiempo de espera puede mostrar UniEat para el local elegido en este momento, con
+reportes recientes, reportes históricos comparables, su antigüedad y cantidad? El server usa la mediana de los
+últimos 30 min (mínimo 3 estudiantes) o, si no alcanza, lo habitual del mismo local, día y hora en 4 semanas;
+el detalle muestra "Normalmente ~X min a esta hora" y el tablero web lista la estimación por local.
 
 ## Concurrencia y persistencia de Kevin
 

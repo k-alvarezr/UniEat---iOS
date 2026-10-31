@@ -196,4 +196,20 @@ final class Sprint3Tests: XCTestCase {
         XCTAssertEqual(current.distinctMenus, 12)
         XCTAssertEqual(current.rates?.active, 0.75)
     }
+
+    // BQ-07: la fila habitual llega como dos campos opcionales y una copia vieja sin ellos se sigue leyendo
+    func testWaitHistoryIsOptionalAndSurvivesTheMenuCopy() throws {
+        let menu = DailyMenu(title: "Almuerzo", validUntil: .now.addingTimeInterval(3600), establishmentName: "Test",
+                             area: "Centro", address: "Calle", items: [MenuDish(name: "Plato", priceCop: 10000)], lowestPriceCop: 10000,
+                             waitHistoricalMinutes: 15, waitHistoricalSampleCount: 8)
+        let data = try UniEatDates.encoder().encode(menu)
+        let decoded = try UniEatDates.decoder().decode(DailyMenu.self, from: data)
+        XCTAssertEqual(decoded.waitHistoricalMinutes, 15)
+        XCTAssertEqual(decoded.replacing(explanation: "otra").waitHistoricalSampleCount, 8)
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        json.removeValue(forKey: "waitHistoricalMinutes")
+        json.removeValue(forKey: "waitHistoricalSampleCount")
+        let old = try UniEatDates.decoder().decode(DailyMenu.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertNil(old.waitHistoricalMinutes)
+    }
 }

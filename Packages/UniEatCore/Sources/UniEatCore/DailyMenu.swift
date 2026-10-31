@@ -23,6 +23,9 @@ public struct DailyMenu: Codable, Hashable, Identifiable, Sendable {
     public let waitMinutes: Int?
     public let waitSampleCount: Int
     public let waitNewestReportAt: Date?
+    // BQ-07: lo habitual del local a esta hora, el server lo manda solo si no hay 3 reportes recientes
+    public let waitHistoricalMinutes: Int?
+    public let waitHistoricalSampleCount: Int?
     public let pendingReports: Int
     /// por que el server puso este menu en ese lugar del feed
     public let explanation: String
@@ -33,6 +36,7 @@ public struct DailyMenu: Codable, Hashable, Identifiable, Sendable {
                 latitude: Double? = nil, longitude: Double? = nil, photoUrl: String? = nil,
                 paymentMethods: [String] = [], isVerified: Bool = false, items: [MenuDish], lowestPriceCop: Int,
                 waitMinutes: Int? = nil, waitSampleCount: Int = 0, waitNewestReportAt: Date? = nil,
+                waitHistoricalMinutes: Int? = nil, waitHistoricalSampleCount: Int? = nil,
                 pendingReports: Int = 0, explanation: String = "Menú vigente") {
         self.id = id
         self.title = title
@@ -55,6 +59,8 @@ public struct DailyMenu: Codable, Hashable, Identifiable, Sendable {
         self.waitMinutes = waitMinutes
         self.waitSampleCount = waitSampleCount
         self.waitNewestReportAt = waitNewestReportAt
+        self.waitHistoricalMinutes = waitHistoricalMinutes
+        self.waitHistoricalSampleCount = waitHistoricalSampleCount
         self.pendingReports = pendingReports
         self.explanation = explanation
     }
