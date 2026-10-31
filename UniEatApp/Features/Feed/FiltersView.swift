@@ -60,9 +60,9 @@ struct FiltersView: View {
                 SurfaceCard {
                     VStack(alignment: .leading, spacing: 10) {
                         sectionTitle("Zona del campus", icon: "mappin")
-                        Picker("Zona", selection: Binding(get: { model.draft.area ?? "Centro" },
-                                                       set: { model.draft.area = $0; model.locationMessage = nil })) {
-                            ForEach(areas, id: \.self) { Text($0).tag($0) }
+                        Picker("Zona", selection: Binding(get: { model.draft.area ?? "Todas" },
+                                                       set: { model.draft.area = $0 == "Todas" ? nil : $0; model.locationMessage = nil })) {
+                            ForEach(["Todas"] + areas, id: \.self) { Text($0).tag($0) }
                         }
                         .pickerStyle(.menu)
                         Button {
