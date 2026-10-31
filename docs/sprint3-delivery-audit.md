@@ -35,8 +35,8 @@ de reportes conserva SwiftData y reintentos. Las correcciones conjuntas de sesi�
 como tales y no convierten esas estrategias originales en trabajo exclusivamente de Kevin.
 
 Permanecen a cargo de Juan los issues #29 (claridad BQ-04), #37 (NSCache de detalle y LRU del panel),
-BQ-07 nueva (fila habitual por local), #59 (revisión/regresiones) y #60 (Instruments). La BQ-04 de Sprint 2
-no reemplaza su BQ nueva. La BQ-07 final no usa la infraestructura de experimentos de BQ-08. El trabajo de iOS no acredita el del equipo Android.
+BQ-12 nueva (búsquedas por filtros), #59 (revisión/regresiones) y #60 (Instruments). La BQ-04 de Sprint 2
+no reemplaza su BQ nueva. La fila habitual por local es una mejora de la BQ-06, no la BQ nueva. El trabajo de iOS no acredita el del equipo Android.
 
 ## Inventario y conectividad de toda la app
 

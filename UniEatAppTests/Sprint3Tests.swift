@@ -197,7 +197,7 @@ final class Sprint3Tests: XCTestCase {
         XCTAssertEqual(current.rates?.active, 0.75)
     }
 
-    // BQ-07: la fila habitual llega como dos campos opcionales y una copia vieja sin ellos se sigue leyendo
+    // la fila habitual llega como dos campos opcionales y una copia vieja sin ellos se sigue leyendo
     func testWaitHistoryIsOptionalAndSurvivesTheMenuCopy() throws {
         let menu = DailyMenu(title: "Almuerzo", validUntil: .now.addingTimeInterval(3600), establishmentName: "Test",
                              area: "Centro", address: "Calle", items: [MenuDish(name: "Plato", priceCop: 10000)], lowestPriceCop: 10000,

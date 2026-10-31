@@ -173,7 +173,7 @@ private struct MenuDetailScreen: View {
                         Text("Último reporte: \(SpanishPresentation.time(updated))").font(.caption)
                     }
                 } else if let usual = menu.waitHistoricalMinutes {
-                    // BQ-07: sin 3 reportes recientes el server manda lo habitual del local a esta hora
+                    // sin 3 reportes recientes el server manda lo habitual del local a esta hora
                     Text("Normalmente ~\(usual) min a esta hora").font(.rounded(26, .black))
                     Text("Según \(menu.waitHistoricalSampleCount ?? 0) reportes de semanas anteriores. Hoy aún no hay suficientes reportes recientes.")
                         .font(.caption).foregroundStyle(.secondary)
