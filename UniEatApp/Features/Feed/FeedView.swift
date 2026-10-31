@@ -201,6 +201,9 @@ struct FoodArtwork: View {
         }
         .frame(maxWidth: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: 11))
+        // clipShape solo recorta lo que se ve, la foto con scaledToFill seguia recibiendo toques por fuera del cuadro
+        // y tapaba el boton de filtros de arriba, contentShape deja la zona tactil del tamaño del cuadro
+        .contentShape(RoundedRectangle(cornerRadius: 11))
         .accessibilityLabel(photo == nil ? "Ilustración de \(name)" : "Foto de \(name)")
     }
 
