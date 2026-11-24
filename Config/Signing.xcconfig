@@ -1,0 +1,4 @@
+// firma del target de la app, xcodegen lo conecta desde project.yml
+// el equipo de cada quien va en Signing.local.xcconfig (no se sube a git), asi regenerar el proyecto no lo borra
+// si no existe el archivo local, el include? no falla y Xcode pide elegir el equipo a mano
+#include? "Signing.local.xcconfig"

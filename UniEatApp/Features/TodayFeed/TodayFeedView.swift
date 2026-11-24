@@ -2,7 +2,7 @@ import SwiftUI
 import Kingfisher
 import UniEatCore
 
-struct FeedView: View {
+struct TodayFeedView: View {
     var body: some View {
         NavigationStack { FeedContent(hidesNavigationBar: true) }
     }
@@ -10,7 +10,7 @@ struct FeedView: View {
 
 /// pestaña hoy BQ-03, menus vigentes en el orden del server con su motivo
 struct FeedContent: View {
-    @EnvironmentObject private var store: FeedViewModel
+    @EnvironmentObject private var store: TodayFeedViewModel
     var hidesNavigationBar = false
 
     var body: some View {
@@ -88,7 +88,7 @@ struct FeedContent: View {
     }
 
     private var recommendationShortcut: some View {
-        NavigationLink(destination: RecommendationView()) {
+        NavigationLink(destination: PickForMeView()) {
             HStack {
                 Image(systemName: "sparkles")
                 VStack(alignment: .leading, spacing: 2) {

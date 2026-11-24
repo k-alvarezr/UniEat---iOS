@@ -72,7 +72,7 @@ private struct MenuDetailScreen: View {
             .navigationBarTitleDisplayMode(.inline)
             // al cerrar la hoja se recarga para ver el reporte que se acabo de mandar
             .sheet(isPresented: $showingReport, onDismiss: { Task { await load(automatic: true) } }) {
-                ReportSheet(menu: menu)
+                SubmitReportSheet(menu: menu)
             }
             .onAppear {
                 store.track("detail_open", menu: initialMenu)
@@ -294,10 +294,13 @@ private struct MenuDetailScreen: View {
                     WaitTimeCard(menu: menu) { await load(automatic: true) }
                 }
             }
-            SolidButton(title: "Reportar un cambio", icon: "exclamationmark.bubble", color: Palette.coral) {
-                Task { await openReport() }
+            // restaurantes y admins no reportan, el boton no se muestra
+            if store.canSubmitReports {
+                SolidButton(title: "Reportar un cambio", icon: "exclamationmark.bubble", color: Palette.coral) {
+                    Task { await openReport() }
+                }
+                .disabled(isLoading)
             }
-            .disabled(isLoading)
         } else {
             Text(isGone ? (loadError?.message ?? "Esta publicación ya no está disponible.")
                         : "Esta publicación venció. Vuelve a la lista de menús para ver opciones vigentes.")

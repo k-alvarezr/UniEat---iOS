@@ -79,7 +79,7 @@ final class FeedOptimizationTests: XCTestCase {
         let events = EventService(api: h.api, session: h.session, connectivity: h.connectivity, clock: h.clock)
         var metadata: ExperimentEventMetadata?
         events.metadataProvider = { _ in metadata }
-        let feed = FeedViewModel(api: api, session: h.session, connectivity: h.connectivity,
+        let feed = TodayFeedViewModel(api: api, session: h.session, connectivity: h.connectivity,
             clock: h.clock, events: events, content: content)
         h.connectivity.update(isConnected: false)
         await feed.refresh()
@@ -114,9 +114,9 @@ final class FeedOptimizationTests: XCTestCase {
         XCTAssertTrue(api.queries.isEmpty)
     }
 
-    private func makeFeed(_ h: Harness, api: FeedOptimizationAPI, content: LocalContentService) -> FeedViewModel {
+    private func makeFeed(_ h: Harness, api: FeedOptimizationAPI, content: LocalContentService) -> TodayFeedViewModel {
         let events = EventService(api: h.api, session: h.session, connectivity: h.connectivity, clock: h.clock)
-        return FeedViewModel(api: api, session: h.session, connectivity: h.connectivity, clock: h.clock,
+        return TodayFeedViewModel(api: api, session: h.session, connectivity: h.connectivity, clock: h.clock,
             events: events, content: content)
     }
     private func seedCatalog(_ content: LocalContentService, h: Harness, menus: [DailyMenu]) async throws {

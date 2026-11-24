@@ -19,7 +19,7 @@ struct FeedExposureKey: Hashable {
 /// hoy, filtros y recomendacion usan este mismo resultado, memoria (30 s), copias
 /// en swiftdata y catalogo sirven para cosas distintas, refrescar no los vuelve a leer todos
 @MainActor
-final class FeedViewModel: FeatureViewModel {
+final class TodayFeedViewModel: FeatureViewModel {
     @Published private(set) var menus: [DailyMenu] = []
     @Published private(set) var locationMenus: [DailyMenu] = []
     @Published private(set) var filters = FeedFilters()

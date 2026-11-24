@@ -4,7 +4,7 @@ import SwiftUI
 import UniEatCore
 
 /// borrador de un plato del formulario
-/// sale de PublishView aca, ya no es private
+/// sale de PublishMenuView aca, ya no es private
 struct DishDraft: Identifiable {
     let id = UUID()
     var name = ""
@@ -36,7 +36,7 @@ struct DishDraft: Identifiable {
     }
 }
 /// lo que se guarda del formulario en un archivo para no perderlo si se cierra la app o se va la red
-/// se mueve de PublishView aca y ahora es Equatable para comparar si el formulario cambio
+/// se mueve de PublishMenuView aca y ahora es Equatable para comparar si el formulario cambio
 struct PublishDraft: Codable, Sendable, Equatable {
     struct Dish: Codable, Sendable, Equatable {
         var name: String
@@ -57,10 +57,10 @@ struct PublishDraft: Codable, Sendable, Equatable {
     var dishes: [Dish]
 }
 
-/// todo el estado del formulario de publicar que antes eran @State en PublishView
+/// todo el estado del formulario de publicar que antes eran @State en PublishMenuView
 /// la vista solo dibuja, publicar cerrar y el borrador pasan por PublishService
 @MainActor
-final class PublishViewModel: FeatureViewModel {
+final class PublishMenuViewModel: FeatureViewModel {
     @Published var selectedEstablishmentID: UUID?
     @Published var restaurantName = ""
     @Published var area = "Centro"
@@ -97,14 +97,14 @@ final class PublishViewModel: FeatureViewModel {
     @Published private(set) var isRefreshingOwnMenus = false
     let paymentChoices = ["Nequi", "Daviplata", "Efectivo", "Tarjeta"]
     private let service: PublishService
-    private let feed: FeedViewModel
+    private let feed: TodayFeedViewModel
     private let session: SessionStore
     private let connectivity: ConnectivityService
     private var draftTask: Task<Void, Never>?
     private var draftRequest = UUID()
     private let draftSaveDelay: Duration
     let clock: ServerClock
-    init(service: PublishService, feed: FeedViewModel, session: SessionStore,
+    init(service: PublishService, feed: TodayFeedViewModel, session: SessionStore,
          connectivity: ConnectivityService, clock: ServerClock, draftSaveDelay: Duration = .milliseconds(400)) {
         self.service = service
         self.feed = feed

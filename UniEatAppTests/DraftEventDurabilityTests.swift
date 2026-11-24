@@ -187,8 +187,8 @@ final class DraftEventDurabilityTests: XCTestCase {
         XCTAssertEqual(model.dishes.count, 1, "siempre queda un plato")
     }
 
-    private func makePublication(_ h: Harness, files: FileStore, delay: Duration = .seconds(60)) -> PublishViewModel {
-        PublishViewModel(service: PublishService(api: h.api, session: h.session, files: files), feed: h.feed,
+    private func makePublication(_ h: Harness, files: FileStore, delay: Duration = .seconds(60)) -> PublishMenuViewModel {
+        PublishMenuViewModel(service: PublishService(api: h.api, session: h.session, files: files), feed: h.feed,
             session: h.session, connectivity: h.connectivity, clock: h.clock, draftSaveDelay: delay)
     }
     private func event(menu: DailyMenu) -> RemoteEvent {

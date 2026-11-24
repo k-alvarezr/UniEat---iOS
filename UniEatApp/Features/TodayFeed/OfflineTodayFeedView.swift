@@ -2,8 +2,8 @@ import SwiftUI
 import UniEatCore
 
 /// sin internet, muestra la ultima copia con su fecha y oculta lo vencido
-struct OfflineFeedView: View {
-    @EnvironmentObject private var store: FeedViewModel
+struct OfflineTodayFeedView: View {
+    @EnvironmentObject private var store: TodayFeedViewModel
     @State private var retryMessage: String?
 
     var body: some View {

@@ -10,15 +10,15 @@ struct MainTabsView: View {
     var body: some View {
         // selection deja cambiar de pestaña desde afuera, por ejemplo el boton de perfil de la cabecera
         TabView(selection: $store.selectedTab) {
-            FeedView()
+            TodayFeedView()
                 .tabItem { Label("Hoy", systemImage: "fork.knife") }
                 .tag(AppTab.today)
             if session.isRestaurant {
-                PublishView()
+                PublishMenuView()
                     .tabItem { Label("Publicar", systemImage: "plus.circle.fill") }
                     .tag(AppTab.second)
             } else {
-                NavigationStack { RecommendationView() }
+                NavigationStack { PickForMeView() }
                     .tabItem { Label("Elige por mí", systemImage: "sparkles") }
                     .tag(AppTab.second)
             }

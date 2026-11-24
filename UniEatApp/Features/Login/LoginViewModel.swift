@@ -2,10 +2,10 @@ import Combine
 import Foundation
 import UniEatCore
 
-/// estado del login y registro que antes vivia en AuthView con @State
+/// estado del login y registro que antes vivia en LoginView con @State
 /// la pantalla solo dibuja y llama submit, la sesion la maneja SessionStore
 @MainActor
-final class AuthViewModel: FeatureViewModel {
+final class LoginViewModel: FeatureViewModel {
     @Published var email = ""
     @Published var password = ""
     @Published var displayName = ""

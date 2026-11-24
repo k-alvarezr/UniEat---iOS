@@ -2,10 +2,10 @@ import Combine
 import Foundation
 import UniEatCore
 
-/// estado de la hoja de reportar que antes estaba en ReportSheet
+/// estado de la hoja de reportar que antes estaba en SubmitReportSheet
 /// se crea uno cada vez que se abre la hoja (AppContainer.makeReport) y manda por ReportFacade
 @MainActor
-final class ReportViewModel: ObservableObject {
+final class SubmitReportViewModel: ObservableObject {
     @Published var kind: ReportKind
     @Published var note = ""
     // minutos de fila, solo se mandan si el tipo es fila larga

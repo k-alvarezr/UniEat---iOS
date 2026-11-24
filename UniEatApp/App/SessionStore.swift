@@ -30,6 +30,8 @@ final class SessionStore: ObservableObject {
     }
     var isRestaurant: Bool { profile?.role == "restaurant" }
     var isAdmin: Bool { profile?.role == "admin" }
+    /// solo estudiantes reportan, el server rechaza a restaurantes y admins
+    var canSubmitReports: Bool { profile != nil && !isAdmin && !isRestaurant }
     /// solo los locales que un admin ya aprobo, con esos se puede publicar
     var approvedEstablishments: [RemoteEstablishment] { establishments.filter(\.approved) }
     /// true si sigue siendo el mismo usuario y la misma sesion con la que arranco una tarea

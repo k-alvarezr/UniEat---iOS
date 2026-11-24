@@ -4,7 +4,7 @@ import UniEatCore
 /// atajo de admin a todas las pantallas, las que necesitan un menu usan uno real del feed
 /// asi que solo salen si hay alguno publicado
 struct ScreenGalleryView: View {
-    @EnvironmentObject private var store: FeedViewModel
+    @EnvironmentObject private var store: TodayFeedViewModel
     @State private var reportMenu: DailyMenu?
 
     private var exampleMenu: DailyMenu? {
@@ -22,9 +22,9 @@ struct ScreenGalleryView: View {
 
                 row("01", "Hoy · Menús", icon: "fork.knife") { FeedContent() }
                 row("02", "Filtros", icon: "slider.horizontal.3") { FiltersView() }
-                row("03", "Elige por mí", icon: "sparkles") { RecommendationView() }
-                row("04", "Publicar menú", icon: "plus.circle") { PublishView() }
-                row("05", "Sin conexión", icon: "wifi.slash") { OfflineFeedView() }
+                row("03", "Elige por mí", icon: "sparkles") { PickForMeView() }
+                row("04", "Publicar menú", icon: "plus.circle") { PublishMenuView() }
+                row("05", "Sin conexión", icon: "wifi.slash") { OfflineTodayFeedView() }
                 row("06", "Rendimiento", icon: "chart.bar") { PerformanceView() }
                 if let menu = exampleMenu {
                     row("07", "Detalle del menú", icon: "doc.text.magnifyingglass") { MenuDetailView(menu: menu) }
@@ -44,7 +44,7 @@ struct ScreenGalleryView: View {
         .navigationTitle("Todas las pantallas")
         .connectionStatus(.gallery)
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(item: $reportMenu) { menu in ReportSheet(menu: menu) }
+        .sheet(item: $reportMenu) { menu in SubmitReportSheet(menu: menu) }
     }
 
     private func row<Destination: View>(

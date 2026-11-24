@@ -235,7 +235,7 @@ struct Harness {
     let reports: ReportFacade
     let connectivity: ConnectivityService
     let clock: ServerClock
-    let feed: FeedViewModel
+    let feed: TodayFeedViewModel
     var menu: DailyMenu { makeMenu(title: "Test") }
     static func make() async throws -> Harness {
         let auth = FakeAuth(), api = FakeAPI(userID: auth.profile.id)
@@ -245,7 +245,7 @@ struct Harness {
         let database = try LocalDatabase(inMemory: true)
         let reports = ReportFacade(api: api, outbox: database, session: session, connectivity: connectivity, clock: clock)
         let events = EventService(api: api, session: session, connectivity: connectivity, clock: clock)
-        let feed = FeedViewModel(api: api, session: session, connectivity: connectivity, clock: clock, events: events)
+        let feed = TodayFeedViewModel(api: api, session: session, connectivity: connectivity, clock: clock, events: events)
         return Harness(auth: auth, api: api, session: session, database: database, reports: reports,
                         connectivity: connectivity, clock: clock, feed: feed)
     }

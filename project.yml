@@ -16,6 +16,10 @@ targets:
     platform: iOS
     sources:
       - path: UniEatApp
+    # el equipo de firma sale de Config/Signing.local.xcconfig de cada Mac, ver Config/Signing.xcconfig
+    configFiles:
+      Debug: Config/Signing.xcconfig
+      Release: Config/Signing.xcconfig
     info:
       path: UniEatApp/Info.plist
       properties:

@@ -3,8 +3,8 @@ import UniEatCore
 
 /// elige por mi, muestra la mejor opcion con los filtros y deja pasar a la siguiente
 /// el orden y el motivo vienen del server, aca solo se recorre la lista
-struct RecommendationView: View {
-    @EnvironmentObject private var store: RecommendationViewModel
+struct PickForMeView: View {
+    @EnvironmentObject private var store: PickForMeViewModel
 
     private var options: [DailyMenu] { store.visibleMenus }
 

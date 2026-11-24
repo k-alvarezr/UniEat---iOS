@@ -12,17 +12,18 @@ struct UniEatApp: App {
                 .environmentObject(container)
                 .environmentObject(container.session)
                 .environmentObject(container.connectivity)
-                .environmentObject(container.feed)
+                .environmentObject(container.todayFeed)
                 .environmentObject(container.saved)
-                .environmentObject(container.authentication)
+                .environmentObject(container.login)
                 .environmentObject(container.filters)
-                .environmentObject(container.recommendation)
-                .environmentObject(container.publication)
+                .environmentObject(container.pickForMe)
+                .environmentObject(container.publishMenu)
                 .environmentObject(container.performance)
                 .environmentObject(container.profile)
                 .environmentObject(container.establishments)
                 .environmentObject(container.approvals)
                 .environmentObject(container.roles)
+                .environmentObject(container.reportHistory)
                 .environmentObject(container.pilot)
                 .environment(\.locale, SpanishPresentation.locale)
                 .preferredColorScheme(.light)
@@ -36,7 +37,7 @@ struct RootView: View {
     var body: some View {
         Group {
             if session.profile == nil {
-                AuthView()
+                LoginView()
             } else {
                 MainTabsView()
             }
