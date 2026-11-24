@@ -4,6 +4,7 @@ import UniEatCore
 /// Mis reportes: un restaurante por fila con cuantos reportes hay y cuantos se confirmaron
 struct ReportHistoryView: View {
     @EnvironmentObject private var store: ReportHistoryViewModel
+    @EnvironmentObject private var connectivity: ConnectivityService   // el mismo que usa el aviso de conexion
 
     var body: some View {
         ScrollView {
@@ -26,12 +27,16 @@ struct ReportHistoryView: View {
                 }
                 if let error = store.errorMessage { Text(error).font(.footnote).foregroundStyle(Palette.coral) }
                 if store.isLoading && store.restaurants.isEmpty { ProgressView("Cargando tus reportes…") }
-                if store.filteredRestaurants.isEmpty && !store.isLoading {
-                    ContentUnavailableView(store.restaurants.isEmpty ? "Aún no tienes reportes" : "Nada con este filtro",
-                                           systemImage: "flag",
-                                           description: Text(store.restaurants.isEmpty
-                                               ? "Abre un menú y toca Reportar para avisar de un cambio."
-                                               : "Prueba con otro filtro."))
+                if store.restaurants.isEmpty {
+                    // solo si de verdad no hay nada: con red, sin reportes por enviar y sin un error que impidio cargar
+                    // sin red el aviso de conexion ya explica por que no hay lista
+                    if !store.isLoading && connectivity.isConnected && store.unsentReports.isEmpty && store.errorMessage == nil {
+                        ContentUnavailableView("Aún no tienes reportes", systemImage: "flag",
+                                               description: Text("Abre un menú y toca Reportar un cambio para avisar de algo."))
+                    }
+                } else if store.filteredRestaurants.isEmpty {
+                    ContentUnavailableView("Nada con este filtro", systemImage: "flag",
+                                           description: Text("Prueba con otro filtro."))
                 } else {
                     ForEach(store.filteredRestaurants) { restaurant in
                         NavigationLink(destination: ReportedRestaurantView(restaurant: restaurant)) { row(restaurant) }
@@ -47,7 +52,7 @@ struct ReportHistoryView: View {
         .task { await store.loadRestaurants() }
         .refreshable { await store.loadRestaurants() }
         // al volver la red se actualiza sola, igual que el detalle del menu
-        .onChange(of: store.isConnected) { _, connected in
+        .onChange(of: connectivity.isConnected) { _, connected in
             if connected { Task { await store.loadRestaurants() } }
         }
         // cuando la cola se manda (o entra un reporte nuevo) se relee la seccion Por enviar
