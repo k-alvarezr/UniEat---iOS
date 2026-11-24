@@ -49,11 +49,7 @@ private struct ReportedRestaurantScreen: View {
                 if let minutes = report.observedWaitMinutes { Text("Fila: \(minutes) min").font(.caption) }
                 if !report.note.isEmpty { Text("“\(report.note)”").font(.caption).italic() }
                 HStack {
-                    Text(report.statusTitle)
-                        .font(.caption.weight(.bold))
-                        .padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(report.statusColor, in: Capsule())
-                        .overlay(Capsule().stroke(Palette.ink, lineWidth: 1))
+                    Sticker(text: report.statusTitle, color: report.statusColor)
                     Spacer()
                     Text(SpanishPresentation.dateAndTime(report.observedAt))
                         .font(.caption).foregroundStyle(.secondary)

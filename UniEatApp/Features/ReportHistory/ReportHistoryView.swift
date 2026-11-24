@@ -72,11 +72,7 @@ struct ReportHistoryView: View {
                             .font(.subheadline)
                         if !report.note.isEmpty { Text("“\(report.note)”").font(.caption).italic() }
                         HStack {
-                            Text("Pendiente de enviar")
-                                .font(.caption.weight(.bold))
-                                .padding(.horizontal, 8).padding(.vertical, 3)
-                                .background(Palette.yellow, in: Capsule())
-                                .overlay(Capsule().stroke(Palette.ink, lineWidth: 1))
+                            Sticker(text: "Pendiente de enviar", color: Palette.yellow)
                             Spacer()
                             Text(SpanishPresentation.dateAndTime(report.createdAt))
                                 .font(.caption).foregroundStyle(.secondary)
@@ -110,11 +106,12 @@ struct ReportHistoryView: View {
                 }
                 Text("\(restaurant.area) · último reporte \(SpanishPresentation.dayAndMonth(restaurant.lastReportAt))")
                     .font(.caption).foregroundStyle(.secondary)
+                // las mismas etiquetas (Sticker) que usa el resto de la app
                 HStack(spacing: 6) {
-                    chip("\(restaurant.total) en total", color: Palette.paper)
-                    if restaurant.pending > 0 { chip("\(restaurant.pending) en revisión", color: Palette.yellow) }
-                    if restaurant.confirmed > 0 { chip("\(restaurant.confirmed) confirmados", color: Palette.green) }
-                    if restaurant.dismissed > 0 { chip("\(restaurant.dismissed) descartados", color: Palette.coral) }
+                    Sticker(text: "\(restaurant.total) en total", color: Palette.paper)
+                    if restaurant.pending > 0 { Sticker(text: "\(restaurant.pending) en revisión", color: Palette.yellow) }
+                    if restaurant.confirmed > 0 { Sticker(text: "\(restaurant.confirmed) confirmados", color: Palette.green) }
+                    if restaurant.dismissed > 0 { Sticker(text: "\(restaurant.dismissed) descartados", color: Palette.coral) }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -134,13 +131,5 @@ struct ReportHistoryView: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
-    }
-
-    private func chip(_ text: String, color: Color) -> some View {
-        Text(text)
-            .font(.caption2.weight(.semibold))
-            .padding(.horizontal, 7).padding(.vertical, 3)
-            .background(color, in: Capsule())
-            .overlay(Capsule().stroke(Palette.ink, lineWidth: 1))
     }
 }
