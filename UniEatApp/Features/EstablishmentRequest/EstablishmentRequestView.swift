@@ -3,9 +3,9 @@ import MapKit
 import SwiftUI
 
 /// perfil de estudiante o restaurante, estado de sus locales y pedir uno nuevo con su ubicacion
-struct EstablishmentView: View {
-    // el formulario del local vive en EstablishmentViewModel
-    @EnvironmentObject private var model: EstablishmentViewModel
+struct EstablishmentRequestView: View {
+    // el formulario del local vive en EstablishmentRequestViewModel
+    @EnvironmentObject private var model: EstablishmentRequestViewModel
     // pin del local, sale de la direccion o del gps y el dueño lo confirma en el mapa
     @StateObject private var location = LocationService()
 

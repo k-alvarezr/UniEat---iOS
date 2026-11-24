@@ -4,7 +4,7 @@ import UniEatCore
 /// hoja para reportar algo raro sobre la version del menu que se esta viendo
 /// el reporte nunca cambia el menu oficial
 /// quejarse de la fila es distinto a anotar minutos o confirmar llegada en el detalle
-struct ReportSheet: View {
+struct SubmitReportSheet: View {
     @EnvironmentObject private var app: AppContainer
     let menu: DailyMenu
     var initialKind: ReportKind = .unavailable
@@ -13,12 +13,12 @@ struct ReportSheet: View {
 }
 
 private struct ReportScreen: View {
-    @StateObject private var model: ReportViewModel
+    @StateObject private var model: SubmitReportViewModel
     @Environment(\.dismiss) private var dismiss
     let menu: DailyMenu
 
     // el viewmodel se crea una sola vez, igual que en el detalle
-    init(menu: DailyMenu, model: @autoclosure @escaping () -> ReportViewModel) {
+    init(menu: DailyMenu, model: @autoclosure @escaping () -> SubmitReportViewModel) {
         self.menu = menu
         _model = StateObject(wrappedValue: model())
     }

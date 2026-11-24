@@ -5,11 +5,11 @@ import UniEatCore
 /// estado de elige por mi, usa el mismo feed y filtros de hoy, no pide nada nuevo
 /// conserva el orden del server rank-v1, el primero compatible es la sugerencia
 @MainActor
-final class RecommendationViewModel: FeatureViewModel {
+final class PickForMeViewModel: FeatureViewModel {
     // posicion del menu sugerido en la lista
     @Published private(set) var index = 0
-    private let feed: FeedViewModel
-    init(feed: FeedViewModel) {
+    private let feed: TodayFeedViewModel
+    init(feed: TodayFeedViewModel) {
         self.feed = feed
         super.init()
         observe(feed)

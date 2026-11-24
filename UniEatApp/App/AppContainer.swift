@@ -24,19 +24,21 @@ final class AppContainer: ObservableObject {
     let pilot: WaitIndicatorPilot                 // piloto de la BQ-08, indicador de fila
 
     // viewmodels de cada pantalla, se inyectan en UniEatApp
-    let feed: FeedViewModel
+    let todayFeed: TodayFeedViewModel
     let saved: SavedMenusViewModel
-    let authentication: AuthViewModel
+    let login: LoginViewModel
     let filters: FiltersViewModel
-    let recommendation: RecommendationViewModel
-    let publication: PublishViewModel
+    let pickForMe: PickForMeViewModel
+    let publishMenu: PublishMenuViewModel
     let performance: PerformanceViewModel
     let profile: ProfileViewModel
-    let establishments: EstablishmentViewModel
+    let establishments: EstablishmentRequestViewModel
     let approvals: AdminApprovalsViewModel
     let roles: AdminRolesViewModel
+    let reportHistory: ReportHistoryViewModel          // lista de Mis reportes
     let reports: ReportFacade                  // envio y cola de reportes
     private let events: EventService              // cola de eventos de analitica
+    private let api: APIRequesting                // para crear el viewmodel de cada restaurante en Mis reportes
     private let details: MenuDetailService        // pide y guarda detalles, se usa al crear cada detalle
     private let files: FileStore                  // archivos de detalle y borrador, se borran al cerrar sesion
     private let content: LocalContentService?
@@ -82,7 +84,7 @@ final class AppContainer: ObservableObject {
         let pilot = WaitIndicatorPilot(api: api, session: session, clock: clock)
         self.pilot = pilot
         let saved = SavedMenusViewModel(session: session, events: events, clock: clock, content: content)
-        let feed = FeedViewModel(api: api, session: session, connectivity: connectivity, clock: clock, events: events, content: content)
+        let feed = TodayFeedViewModel(api: api, session: session, connectivity: connectivity, clock: clock, events: events, content: content)
         let reports = ReportFacade(api: api, outbox: database, session: session, connectivity: connectivity, clock: clock)
         let accounts = AccountService(api: api, session: session, connectivity: connectivity)
         self.session = session
@@ -91,19 +93,21 @@ final class AppContainer: ObservableObject {
         self.database = database
         self.events = events
         self.saved = saved
-        self.feed = feed
+        self.todayFeed = feed
         self.reports = reports
         details = MenuDetailService(api: api, session: session, files: files, clock: clock)
-        authentication = AuthViewModel(session: session, connectivity: connectivity)
+        login = LoginViewModel(session: session, connectivity: connectivity)
         filters = FiltersViewModel(feed: feed)
-        recommendation = RecommendationViewModel(feed: feed)
-        publication = PublishViewModel(service: PublishService(api: api, session: session, files: files),
+        pickForMe = PickForMeViewModel(feed: feed)
+        publishMenu = PublishMenuViewModel(service: PublishService(api: api, session: session, files: files),
                                        feed: feed, session: session, connectivity: connectivity, clock: clock)
         performance = PerformanceViewModel(api: api, session: session, events: events, connectivity: connectivity)
         profile = ProfileViewModel(session: session, saved: saved, reports: reports, storageError: storageError, pilot: pilot)
-        establishments = EstablishmentViewModel(service: accounts, session: session)
+        establishments = EstablishmentRequestViewModel(service: accounts, session: session)
         approvals = AdminApprovalsViewModel(service: accounts, session: session)
         roles = AdminRolesViewModel(service: accounts, session: session)
+        reportHistory = ReportHistoryViewModel(api: api, session: session, connectivity: connectivity)
+        self.api = api
 
         // 4. conexiones: que pasa cuando vence la sesion, cambia la cuenta o vuelve la red
         api.onUnauthorized = { [weak session] in session?.signOut(message: "Tu sesión terminó. Inicia sesión de nuevo.") }
@@ -168,15 +172,16 @@ final class AppContainer: ObservableObject {
         pilot.accountChanged()
         saved.accountChanged()
         reports.accountChanged()
-        publication.reset()
+        publishMenu.reset()
         performance.reset()
-        recommendation.reset()
-        authentication.reset()
+        pickForMe.reset()
+        login.reset()
         roles.reset()
         approvals.reset()
         establishments.reset()
-        feed.accountChanged()
-        sendQueuesAndRefresh(refreshFeed: false)   // el feed ya lo pide feed.accountChanged, aca solo las colas
+        reportHistory.reset()
+        todayFeed.accountChanged()
+        sendQueuesAndRefresh(refreshFeed: false)   // el feed ya lo pide todayFeed.accountChanged, aca solo las colas
     }
 
     /// baja las fotos del feed en segundo plano para tenerlas sin red, cancela la descarga anterior
@@ -210,7 +215,7 @@ final class AppContainer: ObservableObject {
         // si falla la base igual se intentan borrar los archivos, y al reves
         do { try await files.removeAll(userId: userID, invalidating: generation) }
         catch { failed = true }
-        UserDefaultsStore.remove(key: FeedViewModel.cacheKey)
+        UserDefaultsStore.remove(key: TodayFeedViewModel.cacheKey)
         UserDefaultsStore.remove(key: EventService.pendingKey(userID))
         UserDefaultsStore.remove(key: EventService.rejectedKey(userID))
         UserDefaultsStore.remove(key: "unieat.report-failures.\(userID.uuidString)")   // motivos de la version anterior de la fachada
@@ -230,9 +235,9 @@ final class AppContainer: ObservableObject {
             guard session.matches(userID, generation: generation), !Task.isCancelled else { return }
             await reports.sendPendingReports()
             guard session.matches(userID, generation: generation), !Task.isCancelled else { return }
-            if refreshFeed { await feed.refresh() }
+            if refreshFeed { await todayFeed.refresh() }
             guard session.matches(userID, generation: generation), !Task.isCancelled else { return }
-            if session.isRestaurant { await publication.refresh() }
+            if session.isRestaurant { await publishMenu.refresh() }
         }
     }
 
@@ -241,11 +246,15 @@ final class AppContainer: ObservableObject {
     func makeDetail(_ menu: DailyMenu, cachedAt: Date? = nil) -> MenuDetailViewModel {
         MenuDetailViewModel(menu: menu, service: details, session: session, events: events,
                              saved: saved, connectivity: connectivity, clock: clock, pilot: pilot,
-                             initialFetchedAt: cachedAt ?? feed.fetchedAt)
+                             initialFetchedAt: cachedAt ?? todayFeed.fetchedAt)
+    }
+    /// viewmodel del detalle de un restaurante en Mis reportes, uno por cada vez que se abre
+    func makeReportHistoryPlace(_ place: ReportHistoryPlace) -> ReportHistoryPlaceViewModel {
+        ReportHistoryPlaceViewModel(place: place, api: api, session: session, connectivity: connectivity)
     }
     /// viewmodel de la hoja de reportar, uno por cada vez que se abre
     /// waitObservation es cuando se reporta la fila desde el piloto de la BQ-08
-    func makeReport(_ menu: DailyMenu, kind: ReportKind, waitObservation: Bool = false) -> ReportViewModel {
-        ReportViewModel(menu: menu, kind: kind, reports: reports, waitObservation: waitObservation)
+    func makeReport(_ menu: DailyMenu, kind: ReportKind, waitObservation: Bool = false) -> SubmitReportViewModel {
+        SubmitReportViewModel(menu: menu, kind: kind, reports: reports, waitObservation: waitObservation)
     }
 }

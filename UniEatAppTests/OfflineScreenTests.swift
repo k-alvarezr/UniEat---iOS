@@ -108,7 +108,7 @@ final class OfflineScreenTests: XCTestCase {
         let session = SessionStore(auth: auth, api: api)
         let network = ConnectivityService(monitorNetwork: false)
         network.update(isConnected: false)
-        let model = AuthViewModel(session: session, connectivity: network)
+        let model = LoginViewModel(session: session, connectivity: network)
         model.email = "fixture@example.invalid"
         model.password = "fixture-password"
         await model.submit()
@@ -134,8 +134,8 @@ final class OfflineScreenTests: XCTestCase {
         let h = try await roleHarness(role: "restaurant"), clock = ServerClock()
         let files = FileStore()
         let events = EventService(api: h.api, session: h.session, connectivity: h.network, clock: clock)
-        let feed = FeedViewModel(api: h.api, session: h.session, connectivity: h.network, clock: clock, events: events)
-        let model = PublishViewModel(service: PublishService(api: h.api, session: h.session, files: files),
+        let feed = TodayFeedViewModel(api: h.api, session: h.session, connectivity: h.network, clock: clock, events: events)
+        let model = PublishMenuViewModel(service: PublishService(api: h.api, session: h.session, files: files),
             feed: feed, session: h.session, connectivity: h.network, clock: clock)
         h.network.update(isConnected: false)
         h.api.paths = []

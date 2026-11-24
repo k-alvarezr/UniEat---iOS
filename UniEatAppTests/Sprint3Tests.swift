@@ -88,7 +88,7 @@ final class Sprint3Tests: XCTestCase {
         h.connectivity.update(isConnected: false)
         h.api.feed = { XCTFail("Offline catalog must not call the network"); return Data() }
         let events = EventService(api: h.api, session: h.session, connectivity: h.connectivity, clock: h.clock)
-        let feed = FeedViewModel(api: h.api, session: h.session, connectivity: h.connectivity, clock: h.clock, events: events, content: content)
+        let feed = TodayFeedViewModel(api: h.api, session: h.session, connectivity: h.connectivity, clock: h.clock, events: events, content: content)
         await feed.refresh()
         XCTAssertEqual(feed.visibleMenus.map(\.id), [cheap.id])
         XCTAssertEqual(feed.locationMenus.count, 2)
@@ -99,9 +99,9 @@ final class Sprint3Tests: XCTestCase {
 
     func testExplicitComplaintAndNumericWaitAreDifferentReportSignals() async throws {
         let h = try await Harness.make()
-        let complaint = ReportViewModel(menu: h.menu, kind: .longLine, reports: h.reports)
+        let complaint = SubmitReportViewModel(menu: h.menu, kind: .longLine, reports: h.reports)
         await complaint.send()
-        let observation = ReportViewModel(menu: h.menu, kind: .longLine, reports: h.reports, waitObservation: true)
+        let observation = SubmitReportViewModel(menu: h.menu, kind: .longLine, reports: h.reports, waitObservation: true)
         observation.minutes = 5; await observation.send()
         let first = try JSONSerialization.jsonObject(with: h.api.reportBodies[0]) as! [String: Any]
         let second = try JSONSerialization.jsonObject(with: h.api.reportBodies[1]) as! [String: Any]
@@ -113,7 +113,7 @@ final class Sprint3Tests: XCTestCase {
         let h = try await Harness.make()
         h.api.feed = { try feedData(menu: h.menu) }
         await h.feed.refresh()
-        let recommendation = RecommendationViewModel(feed: h.feed), filters = FiltersViewModel(feed: h.feed)
+        let recommendation = PickForMeViewModel(feed: h.feed), filters = FiltersViewModel(feed: h.feed)
         XCTAssertFalse(recommendation.isShowingCachedFeed)
         h.connectivity.update(isConnected: false)
         XCTAssertTrue(recommendation.isShowingCachedFeed)
@@ -131,7 +131,7 @@ final class Sprint3Tests: XCTestCase {
         var pending: CheckedContinuation<Data, Error>?
         h.api.feed = { try await withCheckedThrowingContinuation { pending = $0; started.fulfill() } }
         let events = EventService(api: h.api, session: h.session, connectivity: h.connectivity, clock: h.clock)
-        let feed = FeedViewModel(api: h.api, session: h.session, connectivity: h.connectivity, clock: h.clock, events: events, content: content)
+        let feed = TodayFeedViewModel(api: h.api, session: h.session, connectivity: h.connectivity, clock: h.clock, events: events, content: content)
         let load = Task { await feed.refresh() }
         await fulfillment(of: [started], timeout: 3)
         XCTAssertTrue(feed.isLoading)

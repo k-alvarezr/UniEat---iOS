@@ -4,10 +4,10 @@ import MapKit
 import SwiftUI
 import Foundation
 
-/// estado del formulario para pedir un local que antes estaba en EstablishmentView
+/// estado del formulario para pedir un local que antes estaba en EstablishmentRequestView
 /// incluye el pin del mapa, la direccion y la foto publica https
 @MainActor
-final class EstablishmentViewModel: FeatureViewModel {
+final class EstablishmentRequestViewModel: FeatureViewModel {
     @Published var showingForm = false
     @Published var name = ""
     @Published var area = "Centro"

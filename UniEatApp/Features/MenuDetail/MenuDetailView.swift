@@ -72,7 +72,7 @@ private struct MenuDetailScreen: View {
             .navigationBarTitleDisplayMode(.inline)
             // al cerrar la hoja se recarga para ver el reporte que se acabo de mandar
             .sheet(isPresented: $showingReport, onDismiss: { Task { await load(automatic: true) } }) {
-                ReportSheet(menu: menu)
+                SubmitReportSheet(menu: menu)
             }
             .onAppear {
                 store.track("detail_open", menu: initialMenu)

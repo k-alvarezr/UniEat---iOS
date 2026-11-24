@@ -10,8 +10,8 @@ final class FiltersViewModel: FeatureViewModel {
     @Published var draft = FeedFilters()
     // texto de la zona sugerida por gps o de que no hay locales cerca
     @Published var locationMessage: String?
-    private let feed: FeedViewModel
-    init(feed: FeedViewModel) {
+    private let feed: TodayFeedViewModel
+    init(feed: TodayFeedViewModel) {
         self.feed = feed
         super.init()
         observe(feed)

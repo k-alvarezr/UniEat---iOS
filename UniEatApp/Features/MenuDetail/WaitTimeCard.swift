@@ -12,12 +12,12 @@ struct WaitTimeCard: View {
 }
 
 private struct WaitTimeScreen: View {
-    @StateObject var model: ReportViewModel
+    @StateObject var model: SubmitReportViewModel
     // para que la pantalla que la usa recargue y muestre la estimacion nueva
     var onSent: () async -> Void = {}
 
     // el viewmodel se crea una sola vez, igual que en el detalle
-    init(model: @autoclosure @escaping () -> ReportViewModel, onSent: @escaping () async -> Void = {}) {
+    init(model: @autoclosure @escaping () -> SubmitReportViewModel, onSent: @escaping () async -> Void = {}) {
         _model = StateObject(wrappedValue: model())
         self.onSent = onSent
     }

@@ -3,9 +3,9 @@ import UniEatCore
 
 /// login y registro, corta el nombre y la contraseña mientras se escribe
 /// y revisa las reglas antes de llamar al server
-struct AuthView: View {
-    // los campos y el envio del login viven en AuthViewModel
-    @EnvironmentObject private var model: AuthViewModel
+struct LoginView: View {
+    // los campos y el envio del login viven en LoginViewModel
+    @EnvironmentObject private var model: LoginViewModel
 
     var body: some View {
         ScrollView {
