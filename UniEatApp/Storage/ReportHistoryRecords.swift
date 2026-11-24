@@ -101,13 +101,20 @@ extension LocalDatabase {
     func replaceReportedRestaurants(_ restaurants: [ReportedRestaurant], userId: UUID) throws {
         let context = container.mainContext
         let saved = try context.fetch(FetchDescriptor<ReportedRestaurantRecord>(predicate: #Predicate { $0.userID == userId }))
-        // los que quedan en este diccionario al final son los que el server ya no manda
-        var notInServer = Dictionary(saved.map { ($0.establishmentID, $0) }, uniquingKeysWith: { first, _ in first })
-        for restaurant in restaurants {
-            if let record = notInServer.removeValue(forKey: restaurant.establishmentId) { record.applySummary(from: restaurant) }
-            else { context.insert(ReportedRestaurantRecord(userID: userId, restaurant: restaurant)) }
+        let serverIDs = Set(restaurants.map(\.establishmentId))
+
+        // 1. borrar los que el server ya no manda (el cascade se lleva sus reportes)
+        for record in saved where !serverIDs.contains(record.establishmentID) {
+            context.delete(record)
         }
-        for record in notInServer.values { context.delete(record) }
+        // 2. los que vienen: si ya estaba se actualiza su resumen, si no se agrega
+        for restaurant in restaurants {
+            if let record = saved.first(where: { $0.establishmentID == restaurant.establishmentId }) {
+                record.applySummary(from: restaurant)
+            } else {
+                context.insert(ReportedRestaurantRecord(userID: userId, restaurant: restaurant))
+            }
+        }
         try commitOrRollback()
     }
 
@@ -120,21 +127,30 @@ extension LocalDatabase {
     /// el detalle del server reemplaza los reportes de ese restaurante
     func replaceUserReports(_ reports: [UserReport], restaurant: ReportedRestaurant, userId: UUID) throws {
         let context = container.mainContext
-        let record: ReportedRestaurantRecord
-        if let found = try findRestaurantRecord(userId: userId, establishmentId: restaurant.establishmentId) {
-            record = found
-            record.applySummary(from: restaurant)
-            for oldReport in record.reports { context.delete(oldReport) }
-        } else {
-            record = ReportedRestaurantRecord(userID: userId, restaurant: restaurant)
-            context.insert(record)
-        }
+        // 1. el restaurante guardado (o uno nuevo) con el resumen que mando el server
+        let record = try findOrCreateRestaurantRecord(restaurant, userId: userId)
+
+        // 2. borrar los reportes viejos de ese restaurante
+        for oldReport in record.reports { context.delete(oldReport) }
+
+        // 3. agregar los reportes nuevos colgados del restaurante
         for report in reports {
             let reportRecord = UserReportRecord(report: report)
             context.insert(reportRecord)
             reportRecord.restaurant = record
         }
         try commitOrRollback()
+    }
+
+    /// el restaurante guardado de esa cuenta con el resumen actualizado, o uno nuevo si no existia
+    private func findOrCreateRestaurantRecord(_ restaurant: ReportedRestaurant, userId: UUID) throws -> ReportedRestaurantRecord {
+        if let saved = try findRestaurantRecord(userId: userId, establishmentId: restaurant.establishmentId) {
+            saved.applySummary(from: restaurant)
+            return saved
+        }
+        let created = ReportedRestaurantRecord(userID: userId, restaurant: restaurant)
+        container.mainContext.insert(created)
+        return created
     }
 
     /// cerrar sesion: se borra la copia de esa cuenta, el cascade se lleva sus reportes
@@ -151,7 +167,7 @@ extension LocalDatabase {
             predicate: #Predicate { $0.userID == userId && $0.establishmentID == establishmentId })).first
     }
 
-    // si no se pudo guardar se deshace lo que se metio al contexto, como en enqueueReport
+    // si no se pudo guardar se deshace lo que se metio al contexto
     private func commitOrRollback() throws {
         do { try container.mainContext.save() }
         catch {
