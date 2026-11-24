@@ -45,16 +45,15 @@ struct ReportHistoryPlaceResponse: Decodable, Sendable {
     let reports: [ReportHistoryEntry]
 }
 
-/// filtro de la lista de restaurantes
+/// filtro de la lista de restaurantes, las observaciones no tienen estado que seguir y se ven en Todos
 enum ReportHistoryFilter: String, CaseIterable, Identifiable, Sendable {
-    case all, inReview, resolved, observations
+    case all, inReview, resolved
     var id: String { rawValue }
     var title: String {
         switch self {
         case .all: "Todos"
         case .inReview: "En revisión"
         case .resolved: "Resueltos"
-        case .observations: "Observaciones"
         }
     }
     /// un restaurante entra si tiene al menos un reporte de ese tipo
@@ -63,7 +62,6 @@ enum ReportHistoryFilter: String, CaseIterable, Identifiable, Sendable {
         case .all: true
         case .inReview: place.pending > 0
         case .resolved: place.resolved > 0
-        case .observations: place.observations > 0
         }
     }
 }

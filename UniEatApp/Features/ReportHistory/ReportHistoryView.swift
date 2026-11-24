@@ -12,10 +12,13 @@ struct ReportHistoryView: View {
                 Text("Tus reportes agrupados por restaurante y en qué quedó cada uno.")
                     .font(.subheadline).foregroundStyle(.secondary)
                 if !store.places.isEmpty { summary }
-                Picker("Filtro", selection: $store.filter) {
-                    ForEach(ReportHistoryFilter.allCases) { Text($0.title).tag($0) }
+                // chips con scroll de lado, el segmentado cortaba los textos en el iPhone
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(ReportHistoryFilter.allCases) { option in filterChip(option) }
+                    }
+                    .padding(.vertical, 2)
                 }
-                .pickerStyle(.segmented)
                 if let fetchedAt = store.fetchedAt {
                     Text("Actualizado: \(SpanishPresentation.dateAndTime(fetchedAt))")
                         .font(.caption).foregroundStyle(.secondary)
@@ -74,6 +77,21 @@ struct ReportHistoryView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+
+    /// opcion del filtro con cuantos restaurantes entran, la elegida va en amarillo
+    private func filterChip(_ option: ReportHistoryFilter) -> some View {
+        let selected = store.filter == option
+        return Button { store.filter = option } label: {
+            Text("\(option.title) (\(store.count(for: option)))")
+                .font(.subheadline.weight(selected ? .bold : .regular))
+                .foregroundStyle(Palette.ink)
+                .padding(.horizontal, 12).padding(.vertical, 7)
+                .background(selected ? Palette.yellow : Palette.paper, in: Capsule())
+                .overlay(Capsule().stroke(Palette.ink, lineWidth: selected ? 2 : 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private func chip(_ text: String, color: Color) -> some View {

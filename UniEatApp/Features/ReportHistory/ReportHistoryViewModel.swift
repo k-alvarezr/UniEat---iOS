@@ -25,6 +25,8 @@ final class ReportHistoryViewModel: FeatureViewModel {
     var isOffline: Bool { connectivity.isOffline }
     /// restaurantes que pasan el filtro elegido
     var visiblePlaces: [ReportHistoryPlace] { places.filter(filter.includes) }
+    /// cuantos restaurantes entran en cada opcion, para mostrarlo en el chip
+    func count(for option: ReportHistoryFilter) -> Int { places.filter(option.includes).count }
     /// resumen de arriba, suma de todos los restaurantes sin importar el filtro
     var totalReports: Int { places.reduce(0) { $0 + $1.total } }
     var totalConfirmed: Int { places.reduce(0) { $0 + $1.confirmed } }
