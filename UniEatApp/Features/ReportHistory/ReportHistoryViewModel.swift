@@ -11,7 +11,6 @@ final class ReportHistoryViewModel: FeatureViewModel {
     @Published private(set) var lastSyncDate: Date?          // hora del server de la ultima lista que se tiene
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
-    @Published private(set) var storageWarning: String?   // si falla leer o guardar la copia, la pantalla sigue
     @Published private(set) var unsentReports: [PendingReport] = []   // hechos sin red, siguen en la cola esperando mandarse
     /// al cambiarlo se guarda para esa cuenta, salvo cuando se esta restaurando al entrar
     @Published var filter: ReportHistoryFilter = .all {
@@ -41,7 +40,6 @@ final class ReportHistoryViewModel: FeatureViewModel {
         observe(connectivity)
         observe(reportQueue)
     }
-    var isOffline: Bool { connectivity.isOffline }
     var isConnected: Bool { connectivity.isConnected }
     /// cuantos reportes esperan en la cola, cambia cuando se agrega uno o cuando se mandan
     var unsentCount: Int { reportQueue.pendingReportCount }
@@ -62,7 +60,6 @@ final class ReportHistoryViewModel: FeatureViewModel {
         lastSyncDate = nil
         isLoading = false
         errorMessage = nil
-        storageWarning = nil
         unsentReports = []
         restoringFilter = true
         filter = session.profile.map { preferences.savedFilter(userID: $0.id) } ?? .all
@@ -82,13 +79,10 @@ final class ReportHistoryViewModel: FeatureViewModel {
         loadUnsentReports()
 
         // 1. lo guardado, solo la primera vez, si ya hay lista en pantalla no se vuelve a leer el disco
-        if restaurants.isEmpty, let database {
-            do {
-                restaurants = try database.loadReportedRestaurants(userId: userID)
-                lastSyncDate = preferences.lastSyncDate(userID: userID)
-            } catch {
-                storageWarning = "No se pudo leer la copia guardada de tus reportes."
-            }
+        //    si la base falla se sigue con el server
+        if restaurants.isEmpty, let database, let saved = try? database.loadReportedRestaurants(userId: userID) {
+            restaurants = saved
+            lastSyncDate = preferences.lastSyncDate(userID: userID)
         }
 
         // 2. el server, sin red se queda lo guardado
@@ -103,11 +97,7 @@ final class ReportHistoryViewModel: FeatureViewModel {
             lastSyncDate = response.serverNow
             // se muestra antes de guardar, si falla el guardado igual se ve
             preferences.saveLastSyncDate(response.serverNow, userID: userID)
-            do {
-                try database?.replaceReportedRestaurants(response.restaurants, userId: userID)
-            } catch {
-                storageWarning = "Tus reportes se cargaron, pero no se pudo guardar la copia para verlos sin conexión."
-            }
+            try? database?.replaceReportedRestaurants(response.restaurants, userId: userID)
             // 3. en segundo plano se bajan los reportes de cada restaurante, asi sin red se abre cualquiera
             prefetchReportsOfEachRestaurant(response.restaurants, userID: userID, generation: generation)
         } catch is CancellationError {
