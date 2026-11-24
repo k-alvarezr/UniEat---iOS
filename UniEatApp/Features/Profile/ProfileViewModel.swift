@@ -27,6 +27,7 @@ final class ProfileViewModel: FeatureViewModel {
     var profile: Profile? { session.profile }
     var isAdmin: Bool { session.isAdmin }
     var isRestaurant: Bool { session.isRestaurant }
+    var canSubmitReports: Bool { session.canSubmitReports }
     var savedMenus: [SavedMenuEntry] { saved.savedMenus }
     var accountError: String? { session.accountError }
     var isAccountVerified: Bool { session.isAccountVerified }

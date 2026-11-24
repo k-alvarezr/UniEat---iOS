@@ -75,8 +75,11 @@ struct ProfileView: View {
                     NavigationLink(destination: SavedMenusView()) {
                         profileButton("Menús guardados (\(store.savedMenus.count))", icon: "bookmark.fill", color: Palette.paper)
                     }
-                    NavigationLink(destination: ReportHistoryView()) {
-                        profileButton("Mis reportes", icon: "flag.fill", color: Palette.paper)
+                    // solo estudiantes reportan, a un restaurante o admin la lista le saldria siempre vacia
+                    if store.canSubmitReports {
+                        NavigationLink(destination: ReportHistoryView()) {
+                            profileButton("Mis reportes", icon: "flag.fill", color: Palette.paper)
+                        }
                     }
                     // si hay reportes sin mandar se pregunta antes, al cerrar sesion se borran del celular
                     SolidButton(title: "Cerrar sesión", icon: "rectangle.portrait.and.arrow.right", color: Palette.yellow) {

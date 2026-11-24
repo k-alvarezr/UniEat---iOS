@@ -46,6 +46,7 @@ final class MenuDetailViewModel: FeatureViewModel {
     var isGone: Bool { ["GONE", "NOT_FOUND"].contains(loadError?.code ?? "") }
     var isAdmin: Bool { session.isAdmin }
     var isRestaurant: Bool { session.isRestaurant }
+    var canSubmitReports: Bool { session.canSubmitReports }
     var isOffline: Bool { connectivity.isOffline }
     var isConnected: Bool { connectivity.isConnected }
     var showsWaitIndicator: Bool { pilot?.showsWaitIndicator ?? true }
