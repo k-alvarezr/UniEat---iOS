@@ -106,7 +106,7 @@ final class AppContainer: ObservableObject {
         establishments = EstablishmentRequestViewModel(service: accounts, session: session)
         approvals = AdminApprovalsViewModel(service: accounts, session: session)
         roles = AdminRolesViewModel(service: accounts, session: session)
-        reportHistory = ReportHistoryViewModel(api: api, session: session, connectivity: connectivity)
+        reportHistory = ReportHistoryViewModel(api: api, session: session, connectivity: connectivity, database: database)
         self.api = api
 
         // 4. conexiones: que pasa cuando vence la sesion, cambia la cuenta o vuelve la red
@@ -203,7 +203,7 @@ final class AppContainer: ObservableObject {
     }
 
     /// al cerrar sesion a mano se borra lo que la cuenta dejo en el celular:
-    /// reportes sin mandar, copias del feed, copias de detalles, borrador y eventos sin mandar
+    /// reportes sin mandar, copias del feed, copias de detalles, borrador, eventos sin mandar y la copia de Mis reportes
     /// los menus guardados se quedan, son marcadores que el usuario eligio y no estan en el server
     private func deleteLocalData(_ userID: UUID, generation: UUID) async throws {
         files.invalidate(userID: userID)
@@ -212,6 +212,9 @@ final class AppContainer: ObservableObject {
             guard let content else { throw APIFailure(code: "LOCAL_STORAGE_ERROR", message: "No se pudo abrir la base local.") }
             try await content.forget(userID: userID, generation: generation)
         } catch { failed = true }
+        // copia de Mis reportes, si falla igual se sigue con lo demas
+        do { try database?.deleteReportHistory(userId: userID) }
+        catch { failed = true }
         // si falla la base igual se intentan borrar los archivos, y al reves
         do { try await files.removeAll(userId: userID, invalidating: generation) }
         catch { failed = true }
@@ -219,6 +222,7 @@ final class AppContainer: ObservableObject {
         UserDefaultsStore.remove(key: EventService.pendingKey(userID))
         UserDefaultsStore.remove(key: EventService.rejectedKey(userID))
         UserDefaultsStore.remove(key: "unieat.report-failures.\(userID.uuidString)")   // motivos de la version anterior de la fachada
+        ReportHistoryPreferences().deleteAll(userID: userID)   // filtro y hora de sincronizacion de Mis reportes
         if failed { throw APIFailure(code: "LOCAL_STORAGE_ERROR", message: "La limpieza local no se pudo completar.") }
     }
 
@@ -249,8 +253,8 @@ final class AppContainer: ObservableObject {
                              initialFetchedAt: cachedAt ?? todayFeed.fetchedAt)
     }
     /// viewmodel del detalle de un restaurante en Mis reportes, uno por cada vez que se abre
-    func makeReportHistoryPlace(_ place: ReportHistoryPlace) -> ReportHistoryPlaceViewModel {
-        ReportHistoryPlaceViewModel(place: place, api: api, session: session, connectivity: connectivity)
+    func makeReportedRestaurantViewModel(_ restaurant: ReportedRestaurant) -> ReportedRestaurantViewModel {
+        ReportedRestaurantViewModel(restaurant: restaurant, api: api, session: session, connectivity: connectivity, database: database)
     }
     /// viewmodel de la hoja de reportar, uno por cada vez que se abre
     /// waitObservation es cuando se reporta la fila desde el piloto de la BQ-08
