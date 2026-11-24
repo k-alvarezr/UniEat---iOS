@@ -42,8 +42,8 @@ final class PendingReport{
     var waitMinutes: Int?
     var createdAt: Date
     var snapshot: MenuSnapshot?
-    // motivo si el server lo rechazo, nil si sigue esperando para mandarse
-    // es opcional para que swiftdata migre solo la base que ya existe
+    // ya no se escribe: un rechazo del server ahora borra el reporte de la cola
+    // se deja en el modelo para no cambiar el esquema de las bases que ya existen
     var rejectedReason: String?
     
     init(kind: String, note: String, waitMinutes: Int?) {
@@ -139,29 +139,5 @@ final class LocalDatabase {
     func report(id: UUID, userId: UUID) throws -> PendingReport? {
         let found = try context.fetch(FetchDescriptor<PendingReport>(predicate: #Predicate { $0.id == id }))
         return found.first { $0.snapshot?.userId == userId }
-    }
-
-    /// marca el reporte como rechazado por el server con su motivo, no se borra
-    func reject(_ report: PendingReport, reason: String) throws {
-        report.rejectedReason = reason
-        do {
-            try context.save()
-        } catch {
-            context.rollback()
-            throw error
-        }
-    }
-
-    /// quita la marca de rechazado a todos los reportes del usuario para volver a intentarlos
-    func clearRejections(userId: UUID) throws {
-        for report in try pendingReports(userId: userId) {
-            report.rejectedReason = nil
-        }
-        do {
-            try context.save()
-        } catch {
-            context.rollback()
-            throw error
-        }
     }
 }

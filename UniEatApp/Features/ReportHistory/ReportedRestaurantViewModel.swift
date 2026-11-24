@@ -33,6 +33,7 @@ final class ReportedRestaurantViewModel: FeatureViewModel {
         observe(connectivity)
     }
     var isOffline: Bool { connectivity.isOffline }
+    var isConnected: Bool { connectivity.isConnected }
     /// recien abierto (o sin nada que mostrar): vale la pena buscar algo rapido antes del server
     /// es calculada, asi si la memoria ya lleno la pantalla el paso de la base se salta
     private var nothingOnScreenYet: Bool { reports.isEmpty }

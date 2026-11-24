@@ -107,7 +107,8 @@ final class AppContainer: ObservableObject {
         establishments = EstablishmentRequestViewModel(service: accounts, session: session)
         approvals = AdminApprovalsViewModel(service: accounts, session: session)
         roles = AdminRolesViewModel(service: accounts, session: session)
-        reportHistory = ReportHistoryViewModel(api: api, session: session, connectivity: connectivity, database: database)
+        reportHistory = ReportHistoryViewModel(api: api, session: session, connectivity: connectivity, reportQueue: reports,
+                                               database: database)
         self.api = api
 
         // 4. conexiones: que pasa cuando vence la sesion, cambia la cuenta o vuelve la red

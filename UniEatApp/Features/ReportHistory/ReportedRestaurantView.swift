@@ -35,6 +35,10 @@ private struct ReportedRestaurantScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         .task { await store.loadReports() }
         .refreshable { await store.loadReports() }
+        // al volver la red se actualiza solo, igual que el detalle del menu
+        .onChange(of: store.isConnected) { _, connected in
+            if connected { Task { await store.loadReports() } }
+        }
     }
 
     private func reportCard(_ report: UserReport) -> some View {

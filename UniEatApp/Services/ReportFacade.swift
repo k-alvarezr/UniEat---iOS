@@ -7,7 +7,6 @@ import UniEatCore
 struct ReportToSend: Identifiable, Sendable {
     let id: UUID
     let body: ReportBody
-    let rejectedReason: String?   // si el server ya lo rechazo, nil si sigue esperando
 }
 
 /// lo que la fachada necesita de la base local, como protocolo para probarla sin swiftdata
@@ -18,8 +17,6 @@ protocol ReportOutbox {
     func pending(userID: UUID) throws -> [ReportToSend]
     func queued(id: UUID, userID: UUID) throws -> ReportToSend?
     func acknowledge(id: UUID, userID: UUID) throws
-    func reject(id: UUID, userID: UUID, reason: String) throws
-    func clearRejections(userID: UUID) throws
 }
 
 /// la base local cumple el protocolo, cada metodo busca por id en vez de cargar toda la cola
@@ -36,27 +33,19 @@ extension LocalDatabase: ReportOutbox {
         var copies: [ReportToSend] = []
         for report in try pendingReports(userId: userID) {
             guard let body = report.body else { continue }
-            copies.append(ReportToSend(id: report.id, body: body, rejectedReason: report.rejectedReason))
+            copies.append(ReportToSend(id: report.id, body: body))
         }
         return copies
     }
     /// la copia de un solo reporte, para mandarlo apenas se crea
     func queued(id: UUID, userID: UUID) throws -> ReportToSend? {
         guard let report = try report(id: id, userId: userID), let body = report.body else { return nil }
-        return ReportToSend(id: report.id, body: body, rejectedReason: report.rejectedReason)
+        return ReportToSend(id: report.id, body: body)
     }
-    /// el server acepto el reporte, recien ahi se borra de la base
+    /// el server respondio (lo acepto o lo rechazo para siempre), se borra de la base
     func acknowledge(id: UUID, userID: UUID) throws {
         guard let report = try report(id: id, userId: userID) else { return }
         try remove(report)
-    }
-    /// el server lo rechazo, se guarda el motivo en la misma fila para revisarlo desde perfil
-    func reject(id: UUID, userID: UUID, reason: String) throws {
-        guard let report = try report(id: id, userId: userID) else { return }
-        try reject(report, reason: reason)
-    }
-    func clearRejections(userID: UUID) throws {
-        try clearRejections(userId: userID)
     }
 }
 
@@ -64,7 +53,7 @@ extension LocalDatabase: ReportOutbox {
 enum ReportSubmitResult: Equatable {
     case sent(String)   // el server lo acepto, con su estado: pending, confirmed u observation
     case queued         // quedo guardado, se manda cuando vuelva el servicio
-    case needsReview    // el server lo rechazo, sigue guardado para revisarlo desde perfil
+    case rejected(String)   // el server lo rechazo con un error que no se arregla reintentando, se borra de la cola
 }
 
 /// patron Facade: la hoja de reportar solo pide submitReport y esta clase coordina
@@ -73,8 +62,6 @@ enum ReportSubmitResult: Equatable {
 @MainActor
 final class ReportFacade: FeatureViewModel {
     @Published private(set) var pendingReportCount = 0   // guardados esperando para mandarse
-    @Published private(set) var needsReviewCount = 0     // rechazados por el server, esperan que el usuario reintente
-    @Published private(set) var syncMessage: String?     // aviso en perfil si algo fallo
     private let api: APIRequesting
     private let outbox: ReportOutbox?
     private let session: SessionStore
@@ -93,31 +80,19 @@ final class ReportFacade: FeatureViewModel {
         self.clock = clock
     }
 
-    /// al cambiar de cuenta se cuentan los reportes de ese usuario y se avisa si hay rechazados
+    /// al cambiar de cuenta se cuentan los reportes de ese usuario
     func accountChanged() {
-        syncMessage = nil
         sending = []
         updateCounts()
     }
 
-    // vuelve a contar pendientes y rechazados, si hay rechazados muestra el motivo del primero
+    // vuelve a contar los reportes que esperan en la cola
     private func updateCounts() {
         guard let userID = session.profile?.id, let outbox else {
             pendingReportCount = 0
-            needsReviewCount = 0
             return
         }
-        do {
-            let all = try outbox.pending(userID: userID)
-            let rejected = all.filter { $0.rejectedReason != nil }
-            pendingReportCount = all.count - rejected.count
-            needsReviewCount = rejected.count
-            if syncMessage == nil, let reason = rejected.first?.rejectedReason {
-                syncMessage = "Un reporte requiere revisión y sigue guardado: \(reason)"
-            }
-        } catch {
-            syncMessage = "No se pudieron leer los reportes guardados: \(error.localizedDescription)"
-        }
+        pendingReportCount = (try? outbox.pending(userID: userID).count) ?? 0
     }
 
     /// primero se guarda el reporte y despues se intenta mandar
@@ -141,8 +116,7 @@ final class ReportFacade: FeatureViewModel {
     }
 
     /// manda los reportes guardados en paralelo, se llama al volver la red o el server
-    /// retryRejected en true vuelve a intentar tambien los rechazados, lo usa el boton de perfil
-    func sendPendingReports(retryRejected: Bool = false) async {
+    func sendPendingReports() async {
         guard let userID = session.profile?.id else { return }
         guard !connectivity.isOffline, sendingGeneration != session.generation, let outbox else { return }
         let expected = session.generation
@@ -152,13 +126,9 @@ final class ReportFacade: FeatureViewModel {
             updateCounts()
         }
         do {
-            if retryRejected {
-                try outbox.clearRejections(userID: userID)
-                syncMessage = nil
-            }
-            // 1. lo que hay que mandar: ni rechazados ni los que ya van en camino
+            // 1. lo que hay que mandar: todo lo de la cola menos lo que ya va en camino
             var reports: [ReportToSend] = []
-            for report in try outbox.pending(userID: userID) where report.rejectedReason == nil && !sending.contains(report.id) {
+            for report in try outbox.pending(userID: userID) where !sending.contains(report.id) {
                 reports.append(report)
                 sending.insert(report.id)
             }
@@ -192,8 +162,7 @@ final class ReportFacade: FeatureViewModel {
                     do {
                         try apply(outcome, id: id, userID: userID)
                     } catch {
-                        syncMessage = "El reporte sigue guardado: \(error.localizedDescription)"
-                        canSchedule = false
+                        canSchedule = false   // si la base fallo no se sigue, el reporte sigue guardado
                     }
                     // con el server caido no se siguen mandando, se intenta en la proxima
                     if case .retry = outcome { canSchedule = false }
@@ -203,9 +172,8 @@ final class ReportFacade: FeatureViewModel {
                     }
                 }
             }
-        } catch is CancellationError {
         } catch {
-            syncMessage = "El reporte sigue guardado: \(error.localizedDescription)"
+            // cancelado o la base no se pudo leer: lo guardado se queda y se intenta en la proxima
         }
     }
 
@@ -236,18 +204,14 @@ final class ReportFacade: FeatureViewModel {
         }
     }
 
-    /// actualiza la base y el aviso segun el resultado, solo un enviado borra la fila
+    /// actualiza la base segun el resultado
+    /// enviado o rechazado se borra de la cola (rechazado es un error que no se arregla reintentando),
+    /// si toca reintentar o se cancelo se queda guardado
     private func apply(_ outcome: DeliveryOutcome, id: UUID, userID: UUID) throws {
         switch outcome {
-        case .sent:
+        case .sent, .rejected:
             try outbox?.acknowledge(id: id, userID: userID)
-            syncMessage = nil
-        case .rejected(let reason):
-            try outbox?.reject(id: id, userID: userID, reason: reason)
-            syncMessage = "Un reporte requiere revisión y sigue guardado: \(reason)"
-        case .retry:
-            syncMessage = "El reporte sigue guardado. Se reintentará al recuperar el servicio."
-        case .cancelled:
+        case .retry, .cancelled:
             return
         }
     }
@@ -266,7 +230,7 @@ final class ReportFacade: FeatureViewModel {
         updateCounts()
         switch outcome {
         case .sent(let status): return .sent(status)
-        case .rejected: return .needsReview
+        case .rejected(let reason): return .rejected(reason)
         case .retry: return .queued
         case .cancelled: throw CancellationError()
         }
