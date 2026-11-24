@@ -69,23 +69,17 @@ final class PreparationTests: XCTestCase {
         XCTAssertEqual(Set(ids.compactMap { $0["observedAt"] as? String }).count, 1)
     }
 
-    func testPermanentRejectionRemainsInSwiftDataForReview() async throws {
+    func testPermanentRejectionIsRemovedFromTheQueue() async throws {
         let h = try await Harness.make()
         h.api.failure = APIFailure(code: "VALIDATION_ERROR", message: "Revisa el reporte")
         let status = try await h.reports.submitReport(for: h.menu, kind: .price, note: "", waitMinutes: nil)
-        XCTAssertEqual(status, .needsReview)
-        XCTAssertEqual(try h.database.pending(userID: h.auth.profile.id).count, 1)
-        XCTAssertNotNil(h.reports.syncMessage)
-        // el motivo queda en la misma fila de swiftdata y se cuenta aparte de los que esperan red
-        XCTAssertEqual(try h.database.pending(userID: h.auth.profile.id).first?.rejectedReason, "Revisa el reporte")
-        XCTAssertEqual(h.reports.needsReviewCount, 1)
+        XCTAssertEqual(status, .rejected("Revisa el reporte"))
+        // un rechazo permanente no se arregla reintentando, sale de la cola
+        XCTAssertEqual(try h.database.pending(userID: h.auth.profile.id).count, 0)
         XCTAssertEqual(h.reports.pendingReportCount, 0)
         let attempts = h.api.reportBodies.count
         await h.reports.sendPendingReports()
-        XCTAssertEqual(h.api.reportBodies.count, attempts, "Rejected rows wait for an explicit retry")
-        h.api.failure = nil
-        await h.reports.sendPendingReports(retryRejected: true)
-        XCTAssertEqual(try h.database.pending(userID: h.auth.profile.id).count, 0)
+        XCTAssertEqual(h.api.reportBodies.count, attempts, "nothing left to resend")
     }
 
     func testSwiftDataRelationshipKeepsEachUsersMenuVersionAndOriginalReportID() throws {

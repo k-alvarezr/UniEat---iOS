@@ -12,6 +12,7 @@ final class ReportHistoryViewModel: FeatureViewModel {
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var storageWarning: String?   // si falla leer o guardar la copia, la pantalla sigue
+    @Published private(set) var unsentReports: [PendingReport] = []   // hechos sin red, siguen en la cola esperando mandarse
     /// al cambiarlo se guarda para esa cuenta, salvo cuando se esta restaurando al entrar
     @Published var filter: ReportHistoryFilter = .all {
         didSet {
@@ -21,23 +22,29 @@ final class ReportHistoryViewModel: FeatureViewModel {
     }
     private let api: APIRequesting
     private let session: SessionStore
+    private let reportQueue: ReportFacade   // la cola de reportes del Sprint 3, avisa cuando se manda
     private let connectivity: ConnectivityService
     private let database: LocalDatabase?   // nil si la base no abrio, entonces solo red
     private let preferences: ReportHistoryPreferences
     private var requestID = UUID()   // una respuesta vieja no pisa una nueva
     private var prefetchTask: Task<Void, Never>?   // precarga de los reportes de cada restaurante, una a la vez
     private var restoringFilter = false
-    init(api: APIRequesting, session: SessionStore, connectivity: ConnectivityService,
+    init(api: APIRequesting, session: SessionStore, connectivity: ConnectivityService, reportQueue: ReportFacade,
          database: LocalDatabase?, preferences: ReportHistoryPreferences = ReportHistoryPreferences()) {
         self.api = api
         self.session = session
+        self.reportQueue = reportQueue
         self.connectivity = connectivity
         self.database = database
         self.preferences = preferences
         super.init()
         observe(connectivity)
+        observe(reportQueue)
     }
     var isOffline: Bool { connectivity.isOffline }
+    var isConnected: Bool { connectivity.isConnected }
+    /// cuantos reportes esperan en la cola, cambia cuando se agrega uno o cuando se mandan
+    var unsentCount: Int { reportQueue.pendingReportCount }
     /// restaurantes que pasan el filtro elegido
     var filteredRestaurants: [ReportedRestaurant] { restaurants.filter(filter.matches) }
     /// cuantos restaurantes entran en cada opcion, para mostrarlo en el chip
@@ -56,6 +63,7 @@ final class ReportHistoryViewModel: FeatureViewModel {
         isLoading = false
         errorMessage = nil
         storageWarning = nil
+        unsentReports = []
         restoringFilter = true
         filter = session.profile.map { preferences.savedFilter(userID: $0.id) } ?? .all
         restoringFilter = false
@@ -69,6 +77,9 @@ final class ReportHistoryViewModel: FeatureViewModel {
         isLoading = true
         errorMessage = nil
         defer { if requestID == id { isLoading = false } }
+
+        // 0. los reportes hechos sin red que siguen en la cola, se leen siempre porque son locales
+        loadUnsentReports()
 
         // 1. lo guardado, solo la primera vez, si ya hay lista en pantalla no se vuelve a leer el disco
         if restaurants.isEmpty, let database {
@@ -104,6 +115,13 @@ final class ReportHistoryViewModel: FeatureViewModel {
             guard session.matches(userID, generation: generation), requestID == id else { return }
             errorMessage = error.localizedDescription
         }
+    }
+
+    /// reportes que siguen en la cola sin mandarse (Sprint 3), sin red es justo donde quedan
+    /// se mandan solos al volver la red; si el server los rechaza salen de la cola
+    func loadUnsentReports() {
+        guard let userID = session.profile?.id else { unsentReports = []; return }
+        unsentReports = (try? database?.pendingReports(userId: userID)) ?? []
     }
 
     /// precarga: baja los reportes de cada restaurante de la lista, maximo 3 a la vez, y los guarda para verlos sin red

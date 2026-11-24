@@ -11,6 +11,7 @@ struct ReportHistoryView: View {
                 BrandHeader(title: "Mis reportes")
                 Text("Tus reportes agrupados por restaurante y en qué quedó cada uno.")
                     .font(.subheadline).foregroundStyle(.secondary)
+                if !store.unsentReports.isEmpty { unsentSection }
                 if !store.restaurants.isEmpty { summary }
                 // chips con scroll de lado, el segmentado cortaba los textos en el iPhone
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -45,6 +46,42 @@ struct ReportHistoryView: View {
         .navigationTitle("Mis reportes")
         .task { await store.loadRestaurants() }
         .refreshable { await store.loadRestaurants() }
+        // al volver la red se actualiza sola, igual que el detalle del menu
+        .onChange(of: store.isConnected) { _, connected in
+            if connected { Task { await store.loadRestaurants() } }
+        }
+        // cuando la cola se manda (o entra un reporte nuevo) se relee la seccion Por enviar
+        .onChange(of: store.unsentCount) { _, _ in store.loadUnsentReports() }
+    }
+
+    /// reportes hechos sin red: estan en el celular y se mandan solos al volver la conexion
+    private var unsentSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Por enviar (\(store.unsentReports.count))").font(.headline)
+            ForEach(store.unsentReports, id: \.id) { report in
+                SurfaceCard {
+                    VStack(alignment: .leading, spacing: 5) {
+                        let kind = ReportKind(rawValue: report.kind)
+                        Label(kind?.historyTitle ?? "Reporte", systemImage: kind?.historyIcon ?? "flag").font(.headline)
+                        Text("\(report.snapshot?.title ?? "Menú") · \(report.snapshot?.establishmentName ?? "Restaurante")")
+                            .font(.subheadline)
+                        if !report.note.isEmpty { Text("“\(report.note)”").font(.caption).italic() }
+                        HStack {
+                            Text("Pendiente de enviar")
+                                .font(.caption.weight(.bold))
+                                .padding(.horizontal, 8).padding(.vertical, 3)
+                                .background(Palette.yellow, in: Capsule())
+                                .overlay(Capsule().stroke(Palette.ink, lineWidth: 1))
+                            Spacer()
+                            Text(SpanishPresentation.dateAndTime(report.createdAt))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            Text("Se envían solos cuando vuelva la conexión.").font(.caption).foregroundStyle(.secondary)
+        }
     }
 
     private var summary: some View {
