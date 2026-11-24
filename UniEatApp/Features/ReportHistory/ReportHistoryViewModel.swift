@@ -1,6 +1,5 @@
 import Combine
 import Foundation
-import UniEatCore
 
 /// lista de Mis reportes: los restaurantes donde el usuario reporto, con el conteo por estado
 /// primero pinta la copia de swiftdata y despues la cambia por la del server, que tambien se guarda
@@ -37,10 +36,8 @@ final class ReportHistoryViewModel: FeatureViewModel {
         self.database = database
         self.preferences = preferences
         super.init()
-        observe(connectivity)
         observe(reportQueue)
     }
-    var isConnected: Bool { connectivity.isConnected }
     /// cuantos reportes esperan en la cola, cambia cuando se agrega uno o cuando se mandan
     var unsentCount: Int { reportQueue.pendingReportCount }
     /// restaurantes que pasan el filtro elegido
@@ -85,11 +82,8 @@ final class ReportHistoryViewModel: FeatureViewModel {
             lastSyncDate = preferences.lastSyncDate(userID: userID)
         }
 
-        // 2. el server, sin red se queda lo guardado
-        guard connectivity.isConnected else {
-            if restaurants.isEmpty { errorMessage = APIFailure.offline.message }
-            return
-        }
+        // 2. el server, sin red se queda lo guardado (el aviso de conexion de la vista ya lo explica)
+        guard connectivity.isConnected else { return }
         do {
             let response: ReportedRestaurantsResponse = try await api.get("me/reports/places", query: [])
             guard session.matches(userID, generation: generation), requestID == id, !Task.isCancelled else { return }

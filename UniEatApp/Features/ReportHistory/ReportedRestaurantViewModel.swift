@@ -1,6 +1,5 @@
 import Combine
 import Foundation
-import UniEatCore
 
 /// detalle de un restaurante en Mis reportes, uno por cada vez que se abre (como el detalle del menu)
 /// busca en este orden: memoria (LRU de los 2 ultimos) -> copia de swiftdata -> server
@@ -29,9 +28,7 @@ final class ReportedRestaurantViewModel: FeatureViewModel {
         self.database = database
         self.memory = memory
         super.init()
-        observe(connectivity)
     }
-    var isConnected: Bool { connectivity.isConnected }
     /// recien abierto (o sin nada que mostrar): vale la pena buscar algo rapido antes del server
     /// es calculada, asi si la memoria ya lleno la pantalla el paso de la base se salta
     private var nothingOnScreenYet: Bool { reports.isEmpty }
@@ -58,11 +55,8 @@ final class ReportedRestaurantViewModel: FeatureViewModel {
             memory.insert(snapshot, userID: userID)
         }
 
-        // 3. el server, sin red se queda lo que ya se mostro
-        guard connectivity.isConnected else {
-            if nothingOnScreenYet { errorMessage = APIFailure.offline.message }
-            return
-        }
+        // 3. el server, sin red se queda lo que ya se mostro (el aviso de conexion de la vista ya lo explica)
+        guard connectivity.isConnected else { return }
         do {
             let response: ReportedRestaurantDetailResponse = try await api.get("me/reports/places/\(establishmentID.uuidString)", query: [])
             guard session.matches(userID, generation: generation), requestID == id, !Task.isCancelled else { return }
