@@ -12,7 +12,6 @@ final class ReportedRestaurantViewModel: FeatureViewModel {
     @Published private(set) var lastSyncDate: Date?          // hora del server de la copia que se muestra
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
-    @Published private(set) var storageWarning: String?
     private let api: APIRequesting
     private let session: SessionStore
     private let connectivity: ConnectivityService
@@ -32,7 +31,6 @@ final class ReportedRestaurantViewModel: FeatureViewModel {
         super.init()
         observe(connectivity)
     }
-    var isOffline: Bool { connectivity.isOffline }
     var isConnected: Bool { connectivity.isConnected }
     /// recien abierto (o sin nada que mostrar): vale la pena buscar algo rapido antes del server
     /// es calculada, asi si la memoria ya lleno la pantalla el paso de la base se salta
@@ -50,20 +48,14 @@ final class ReportedRestaurantViewModel: FeatureViewModel {
         if nothingOnScreenYet, let recent = memory.value(userID: userID, establishmentID: establishmentID) {
             show(recent)
         }
-        // 2. lo guardado en la base, si no estaba en memoria
-        if nothingOnScreenYet, let database {
-            do {
-                let saved = try database.loadUserReports(userId: userID, establishmentId: establishmentID)
-                if !saved.isEmpty {
-                    // la copia es de la ultima sincronizacion de Mis reportes
-                    let snapshot = ReportedRestaurantSnapshot(restaurant: restaurant, reports: saved,
-                                                              lastSyncDate: preferences.lastSyncDate(userID: userID))
-                    show(snapshot)
-                    memory.insert(snapshot, userID: userID)
-                }
-            } catch {
-                storageWarning = "No se pudo leer la copia guardada de este restaurante."
-            }
+        // 2. lo guardado en la base, si no estaba en memoria (si la base falla se sigue con el server)
+        if nothingOnScreenYet, let database,
+           let saved = try? database.loadUserReports(userId: userID, establishmentId: establishmentID), !saved.isEmpty {
+            // la copia es de la ultima sincronizacion de Mis reportes
+            let snapshot = ReportedRestaurantSnapshot(restaurant: restaurant, reports: saved,
+                                                      lastSyncDate: preferences.lastSyncDate(userID: userID))
+            show(snapshot)
+            memory.insert(snapshot, userID: userID)
         }
 
         // 3. el server, sin red se queda lo que ya se mostro
@@ -78,11 +70,8 @@ final class ReportedRestaurantViewModel: FeatureViewModel {
                                                    lastSyncDate: response.serverNow)
             show(fresh)
             memory.insert(fresh, userID: userID)
-            do {
-                try database?.replaceUserReports(response.reports, restaurant: response.restaurant, userId: userID)
-            } catch {
-                storageWarning = "El restaurante se cargó, pero no se pudo guardar la copia para verlo sin conexión."
-            }
+            // si falla el guardado igual se ve lo que llego
+            try? database?.replaceUserReports(response.reports, restaurant: response.restaurant, userId: userID)
         } catch is CancellationError {
         } catch {
             guard session.matches(userID, generation: generation), requestID == id else { return }
