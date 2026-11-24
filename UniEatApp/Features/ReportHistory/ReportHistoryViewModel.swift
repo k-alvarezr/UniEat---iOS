@@ -25,6 +25,7 @@ final class ReportHistoryViewModel: FeatureViewModel {
     private let database: LocalDatabase?   // nil si la base no abrio, entonces solo red
     private let preferences: ReportHistoryPreferences
     private var requestID = UUID()   // una respuesta vieja no pisa una nueva
+    private var prefetchTask: Task<Void, Never>?   // precarga de los reportes de cada restaurante, una a la vez
     private var restoringFilter = false
     init(api: APIRequesting, session: SessionStore, connectivity: ConnectivityService,
          database: LocalDatabase?, preferences: ReportHistoryPreferences = ReportHistoryPreferences()) {
@@ -48,6 +49,8 @@ final class ReportHistoryViewModel: FeatureViewModel {
     /// al cambiar de cuenta se bota todo y se recupera el filtro que habia dejado la cuenta nueva
     func reset() {
         requestID = UUID()
+        prefetchTask?.cancel()   // una precarga de la cuenta anterior no sigue guardando
+        prefetchTask = nil
         restaurants = []
         lastSyncDate = nil
         isLoading = false
@@ -94,10 +97,42 @@ final class ReportHistoryViewModel: FeatureViewModel {
             } catch {
                 storageWarning = "Tus reportes se cargaron, pero no se pudo guardar la copia para verlos sin conexión."
             }
+            // 3. en segundo plano se bajan los reportes de cada restaurante, asi sin red se abre cualquiera
+            prefetchReportsOfEachRestaurant(response.restaurants, userID: userID, generation: generation)
         } catch is CancellationError {
         } catch {
             guard session.matches(userID, generation: generation), requestID == id else { return }
             errorMessage = error.localizedDescription
+        }
+    }
+
+    /// precarga: baja los reportes de cada restaurante de la lista, maximo 3 a la vez, y los guarda para verlos sin red
+    private func prefetchReportsOfEachRestaurant(_ restaurants: [ReportedRestaurant], userID: UUID, generation: UUID) {
+        prefetchTask?.cancel()
+        guard let database else { return }
+        let api = self.api
+        var waiting = restaurants.map(\.establishmentId)   // restaurantes que faltan por bajar
+
+        prefetchTask = Task {   // tarea padre, en el hilo principal
+            await withTaskGroup(of: ReportedRestaurantDetailResponse?.self) { group in
+                // 1. arrancan las 3 primeras descargas, cada una es una tarea hija en un hilo de fondo
+                for _ in 0..<min(3, waiting.count) {
+                    let id = waiting.removeFirst()
+                    group.addTask { try? await api.get("me/reports/places/\(id.uuidString)", query: []) }
+                }
+                // 2. cada vez que una termina, vuelve aca (hilo principal)
+                for await response in group {
+                    if Task.isCancelled { break }   // si cancelaron la precarga no se arranca nada mas
+                    // entra la siguiente que esperaba, asi siempre hay maximo 3
+                    if !waiting.isEmpty {
+                        let id = waiting.removeFirst()
+                        group.addTask { try? await api.get("me/reports/places/\(id.uuidString)", query: []) }
+                    }
+                    // se guarda lo que llego, si fallo (nil) o cambio la cuenta se salta
+                    guard let response, session.matches(userID, generation: generation) else { continue }
+                    try? database.replaceUserReports(response.reports, restaurant: response.restaurant, userId: userID)
+                }
+            }
         }
     }
 }
