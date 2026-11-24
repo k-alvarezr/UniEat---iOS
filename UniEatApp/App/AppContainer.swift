@@ -41,6 +41,7 @@ final class AppContainer: ObservableObject {
     private let api: APIRequesting                // para crear el viewmodel de cada restaurante en Mis reportes
     private let details: MenuDetailService        // pide y guarda detalles, se usa al crear cada detalle
     private let files: FileStore                  // archivos de detalle y borrador, se borran al cerrar sesion
+    private let reportedRestaurants = ReportedRestaurantMemoryCache()   // LRU de los 2 ultimos restaurantes de Mis reportes
     private let content: LocalContentService?
     private var synchronization: Task<Void, Never>?   // tarea que manda colas y refresca, una a la vez
     private var imageTask: Task<Void, Never>?         // descarga de fotos del feed en segundo plano
@@ -106,7 +107,8 @@ final class AppContainer: ObservableObject {
         establishments = EstablishmentRequestViewModel(service: accounts, session: session)
         approvals = AdminApprovalsViewModel(service: accounts, session: session)
         roles = AdminRolesViewModel(service: accounts, session: session)
-        reportHistory = ReportHistoryViewModel(api: api, session: session, connectivity: connectivity, database: database)
+        reportHistory = ReportHistoryViewModel(api: api, session: session, connectivity: connectivity, reportQueue: reports,
+                                               database: database)
         self.api = api
 
         // 4. conexiones: que pasa cuando vence la sesion, cambia la cuenta o vuelve la red
@@ -165,6 +167,7 @@ final class AppContainer: ObservableObject {
         content?.setSession(userID: session.profile?.id, generation: session.generation)
         files.setSession(userID: session.profile?.id, generation: session.generation)
         details.clearMemory()  // se cambia de cuenta, la memoria se limpia
+        reportedRestaurants.clear()   // igual con los restaurantes recientes de Mis reportes
         selectedTab = .today
         connectivity.serverUnreachable = false
         // cada pieza limpia lo suyo, AppContainer no toca el interior de las pantallas
@@ -254,7 +257,8 @@ final class AppContainer: ObservableObject {
     }
     /// viewmodel del detalle de un restaurante en Mis reportes, uno por cada vez que se abre
     func makeReportedRestaurantViewModel(_ restaurant: ReportedRestaurant) -> ReportedRestaurantViewModel {
-        ReportedRestaurantViewModel(restaurant: restaurant, api: api, session: session, connectivity: connectivity, database: database)
+        ReportedRestaurantViewModel(restaurant: restaurant, api: api, session: session, connectivity: connectivity,
+                                    database: database, memory: reportedRestaurants)
     }
     /// viewmodel de la hoja de reportar, uno por cada vez que se abre
     /// waitObservation es cuando se reporta la fila desde el piloto de la BQ-08

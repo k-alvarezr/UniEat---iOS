@@ -39,7 +39,7 @@ final class SubmitReportViewModel: ObservableObject {
             case .sent("dismissed"): "Tu reporte ya fue revisado y descartado."
             case .sent: "Gracias. Tu observación quedó registrada."
             case .queued: "Tu reporte quedó guardado y se enviará cuando el servicio esté disponible."
-            case .needsReview: "El servidor rechazó el envío. Tu reporte sigue guardado para revisión desde Perfil."
+            case .rejected(let reason): "El servidor rechazó el reporte: \(reason)"
             }
             // si vuelve a mandar la fila es una observacion nueva con id nuevo
             // los reintentos de este mismo envio conservan el id de antes

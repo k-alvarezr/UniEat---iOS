@@ -54,17 +54,6 @@ struct ProfileView: View {
                         .font(.footnote).foregroundStyle(.secondary)
                     }
                     if let error = store.storageError { Text(error).font(.footnote).foregroundStyle(Palette.coral) }
-                    // reportes guardados en el celular: los que esperan red y los que el server rechazo
-                    if store.reports.pendingReportCount + store.reports.needsReviewCount > 0 {
-                        if store.reports.pendingReportCount > 0 {
-                            Text("Reportes por enviar: \(store.reports.pendingReportCount)").font(.footnote)
-                        }
-                        if store.reports.needsReviewCount > 0 {
-                            Text("Reportes por revisar: \(store.reports.needsReviewCount)").font(.footnote)
-                        }
-                        if let message = store.reports.syncMessage { Text(message).font(.footnote) }
-                        Button("Reintentar reportes pendientes") { Task { await store.retryReports() } }
-                    }
                     Text("La información guardada muestra cuándo se obtuvo y descarta menús vencidos incluso sin conexión.")
                         .font(.footnote).foregroundStyle(.secondary)
                     if store.isAdmin {

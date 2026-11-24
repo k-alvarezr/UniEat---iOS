@@ -1,5 +1,4 @@
 import SwiftUI
-import UniEatCore
 
 /// detalle de un restaurante: crea su viewmodel desde el contenedor, igual que MenuDetailView
 struct ReportedRestaurantView: View {
@@ -11,6 +10,7 @@ struct ReportedRestaurantView: View {
 private struct ReportedRestaurantScreen: View {
     // StateObject guarda el primero y no vuelve a crear el viewmodel en cada redibujado
     @StateObject private var store: ReportedRestaurantViewModel
+    @EnvironmentObject private var connectivity: ConnectivityService   // el mismo que usa el aviso de conexion
     init(model: @autoclosure @escaping () -> ReportedRestaurantViewModel) { _store = StateObject(wrappedValue: model()) }
 
     var body: some View {
@@ -35,6 +35,10 @@ private struct ReportedRestaurantScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         .task { await store.loadReports() }
         .refreshable { await store.loadReports() }
+        // al volver la red se actualiza solo, igual que el detalle del menu
+        .onChange(of: connectivity.isConnected) { _, connected in
+            if connected { Task { await store.loadReports() } }
+        }
     }
 
     private func reportCard(_ report: UserReport) -> some View {

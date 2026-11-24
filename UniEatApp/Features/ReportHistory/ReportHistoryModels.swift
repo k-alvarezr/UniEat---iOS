@@ -3,7 +3,7 @@ import UniEatCore
 
 /// un restaurante donde el usuario reporto, con cuantos reportes tiene en cada estado
 /// es lo que manda GET /me/reports/places, todo Sendable para poder pasarlo entre hilos
-struct ReportedRestaurant: Codable, Identifiable, Hashable, Sendable {
+struct ReportedRestaurant: Decodable, Identifiable, Sendable {
     let establishmentId: UUID
     let name: String
     let area: String
@@ -17,7 +17,7 @@ struct ReportedRestaurant: Codable, Identifiable, Hashable, Sendable {
 }
 
 /// un reporte del usuario en un restaurante, sale de GET /me/reports/places/:id
-struct UserReport: Codable, Identifiable, Hashable, Sendable {
+struct UserReport: Decodable, Identifiable, Sendable {
     let id: UUID
     let kind: String
     let version: Int
@@ -66,30 +66,34 @@ enum ReportHistoryFilter: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// textos y colores de cada reporte, para que la lista y el detalle digan lo mismo
-extension UserReport {
-    var kindTitle: String {
-        switch ReportKind(rawValue: kind) {
+/// titulo e icono de cada tipo de reporte, los usan los reportes enviados y los que siguen en la cola
+extension ReportKind {
+    var historyTitle: String {
+        switch self {
         case .unavailable: "Plato agotado o no disponible"
         case .price: "Precio distinto al publicado"
         case .location: "Ubicación difícil de encontrar"
         case .longLine: "Fila demasiado larga"
         case .accurate: "El menú estaba correcto"
         case .arrival: "Llegué al local"
-        case nil: "Reporte"
         }
     }
-    var kindIcon: String {
-        switch ReportKind(rawValue: kind) {
+    var historyIcon: String {
+        switch self {
         case .unavailable: "fork.knife"
         case .price: "tag"
         case .location: "mappin.slash"
         case .longLine: "person.3"
         case .accurate: "checkmark.circle"
         case .arrival: "figure.walk"
-        case nil: "flag"
         }
     }
+}
+
+/// textos y colores de cada reporte, para que la lista y el detalle digan lo mismo
+extension UserReport {
+    var kindTitle: String { ReportKind(rawValue: kind)?.historyTitle ?? "Reporte" }
+    var kindIcon: String { ReportKind(rawValue: kind)?.historyIcon ?? "flag" }
     var statusTitle: String {
         switch status {
         case "pending": "En revisión"
