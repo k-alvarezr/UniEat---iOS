@@ -77,7 +77,9 @@ final class LocalDatabase {
     /// lanza el error si la base no abre, inMemory y storeURL son para las pruebas
     init(inMemory: Bool = false, storeURL: URL? = nil) throws {
         // todos los modelos de la app van en esta lista: reportes, guardados y copias del feed
-        let schema = Schema([MenuSnapshot.self, PendingReport.self, SavedMenu.self, SavedDish.self, FeedCacheRecord.self])
+        // ReportedRestaurantRecord y UserReportRecord son la copia de Mis reportes, agregarlos no toca las tablas que ya existen
+        let schema = Schema([MenuSnapshot.self, PendingReport.self, SavedMenu.self, SavedDish.self, FeedCacheRecord.self,
+                             ReportedRestaurantRecord.self, UserReportRecord.self])
         let config = storeURL.map { ModelConfiguration(schema: schema, url: $0) }
             ?? ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory)
         // si no abre no se borra el archivo, puede tener reportes del usuario

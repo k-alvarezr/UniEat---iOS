@@ -50,6 +50,10 @@ targets:
   UniEatTests:
     type: bundle.unit-test
     platform: iOS
+    # mismo equipo de firma que la app, para poder correr las pruebas en un iPhone real
+    configFiles:
+      Debug: Config/Signing.xcconfig
+      Release: Config/Signing.xcconfig
     sources:
       - path: UniEatAppTests
     settings:

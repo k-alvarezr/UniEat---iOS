@@ -3,46 +3,46 @@ import UniEatCore
 
 /// un restaurante donde el usuario reporto, con cuantos reportes tiene en cada estado
 /// es lo que manda GET /me/reports/places, todo Sendable para poder pasarlo entre hilos
-struct ReportHistoryPlace: Codable, Identifiable, Hashable, Sendable {
+struct ReportedRestaurant: Codable, Identifiable, Hashable, Sendable {
     let establishmentId: UUID
     let name: String
     let area: String
-    let photoUrl: String?
     let total: Int
     let pending: Int        // discrepancias que siguen en revision
     let confirmed: Int
     let dismissed: Int
-    let observations: Int   // fila, llegada o "todo bien", nunca quedan pendientes
     let lastReportAt: Date
     var id: UUID { establishmentId }
     var resolved: Int { confirmed + dismissed }
 }
 
 /// un reporte del usuario en un restaurante, sale de GET /me/reports/places/:id
-struct ReportHistoryEntry: Codable, Identifiable, Hashable, Sendable {
+struct UserReport: Codable, Identifiable, Hashable, Sendable {
     let id: UUID
     let kind: String
-    let publicationId: UUID
     let version: Int
     let menuTitle: String
     let note: String
     let observedWaitMinutes: Int?
     let status: String              // pending | confirmed | dismissed | observation
     let resolutionSource: String?   // community | admin, nil si no se ha resuelto
-    let createdAt: Date
     let observedAt: Date
     let resolvedAt: Date?
 }
 
-struct ReportHistoryPlacesResponse: Decodable, Sendable {
+/// respuesta de GET /me/reports/places, el server la llama places
+struct ReportedRestaurantsResponse: Decodable, Sendable {
     let serverNow: Date
-    let places: [ReportHistoryPlace]
+    let restaurants: [ReportedRestaurant]
+    private enum CodingKeys: String, CodingKey { case serverNow, restaurants = "places" }
 }
 
-struct ReportHistoryPlaceResponse: Decodable, Sendable {
+/// respuesta de GET /me/reports/places/:id, el server llama place al restaurante
+struct ReportedRestaurantDetailResponse: Decodable, Sendable {
     let serverNow: Date
-    let place: ReportHistoryPlace
-    let reports: [ReportHistoryEntry]
+    let restaurant: ReportedRestaurant
+    let reports: [UserReport]
+    private enum CodingKeys: String, CodingKey { case serverNow, restaurant = "place", reports }
 }
 
 /// filtro de la lista de restaurantes, las observaciones no tienen estado que seguir y se ven en Todos
@@ -57,17 +57,17 @@ enum ReportHistoryFilter: String, CaseIterable, Identifiable, Sendable {
         }
     }
     /// un restaurante entra si tiene al menos un reporte de ese tipo
-    func includes(_ place: ReportHistoryPlace) -> Bool {
+    func matches(_ restaurant: ReportedRestaurant) -> Bool {
         switch self {
         case .all: true
-        case .inReview: place.pending > 0
-        case .resolved: place.resolved > 0
+        case .inReview: restaurant.pending > 0
+        case .resolved: restaurant.resolved > 0
         }
     }
 }
 
 /// textos y colores de cada reporte, para que la lista y el detalle digan lo mismo
-extension ReportHistoryEntry {
+extension UserReport {
     var kindTitle: String {
         switch ReportKind(rawValue: kind) {
         case .unavailable: "Plato agotado o no disponible"

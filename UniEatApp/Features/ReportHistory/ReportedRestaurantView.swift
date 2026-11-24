@@ -2,25 +2,25 @@ import SwiftUI
 import UniEatCore
 
 /// detalle de un restaurante: crea su viewmodel desde el contenedor, igual que MenuDetailView
-struct ReportHistoryPlaceView: View {
+struct ReportedRestaurantView: View {
     @EnvironmentObject private var app: AppContainer
-    let place: ReportHistoryPlace
-    var body: some View { ReportHistoryPlaceScreen(model: app.makeReportHistoryPlace(place)) }
+    let restaurant: ReportedRestaurant
+    var body: some View { ReportedRestaurantScreen(model: app.makeReportedRestaurantViewModel(restaurant)) }
 }
 
-private struct ReportHistoryPlaceScreen: View {
+private struct ReportedRestaurantScreen: View {
     // StateObject guarda el primero y no vuelve a crear el viewmodel en cada redibujado
-    @StateObject private var store: ReportHistoryPlaceViewModel
-    init(model: @autoclosure @escaping () -> ReportHistoryPlaceViewModel) { _store = StateObject(wrappedValue: model()) }
+    @StateObject private var store: ReportedRestaurantViewModel
+    init(model: @autoclosure @escaping () -> ReportedRestaurantViewModel) { _store = StateObject(wrappedValue: model()) }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                BrandHeader(title: store.place.name, subtitle: store.place.area)
-                Text("\(store.place.total) reportes · \(store.place.confirmed) confirmados · \(store.place.pending) en revisión")
+                BrandHeader(title: store.restaurant.name, subtitle: store.restaurant.area)
+                Text("\(store.restaurant.total) reportes · \(store.restaurant.confirmed) confirmados · \(store.restaurant.pending) en revisión")
                     .font(.subheadline)
-                if let fetchedAt = store.fetchedAt {
-                    Text("Actualizado: \(SpanishPresentation.dateAndTime(fetchedAt))")
+                if let lastSyncDate = store.lastSyncDate {
+                    Text("Actualizado: \(SpanishPresentation.dateAndTime(lastSyncDate))")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if let error = store.errorMessage { Text(error).font(.footnote).foregroundStyle(Palette.coral) }
@@ -31,13 +31,13 @@ private struct ReportHistoryPlaceScreen: View {
         }
         .background(Palette.cream)
         .connectionStatus(.reportHistory)
-        .navigationTitle(store.place.name)
+        .navigationTitle(store.restaurant.name)
         .navigationBarTitleDisplayMode(.inline)
-        .task { await store.load() }
-        .refreshable { await store.load() }
+        .task { await store.loadReports() }
+        .refreshable { await store.loadReports() }
     }
 
-    private func reportCard(_ report: ReportHistoryEntry) -> some View {
+    private func reportCard(_ report: UserReport) -> some View {
         SurfaceCard {
             VStack(alignment: .leading, spacing: 6) {
                 Label(report.kindTitle, systemImage: report.kindIcon).font(.headline)

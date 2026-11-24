@@ -11,7 +11,7 @@ struct ReportHistoryView: View {
                 BrandHeader(title: "Mis reportes")
                 Text("Tus reportes agrupados por restaurante y en qué quedó cada uno.")
                     .font(.subheadline).foregroundStyle(.secondary)
-                if !store.places.isEmpty { summary }
+                if !store.restaurants.isEmpty { summary }
                 // chips con scroll de lado, el segmentado cortaba los textos en el iPhone
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
@@ -19,21 +19,21 @@ struct ReportHistoryView: View {
                     }
                     .padding(.vertical, 2)
                 }
-                if let fetchedAt = store.fetchedAt {
-                    Text("Actualizado: \(SpanishPresentation.dateAndTime(fetchedAt))")
+                if let lastSyncDate = store.lastSyncDate {
+                    Text("Actualizado: \(SpanishPresentation.dateAndTime(lastSyncDate))")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if let error = store.errorMessage { Text(error).font(.footnote).foregroundStyle(Palette.coral) }
-                if store.isLoading && store.places.isEmpty { ProgressView("Cargando tus reportes…") }
-                if store.visiblePlaces.isEmpty && !store.isLoading {
-                    ContentUnavailableView(store.places.isEmpty ? "Aún no tienes reportes" : "Nada con este filtro",
+                if store.isLoading && store.restaurants.isEmpty { ProgressView("Cargando tus reportes…") }
+                if store.filteredRestaurants.isEmpty && !store.isLoading {
+                    ContentUnavailableView(store.restaurants.isEmpty ? "Aún no tienes reportes" : "Nada con este filtro",
                                            systemImage: "flag",
-                                           description: Text(store.places.isEmpty
+                                           description: Text(store.restaurants.isEmpty
                                                ? "Abre un menú y toca Reportar para avisar de un cambio."
                                                : "Prueba con otro filtro."))
                 } else {
-                    ForEach(store.visiblePlaces) { place in
-                        NavigationLink(destination: ReportHistoryPlaceView(place: place)) { row(place) }
+                    ForEach(store.filteredRestaurants) { restaurant in
+                        NavigationLink(destination: ReportedRestaurantView(restaurant: restaurant)) { row(restaurant) }
                             .buttonStyle(.plain)
                     }
                 }
@@ -43,8 +43,8 @@ struct ReportHistoryView: View {
         .background(Palette.cream)
         .connectionStatus(.reportHistory)
         .navigationTitle("Mis reportes")
-        .task { await store.load() }
-        .refreshable { await store.load() }
+        .task { await store.loadRestaurants() }
+        .refreshable { await store.loadRestaurants() }
     }
 
     private var summary: some View {
@@ -58,21 +58,21 @@ struct ReportHistoryView: View {
         }
     }
 
-    private func row(_ place: ReportHistoryPlace) -> some View {
+    private func row(_ restaurant: ReportedRestaurant) -> some View {
         SurfaceCard {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text(place.name).font(.headline)
+                    Text(restaurant.name).font(.headline)
                     Spacer()
                     Image(systemName: "chevron.right").foregroundStyle(.secondary)
                 }
-                Text("\(place.area) · último reporte \(SpanishPresentation.dayAndMonth(place.lastReportAt))")
+                Text("\(restaurant.area) · último reporte \(SpanishPresentation.dayAndMonth(restaurant.lastReportAt))")
                     .font(.caption).foregroundStyle(.secondary)
                 HStack(spacing: 6) {
-                    chip("\(place.total) en total", color: Palette.paper)
-                    if place.pending > 0 { chip("\(place.pending) en revisión", color: Palette.yellow) }
-                    if place.confirmed > 0 { chip("\(place.confirmed) confirmados", color: Palette.green) }
-                    if place.dismissed > 0 { chip("\(place.dismissed) descartados", color: Palette.coral) }
+                    chip("\(restaurant.total) en total", color: Palette.paper)
+                    if restaurant.pending > 0 { chip("\(restaurant.pending) en revisión", color: Palette.yellow) }
+                    if restaurant.confirmed > 0 { chip("\(restaurant.confirmed) confirmados", color: Palette.green) }
+                    if restaurant.dismissed > 0 { chip("\(restaurant.dismissed) descartados", color: Palette.coral) }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -83,7 +83,7 @@ struct ReportHistoryView: View {
     private func filterChip(_ option: ReportHistoryFilter) -> some View {
         let selected = store.filter == option
         return Button { store.filter = option } label: {
-            Text("\(option.title) (\(store.count(for: option)))")
+            Text("\(option.title) (\(store.restaurantCount(matching: option)))")
                 .font(.subheadline.weight(selected ? .bold : .regular))
                 .foregroundStyle(Palette.ink)
                 .padding(.horizontal, 12).padding(.vertical, 7)
