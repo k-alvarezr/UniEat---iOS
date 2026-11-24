@@ -3,7 +3,7 @@ import UniEatCore
 
 /// un restaurante donde el usuario reporto, con cuantos reportes tiene en cada estado
 /// es lo que manda GET /me/reports/places, todo Sendable para poder pasarlo entre hilos
-struct ReportedRestaurant: Codable, Identifiable, Hashable, Sendable {
+struct ReportedRestaurant: Decodable, Identifiable, Sendable {
     let establishmentId: UUID
     let name: String
     let area: String
@@ -17,7 +17,7 @@ struct ReportedRestaurant: Codable, Identifiable, Hashable, Sendable {
 }
 
 /// un reporte del usuario en un restaurante, sale de GET /me/reports/places/:id
-struct UserReport: Codable, Identifiable, Hashable, Sendable {
+struct UserReport: Decodable, Identifiable, Sendable {
     let id: UUID
     let kind: String
     let version: Int
