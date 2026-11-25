@@ -33,7 +33,7 @@ final class ProfileViewModel: FeatureViewModel {
     var isAccountVerified: Bool { session.isAccountVerified }
     var cachedAccountDate: Date? { session.cachedAccountDate }
     /// reportes que se borrarian al cerrar sesion, perfil avisa antes
-    var unsentReports: Int { reports.pendingReportCount + reports.needsReviewCount }
+    var unsentReports: Int { reports.pendingReportCount }
     /// cierra sesion a mano: primero intenta mandar los reportes pendientes (si no hay red no hace nada)
     /// y despues borra del celular todo lo de la cuenta
     func signOut() async {
@@ -46,8 +46,6 @@ final class ProfileViewModel: FeatureViewModel {
         await session.signOutAndForget()
     }
     func refreshAccount() async { try? await session.refreshAccount() }
-    /// reintenta tambien los reportes que el server rechazo
-    func retryReports() async { await reports.sendPendingReports(retryRejected: true) }
     var canJoinPilot: Bool { pilot?.isStudent == true }
     var pilotEnabled: Bool { pilot?.isEnabled == true }
     var pilotMessage: String? { pilot?.message }

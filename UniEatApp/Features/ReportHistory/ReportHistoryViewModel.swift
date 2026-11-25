@@ -1,6 +1,5 @@
 import Combine
 import Foundation
-import UniEatCore
 
 /// lista de Mis reportes: los restaurantes donde el usuario reporto, con el conteo por estado
 /// primero pinta la copia de swiftdata y despues la cambia por la del server, que tambien se guarda
@@ -11,7 +10,7 @@ final class ReportHistoryViewModel: FeatureViewModel {
     @Published private(set) var lastSyncDate: Date?          // hora del server de la ultima lista que se tiene
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
-    @Published private(set) var storageWarning: String?   // si falla leer o guardar la copia, la pantalla sigue
+    @Published private(set) var unsentReports: [PendingReport] = []   // hechos sin red, siguen en la cola esperando mandarse
     /// al cambiarlo se guarda para esa cuenta, salvo cuando se esta restaurando al entrar
     @Published var filter: ReportHistoryFilter = .all {
         didSet {
@@ -21,22 +20,26 @@ final class ReportHistoryViewModel: FeatureViewModel {
     }
     private let api: APIRequesting
     private let session: SessionStore
+    private let reportQueue: ReportFacade   // la cola de reportes del Sprint 3, avisa cuando se manda
     private let connectivity: ConnectivityService
     private let database: LocalDatabase?   // nil si la base no abrio, entonces solo red
     private let preferences: ReportHistoryPreferences
     private var requestID = UUID()   // una respuesta vieja no pisa una nueva
+    private var prefetchTask: Task<Void, Never>?   // precarga de los reportes de cada restaurante, una a la vez
     private var restoringFilter = false
-    init(api: APIRequesting, session: SessionStore, connectivity: ConnectivityService,
+    init(api: APIRequesting, session: SessionStore, connectivity: ConnectivityService, reportQueue: ReportFacade,
          database: LocalDatabase?, preferences: ReportHistoryPreferences = ReportHistoryPreferences()) {
         self.api = api
         self.session = session
+        self.reportQueue = reportQueue
         self.connectivity = connectivity
         self.database = database
         self.preferences = preferences
         super.init()
-        observe(connectivity)
+        observe(reportQueue)
     }
-    var isOffline: Bool { connectivity.isOffline }
+    /// cuantos reportes esperan en la cola, cambia cuando se agrega uno o cuando se mandan
+    var unsentCount: Int { reportQueue.pendingReportCount }
     /// restaurantes que pasan el filtro elegido
     var filteredRestaurants: [ReportedRestaurant] { restaurants.filter(filter.matches) }
     /// cuantos restaurantes entran en cada opcion, para mostrarlo en el chip
@@ -48,11 +51,13 @@ final class ReportHistoryViewModel: FeatureViewModel {
     /// al cambiar de cuenta se bota todo y se recupera el filtro que habia dejado la cuenta nueva
     func reset() {
         requestID = UUID()
+        prefetchTask?.cancel()   // una precarga de la cuenta anterior no sigue guardando
+        prefetchTask = nil
         restaurants = []
         lastSyncDate = nil
         isLoading = false
         errorMessage = nil
-        storageWarning = nil
+        unsentReports = []
         restoringFilter = true
         filter = session.profile.map { preferences.savedFilter(userID: $0.id) } ?? .all
         restoringFilter = false
@@ -67,21 +72,18 @@ final class ReportHistoryViewModel: FeatureViewModel {
         errorMessage = nil
         defer { if requestID == id { isLoading = false } }
 
+        // 0. los reportes hechos sin red que siguen en la cola, se leen siempre porque son locales
+        loadUnsentReports()
+
         // 1. lo guardado, solo la primera vez, si ya hay lista en pantalla no se vuelve a leer el disco
-        if restaurants.isEmpty, let database {
-            do {
-                restaurants = try database.loadReportedRestaurants(userId: userID)
-                lastSyncDate = preferences.lastSyncDate(userID: userID)
-            } catch {
-                storageWarning = "No se pudo leer la copia guardada de tus reportes."
-            }
+        //    si la base falla se sigue con el server
+        if restaurants.isEmpty, let database, let saved = try? database.loadReportedRestaurants(userId: userID) {
+            restaurants = saved
+            lastSyncDate = preferences.lastSyncDate(userID: userID)
         }
 
-        // 2. el server, sin red se queda lo guardado
-        guard connectivity.isConnected else {
-            if restaurants.isEmpty { errorMessage = APIFailure.offline.message }
-            return
-        }
+        // 2. el server, sin red se queda lo guardado (el aviso de conexion de la vista ya lo explica)
+        guard connectivity.isConnected else { return }
         do {
             let response: ReportedRestaurantsResponse = try await api.get("me/reports/places", query: [])
             guard session.matches(userID, generation: generation), requestID == id, !Task.isCancelled else { return }
@@ -89,15 +91,50 @@ final class ReportHistoryViewModel: FeatureViewModel {
             lastSyncDate = response.serverNow
             // se muestra antes de guardar, si falla el guardado igual se ve
             preferences.saveLastSyncDate(response.serverNow, userID: userID)
-            do {
-                try database?.replaceReportedRestaurants(response.restaurants, userId: userID)
-            } catch {
-                storageWarning = "Tus reportes se cargaron, pero no se pudo guardar la copia para verlos sin conexión."
-            }
+            try? database?.replaceReportedRestaurants(response.restaurants, userId: userID)
+            // 3. en segundo plano se bajan los reportes de cada restaurante, asi sin red se abre cualquiera
+            prefetchReportsOfEachRestaurant(response.restaurants, userID: userID, generation: generation)
         } catch is CancellationError {
         } catch {
             guard session.matches(userID, generation: generation), requestID == id else { return }
             errorMessage = error.localizedDescription
+        }
+    }
+
+    /// reportes que siguen en la cola sin mandarse (Sprint 3), sin red es justo donde quedan
+    /// se mandan solos al volver la red; si el server los rechaza salen de la cola
+    func loadUnsentReports() {
+        guard let userID = session.profile?.id else { unsentReports = []; return }
+        unsentReports = (try? database?.pendingReports(userId: userID)) ?? []
+    }
+
+    /// precarga: baja los reportes de cada restaurante de la lista, maximo 3 a la vez, y los guarda para verlos sin red
+    private func prefetchReportsOfEachRestaurant(_ restaurants: [ReportedRestaurant], userID: UUID, generation: UUID) {
+        prefetchTask?.cancel()
+        guard let database else { return }
+        let api = self.api
+        var waiting = restaurants.map(\.establishmentId)   // restaurantes que faltan por bajar
+
+        prefetchTask = Task {   // tarea padre, en el hilo principal
+            await withTaskGroup(of: ReportedRestaurantDetailResponse?.self) { group in
+                // 1. arrancan las 3 primeras descargas, cada una es una tarea hija en un hilo de fondo
+                for _ in 0..<min(3, waiting.count) {
+                    let id = waiting.removeFirst()
+                    group.addTask { try? await api.get("me/reports/places/\(id.uuidString)", query: []) }
+                }
+                // 2. cada vez que una termina, vuelve aca (hilo principal)
+                for await response in group {
+                    if Task.isCancelled { break }   // si cancelaron la precarga no se arranca nada mas
+                    // entra la siguiente que esperaba, asi siempre hay maximo 3
+                    if !waiting.isEmpty {
+                        let id = waiting.removeFirst()
+                        group.addTask { try? await api.get("me/reports/places/\(id.uuidString)", query: []) }
+                    }
+                    // se guarda lo que llego, si fallo (nil) o cambio la cuenta se salta
+                    guard let response, session.matches(userID, generation: generation) else { continue }
+                    try? database.replaceUserReports(response.reports, restaurant: response.restaurant, userId: userID)
+                }
+            }
         }
     }
 }

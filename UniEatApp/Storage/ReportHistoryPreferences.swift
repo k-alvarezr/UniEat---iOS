@@ -5,11 +5,11 @@ import Foundation
 /// - la hora del server de la ultima sincronizacion, para decir que tan vieja es la copia sin red
 /// no van en swiftdata porque son un valor suelto por cuenta, no datos con relaciones
 struct ReportHistoryPreferences {
-    let defaults: UserDefaults
+    private let defaults: UserDefaults
     init(defaults: UserDefaults = .standard) { self.defaults = defaults }
 
-    static func filterKey(_ userID: UUID) -> String { "unieat.report-history.filter.\(userID.uuidString)" }
-    static func lastSyncDateKey(_ userID: UUID) -> String { "unieat.report-history.synced-at.\(userID.uuidString)" }
+    private static func filterKey(_ userID: UUID) -> String { "unieat.report-history.filter.\(userID.uuidString)" }
+    private static func lastSyncDateKey(_ userID: UUID) -> String { "unieat.report-history.synced-at.\(userID.uuidString)" }
 
     /// filtro guardado, .all si nunca se eligio o si la opcion ya no existe
     func savedFilter(userID: UUID) -> ReportHistoryFilter {

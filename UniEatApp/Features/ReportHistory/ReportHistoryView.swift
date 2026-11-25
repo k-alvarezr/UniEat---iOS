@@ -4,6 +4,7 @@ import UniEatCore
 /// Mis reportes: un restaurante por fila con cuantos reportes hay y cuantos se confirmaron
 struct ReportHistoryView: View {
     @EnvironmentObject private var store: ReportHistoryViewModel
+    @EnvironmentObject private var connectivity: ConnectivityService   // el mismo que usa el aviso de conexion
 
     var body: some View {
         ScrollView {
@@ -11,6 +12,7 @@ struct ReportHistoryView: View {
                 BrandHeader(title: "Mis reportes")
                 Text("Tus reportes agrupados por restaurante y en qué quedó cada uno.")
                     .font(.subheadline).foregroundStyle(.secondary)
+                if !store.unsentReports.isEmpty { unsentSection }
                 if !store.restaurants.isEmpty { summary }
                 // chips con scroll de lado, el segmentado cortaba los textos en el iPhone
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -25,12 +27,16 @@ struct ReportHistoryView: View {
                 }
                 if let error = store.errorMessage { Text(error).font(.footnote).foregroundStyle(Palette.coral) }
                 if store.isLoading && store.restaurants.isEmpty { ProgressView("Cargando tus reportes…") }
-                if store.filteredRestaurants.isEmpty && !store.isLoading {
-                    ContentUnavailableView(store.restaurants.isEmpty ? "Aún no tienes reportes" : "Nada con este filtro",
-                                           systemImage: "flag",
-                                           description: Text(store.restaurants.isEmpty
-                                               ? "Abre un menú y toca Reportar para avisar de un cambio."
-                                               : "Prueba con otro filtro."))
+                if store.restaurants.isEmpty {
+                    // solo si de verdad no hay nada: con red, sin reportes por enviar y sin un error que impidio cargar
+                    // sin red el aviso de conexion ya explica por que no hay lista
+                    if !store.isLoading && connectivity.isConnected && store.unsentReports.isEmpty && store.errorMessage == nil {
+                        ContentUnavailableView("Aún no tienes reportes", systemImage: "flag",
+                                               description: Text("Abre un menú y toca Reportar un cambio para avisar de algo."))
+                    }
+                } else if store.filteredRestaurants.isEmpty {
+                    ContentUnavailableView("Nada con este filtro", systemImage: "flag",
+                                           description: Text("Prueba con otro filtro."))
                 } else {
                     ForEach(store.filteredRestaurants) { restaurant in
                         NavigationLink(destination: ReportedRestaurantView(restaurant: restaurant)) { row(restaurant) }
@@ -45,6 +51,38 @@ struct ReportHistoryView: View {
         .navigationTitle("Mis reportes")
         .task { await store.loadRestaurants() }
         .refreshable { await store.loadRestaurants() }
+        // al volver la red se actualiza sola, igual que el detalle del menu
+        .onChange(of: connectivity.isConnected) { _, connected in
+            if connected { Task { await store.loadRestaurants() } }
+        }
+        // cuando la cola se manda (o entra un reporte nuevo) se relee la seccion Por enviar
+        .onChange(of: store.unsentCount) { _, _ in store.loadUnsentReports() }
+    }
+
+    /// reportes hechos sin red: estan en el celular y se mandan solos al volver la conexion
+    private var unsentSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Por enviar (\(store.unsentReports.count))").font(.headline)
+            ForEach(store.unsentReports, id: \.id) { report in
+                SurfaceCard {
+                    VStack(alignment: .leading, spacing: 5) {
+                        let kind = ReportKind(rawValue: report.kind)
+                        Label(kind?.historyTitle ?? "Reporte", systemImage: kind?.historyIcon ?? "flag").font(.headline)
+                        Text("\(report.snapshot?.title ?? "Menú") · \(report.snapshot?.establishmentName ?? "Restaurante")")
+                            .font(.subheadline)
+                        if !report.note.isEmpty { Text("“\(report.note)”").font(.caption).italic() }
+                        HStack {
+                            Sticker(text: "Pendiente de enviar", color: Palette.yellow)
+                            Spacer()
+                            Text(SpanishPresentation.dateAndTime(report.createdAt))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            Text("Se envían solos cuando vuelva la conexión.").font(.caption).foregroundStyle(.secondary)
+        }
     }
 
     private var summary: some View {
@@ -68,11 +106,12 @@ struct ReportHistoryView: View {
                 }
                 Text("\(restaurant.area) · último reporte \(SpanishPresentation.dayAndMonth(restaurant.lastReportAt))")
                     .font(.caption).foregroundStyle(.secondary)
+                // las mismas etiquetas (Sticker) que usa el resto de la app
                 HStack(spacing: 6) {
-                    chip("\(restaurant.total) en total", color: Palette.paper)
-                    if restaurant.pending > 0 { chip("\(restaurant.pending) en revisión", color: Palette.yellow) }
-                    if restaurant.confirmed > 0 { chip("\(restaurant.confirmed) confirmados", color: Palette.green) }
-                    if restaurant.dismissed > 0 { chip("\(restaurant.dismissed) descartados", color: Palette.coral) }
+                    Sticker(text: "\(restaurant.total) en total", color: Palette.paper)
+                    if restaurant.pending > 0 { Sticker(text: "\(restaurant.pending) en revisión", color: Palette.yellow) }
+                    if restaurant.confirmed > 0 { Sticker(text: "\(restaurant.confirmed) confirmados", color: Palette.green) }
+                    if restaurant.dismissed > 0 { Sticker(text: "\(restaurant.dismissed) descartados", color: Palette.coral) }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -92,13 +131,5 @@ struct ReportHistoryView: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
-    }
-
-    private func chip(_ text: String, color: Color) -> some View {
-        Text(text)
-            .font(.caption2.weight(.semibold))
-            .padding(.horizontal, 7).padding(.vertical, 3)
-            .background(color, in: Capsule())
-            .overlay(Capsule().stroke(Palette.ink, lineWidth: 1))
     }
 }
