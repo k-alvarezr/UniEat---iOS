@@ -4,7 +4,7 @@ import SwiftUI
 /// cada pantalla sigue con su navegacion, copias, formularios o cola de envios
 enum ConnectionContext {
     case authentication, today, filters, recommendation, saved, detail, reporting, waitTime
-    case publishing, profile, administration, performance, gallery, reportHistory
+    case publishing, profile, administration, performance, gallery, reportHistory, publicationTiming
 
     var guidance: String {
         switch self {
@@ -34,6 +34,8 @@ enum ConnectionContext {
             "Puedes navegar a las pantallas. Cada una indica qué información local y acciones están disponibles."
         case .reportHistory:
             "Puedes ver lo último que se cargó de tus reportes. Sus estados se actualizan al recuperar la conexión."
+        case .publicationTiming:
+            "Puedes cambiar de local y revisar las franjas de la última consulta guardada."
         }
     }
 }

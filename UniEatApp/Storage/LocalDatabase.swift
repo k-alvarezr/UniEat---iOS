@@ -79,7 +79,7 @@ final class LocalDatabase {
         // todos los modelos de la app van en esta lista: reportes, guardados y copias del feed
         // ReportedRestaurantRecord y UserReportRecord son la copia de Mis reportes, agregarlos no toca las tablas que ya existen
         let schema = Schema([MenuSnapshot.self, PendingReport.self, SavedMenu.self, SavedDish.self, FeedCacheRecord.self,
-                             ReportedRestaurantRecord.self, UserReportRecord.self])
+                             ReportedRestaurantRecord.self, UserReportRecord.self, PublicationTimingRecord.self])
         let config = storeURL.map { ModelConfiguration(schema: schema, url: $0) }
             ?? ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory)
         // si no abre no se borra el archivo, puede tener reportes del usuario

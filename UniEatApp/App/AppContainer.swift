@@ -31,6 +31,7 @@ final class AppContainer: ObservableObject {
     let pickForMe: PickForMeViewModel
     let publishMenu: PublishMenuViewModel
     let performance: PerformanceViewModel
+    let publicationTiming: PublicationTimingViewModel
     let profile: ProfileViewModel
     let establishments: EstablishmentRequestViewModel
     let approvals: AdminApprovalsViewModel
@@ -103,6 +104,7 @@ final class AppContainer: ObservableObject {
         publishMenu = PublishMenuViewModel(service: PublishService(api: api, session: session, files: files),
                                        feed: feed, session: session, connectivity: connectivity, clock: clock)
         performance = PerformanceViewModel(api: api, session: session, events: events, connectivity: connectivity)
+        publicationTiming = PublicationTimingViewModel(api: api, session: session, connectivity: connectivity, content: content)
         profile = ProfileViewModel(session: session, saved: saved, reports: reports, storageError: storageError, pilot: pilot)
         establishments = EstablishmentRequestViewModel(service: accounts, session: session)
         approvals = AdminApprovalsViewModel(service: accounts, session: session)
@@ -177,6 +179,7 @@ final class AppContainer: ObservableObject {
         reports.accountChanged()
         publishMenu.reset()
         performance.reset()
+        publicationTiming.reset()
         pickForMe.reset()
         login.reset()
         roles.reset()
