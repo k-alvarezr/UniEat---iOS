@@ -84,6 +84,20 @@ final class FeedCacheRecord {
     }
 }
 
+/// La consulta completa incluye los locales aprobados y se reemplaza junta.
+@Model
+final class PublicationTimingRecord {
+    @Attribute(.unique) var userID: UUID
+    var asOf: Date
+    var payload: Data
+
+    init(userID: UUID, asOf: Date, payload: Data) {
+        self.userID = userID
+        self.asOf = asOf
+        self.payload = payload
+    }
+}
+
 /// llave de una copia: el usuario mas los filtros en json ordenado
 /// ordenado para que los mismos filtros siempre den la misma llave
 enum FeedCacheKey {

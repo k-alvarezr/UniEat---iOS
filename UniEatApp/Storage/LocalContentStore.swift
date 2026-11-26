@@ -102,6 +102,7 @@ actor LocalContentStore {
             let feeds = try modelContext.fetch(FetchDescriptor<FeedCacheRecord>(predicate: #Predicate { $0.userID == userID }))
             for row in reports { modelContext.delete(row) }
             for row in feeds { modelContext.delete(row) }
+            if let timing = try timingRecord(userID: userID) { modelContext.delete(timing) }
             try modelContext.save()
         } catch {
             modelContext.rollback()
@@ -114,5 +115,44 @@ actor LocalContentStore {
         let key = catalog ? "\(userID):catalog" : FeedCacheKey.make(userID: userID, filters: filters)
         guard let row = try modelContext.fetch(FetchDescriptor<FeedCacheRecord>(predicate: #Predicate { $0.key == key })).first else { return nil }
         return try UniEatDates.decoder().decode(CachedFeedSnapshot.self, from: row.payload)
+    }
+
+    func publicationTiming(userID: UUID) throws -> PublicationTimingSnapshot? {
+        guard let record = try timingRecord(userID: userID) else { return nil }
+        return try UniEatDates.decoder().decode(PublicationTimingSnapshot.self, from: record.payload)
+    }
+
+    func savePublicationTiming(_ snapshot: PublicationTimingSnapshot, userID: UUID, permit: WritePermit) throws {
+        let data = try UniEatDates.encoder().encode(snapshot)
+        try permit.check()
+        do {
+            if let record = try timingRecord(userID: userID) {
+                guard record.asOf <= snapshot.asOf else { return }
+                record.asOf = snapshot.asOf
+                record.payload = data
+            } else {
+                modelContext.insert(PublicationTimingRecord(userID: userID, asOf: snapshot.asOf, payload: data))
+            }
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            throw error
+        }
+    }
+
+    func clearPublicationTiming(userID: UUID, permit: WritePermit) throws {
+        try permit.check()
+        guard let record = try timingRecord(userID: userID) else { return }
+        do {
+            modelContext.delete(record)
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            throw error
+        }
+    }
+
+    private func timingRecord(userID: UUID) throws -> PublicationTimingRecord? {
+        try modelContext.fetch(FetchDescriptor<PublicationTimingRecord>(predicate: #Predicate { $0.userID == userID })).first
     }
 }

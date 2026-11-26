@@ -43,4 +43,18 @@ struct LocalContentService: Sendable {
     func feed(userID: UUID, filters: FeedFilters, catalog: Bool = false) async throws -> CachedFeedSnapshot? {
         try await worker.value.feed(userID: userID, filters: filters, catalog: catalog)
     }
+
+    func publicationTiming(userID: UUID) async throws -> PublicationTimingSnapshot? {
+        try await worker.value.publicationTiming(userID: userID)
+    }
+
+    func savePublicationTiming(_ snapshot: PublicationTimingSnapshot, userID: UUID, generation: UUID) async throws {
+        let permit = sessions.permit(userID: userID, generation: generation)
+        try await worker.value.savePublicationTiming(snapshot, userID: userID, permit: permit)
+    }
+
+    func clearPublicationTiming(userID: UUID, generation: UUID) async throws {
+        let permit = sessions.permit(userID: userID, generation: generation)
+        try await worker.value.clearPublicationTiming(userID: userID, permit: permit)
+    }
 }
