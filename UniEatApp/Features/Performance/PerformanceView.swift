@@ -59,6 +59,10 @@ struct RestaurantPerformanceView: View {
                         BrandHeader(title: "Actividad de mis menús", showsProfileButton: true)
                         Text("Solo publicaciones de tus establecimientos aprobados. Las cifras son actividad iOS, no ventas ni visitas verificadas.")
                             .font(.subheadline).foregroundStyle(.secondary)
+                        NavigationLink(destination: PublicationTimingView()) {
+                            Label("Cuándo publicar", systemImage: "chart.bar")
+                        }
+                        .buttonStyle(.bordered)
                         PeriodPicker(days: $store.days)
                         if let error = store.performanceError {
                             PerformanceErrorCard(message: error) { Task { await store.loadPerformance(days: store.days) } }

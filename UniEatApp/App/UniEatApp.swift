@@ -19,6 +19,7 @@ struct UniEatApp: App {
                 .environmentObject(container.pickForMe)
                 .environmentObject(container.publishMenu)
                 .environmentObject(container.performance)
+                .environmentObject(container.publicationTiming)
                 .environmentObject(container.profile)
                 .environmentObject(container.establishments)
                 .environmentObject(container.approvals)
