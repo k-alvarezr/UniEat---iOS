@@ -164,12 +164,19 @@ final class APIClient: APIRequesting {
             throw APIFailure.from(data)
         }
         do {
-            return try UniEatDates.decoder().decode(Response.self, from: data)
+            return try await Self.decode(Response.self, from: data)
         } catch {
             // el server respondio bien pero el json no calza con lo que espera la app,
             // pasa si el back cambio el contrato y la app no se actualizo
             throw APIFailure.invalidResponse
         }
+    }
+
+    // convierte el json fuera del hilo principal (@concurrent), asi la pantalla no se traba con respuestas grandes
+    // como la precarga de Mis reportes, donde llegan 3 detalles de hasta 100 reportes casi a la vez
+    @concurrent
+    private nonisolated static func decode<Response: Decodable>(_ type: Response.Type, from data: Data) async throws -> Response {
+        try UniEatDates.decoder().decode(type, from: data)
     }
 
     private func receive(_ request: URLRequest, identity: UUID) async throws -> (Data, HTTPURLResponse) {
