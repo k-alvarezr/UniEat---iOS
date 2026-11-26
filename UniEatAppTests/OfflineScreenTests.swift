@@ -130,6 +130,52 @@ final class OfflineScreenTests: XCTestCase {
         XCTAssertTrue(h.api.paths.isEmpty)
     }
 
+    func testPublicationTimingRecoversAndHidesAccessRevokedSinceItsLastLoad() async throws {
+        let h = try await roleHarness(role: "restaurant")
+        let first = UUID(), revoked = UUID()
+        h.api.ownedEstablishments = [first, revoked].map { approvedEstablishment($0) }
+        try await h.session.refreshAccount()
+        let database = try LocalDatabase(inMemory: true)
+        let content = LocalContentService(container: database.container)
+        let userID = h.api.userID, generation = h.session.generation
+        content.setSession(userID: userID, generation: generation)
+        let groups = [first, revoked].map { PublicationTimingGroup(id: $0, name: "Fixture", slots: []) }
+        let original = PublicationTimingSnapshot(periodDays: 28, asOf: Date(timeIntervalSince1970: 1_800_000_000),
+                                                  minimumSessions: 5, groups: groups)
+        let fresh = PublicationTimingSnapshot(periodDays: 28, asOf: original.asOf.addingTimeInterval(60),
+                                               minimumSessions: 5, groups: groups)
+        try await content.savePublicationTiming(original, userID: userID, generation: generation)
+        let model = PublicationTimingViewModel(api: h.api, session: h.session, connectivity: h.network, content: content)
+
+        h.api.paths = []
+        h.network.update(isConnected: false)
+        await model.load()
+        XCTAssertEqual(model.snapshot?.asOf, original.asOf)
+        XCTAssertTrue(model.isShowingCopy)
+        XCTAssertTrue(h.api.paths.isEmpty)
+
+        h.api.publicationTiming = { try UniEatDates.encoder().encode(fresh) }
+        h.network.update(isConnected: true)
+        await model.load()
+        XCTAssertEqual(model.snapshot?.asOf, fresh.asOf)
+        XCTAssertFalse(model.isShowingCopy)
+
+        h.api.ownedEstablishments = [approvedEstablishment(first)]
+        try await h.session.refreshAccount()
+        XCTAssertEqual(model.groups.map(\.id), [first])
+
+        h.api.publicationTiming = { throw APIFailure(code: "FORBIDDEN", message: "Fixture") }
+        await model.load()
+        XCTAssertNil(model.snapshot)
+        let stored = try await content.publicationTiming(userID: userID)
+        XCTAssertNil(stored)
+    }
+
+    private func approvedEstablishment(_ id: UUID) -> RemoteEstablishment {
+        RemoteEstablishment(id: id, name: "Fixture", area: "Centro", address: "Fixture",
+                            entranceDescription: "", paymentMethods: [], approved: true)
+    }
+
     func testOfflinePublicationsDoNotClaimThatAnUnloadedListIsEmpty() async throws {
         let h = try await roleHarness(role: "restaurant"), clock = ServerClock()
         let files = FileStore()
@@ -352,6 +398,8 @@ private final class ScreenAPI: APIRequesting {
     var paths: [String] = []
     var dashboard: (() async throws -> Data)?
     var users: (() async throws -> Data)?
+    var publicationTiming: (() async throws -> Data)?
+    var ownedEstablishments: [RemoteEstablishment] = []
     var role = "admin"
     var accountUnavailable = false
     func get<Response: Decodable>(_ path: String, query: [URLQueryItem]) async throws -> Response {
@@ -360,11 +408,14 @@ private final class ScreenAPI: APIRequesting {
         let data: Data
         switch path {
         case "me": data = Data("{\"id\":\"\(userID)\",\"displayName\":\"Fixture\",\"role\":\"\(role)\",\"establishments\":[]}".utf8)
-        case "establishments/mine": data = Data("{\"establishments\":[]}".utf8)
+        case "establishments/mine": data = try UniEatDates.encoder().encode(["establishments": ownedEstablishments])
         case "admin/dashboard": data = try await dashboard?() ?? dashboardData()
         case "admin/users": data = try await users?() ?? Data("{\"users\":[]}".utf8)
         case "admin/memberships": data = Data("{\"memberships\":[]}".utf8)
         case "menus/mine": data = Data("{\"menus\":[]}".utf8)
+        case "restaurant/publication-timing":
+            guard let publicationTiming else { throw APIFailure.unexpected }
+            data = try await publicationTiming()
         default: throw APIFailure.unexpected
         }
         return try UniEatDates.decoder().decode(Response.self, from: data)

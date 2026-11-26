@@ -29,7 +29,6 @@ final class PublicationTimingViewModel: FeatureViewModel {
     var isConnected: Bool { connectivity.isConnected }
     var groups: [PublicationTimingGroup] {
         guard let snapshot else { return [] }
-        if !isShowingCopy { return snapshot.groups }
         let approved = Set(session.approvedEstablishments.map(\.id))
         return snapshot.groups.filter { approved.contains($0.id) }
     }
