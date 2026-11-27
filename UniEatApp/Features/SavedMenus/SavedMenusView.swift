@@ -7,7 +7,7 @@ struct SavedMenusView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
+            LazyVStack(alignment: .leading, spacing: 14) {
                 BrandHeader(title: "Menús guardados")
                 Text("Se guardan en este dispositivo para tu cuenta. La vigencia y los reportes se actualizan al abrir el detalle con conexión.")
                     .font(.subheadline).foregroundStyle(.secondary)
