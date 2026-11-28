@@ -178,6 +178,7 @@ struct FoodArtwork: View {
     }
 
     var body: some View {
+        let photo = self.photo
         ZStack {
             LinearGradient(colors: [Palette.yellow, Palette.coral.opacity(0.8)],
                            startPoint: .topLeading, endPoint: .bottomTrailing)
